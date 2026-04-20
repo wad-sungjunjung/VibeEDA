@@ -1,0 +1,51 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: vibe-eda-backend
+  labels:
+    app: vibe-eda
+    component: backend
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "20"
+        # Cloud SQL 연결 (Unix socket)
+        run.googleapis.com/cloudsql-instances: PROJECT_ID:asia-northeast3:vibe-eda-db
+    spec:
+      serviceAccountName: vibe-eda-backend-sa@PROJECT_ID.iam.gserviceaccount.com
+      containerConcurrency: 80
+      timeoutSeconds: 300   # LLM 스트리밍 응답 여유
+      containers:
+        - image: asia-northeast3-docker.pkg.dev/PROJECT_ID/vibe-eda/vibe-eda-backend:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: GCS_BUCKET
+              value: vibe-eda-artifacts
+            - name: ALLOWED_DOMAINS
+              value: company.com
+            - name: CLOUD_SQL_INSTANCE
+              value: PROJECT_ID:asia-northeast3:vibe-eda-db
+          # Secrets via Secret Manager (운영)
+          envFrom:
+            - secretRef:
+                name: vibe-eda-backend-secrets
+          resources:
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          startupProbe:
+            httpGet:
+              path: /healthz
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /healthz
+            periodSeconds: 30
+  traffic:
+    - percent: 100
+      latestRevision: true

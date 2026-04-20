@@ -1,0 +1,41 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: vibe-eda-frontend
+  labels:
+    app: vibe-eda
+    component: frontend
+  annotations:
+    run.googleapis.com/launch-stage: GA
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+    spec:
+      containerConcurrency: 1000
+      containers:
+        - image: asia-northeast3-docker.pkg.dev/PROJECT_ID/vibe-eda/vibe-eda-frontend:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: BACKEND_URL
+              value: https://vibe-eda-backend-HASH-du.a.run.app   # 배포 후 업데이트
+          resources:
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          startupProbe:
+            httpGet:
+              path: /healthz
+            initialDelaySeconds: 0
+            periodSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+            periodSeconds: 30
+  traffic:
+    - percent: 100
+      latestRevision: true

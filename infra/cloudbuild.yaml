@@ -1,0 +1,84 @@
+steps:
+  # ── 1. 프론트엔드 이미지 빌드 ───────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: build-frontend
+    args:
+      - build
+      - -t
+      - $_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-frontend:$SHORT_SHA
+      - -t
+      - $_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-frontend:latest
+      - --cache-from
+      - $_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-frontend:latest
+      - .
+
+  # ── 2. 백엔드 이미지 빌드 ────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: build-backend
+    waitFor: ["-"]   # parallel with build-frontend
+    args:
+      - build
+      - -t
+      - $_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-backend:$SHORT_SHA
+      - -t
+      - $_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-backend:latest
+      - --cache-from
+      - $_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-backend:latest
+      - backend/
+
+  # ── 3. 이미지 푸시 ────────────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: push-frontend
+    waitFor: [build-frontend]
+    args: [push, --all-tags, $_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-frontend]
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-backend
+    waitFor: [build-backend]
+    args: [push, --all-tags, $_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-backend]
+
+  # ── 4. Cloud Run 배포 ─────────────────────────────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-frontend
+    waitFor: [push-frontend]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - vibe-eda-frontend
+      - --image=$_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-frontend:$SHORT_SHA
+      - --region=$_REGION
+      - --platform=managed
+      - --allow-unauthenticated
+      - --set-env-vars=BACKEND_URL=$_BACKEND_URL
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-backend
+    waitFor: [push-backend]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - vibe-eda-backend
+      - --image=$_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-backend:$SHORT_SHA
+      - --region=$_REGION
+      - --platform=managed
+      - --no-allow-unauthenticated
+      - --set-secrets=DATABASE_URL=DATABASE_URL:latest,REDIS_URL=REDIS_URL:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,JWT_SECRET=JWT_SECRET:latest
+      - --set-env-vars=GCS_BUCKET=$_GCS_BUCKET,ALLOWED_DOMAINS=$_ALLOWED_DOMAINS
+
+substitutions:
+  _AR_HOSTNAME: asia-northeast3-docker.pkg.dev
+  _AR_REPO: vibe-eda
+  _REGION: asia-northeast3
+  _BACKEND_URL: https://vibe-eda-backend-HASH-du.a.run.app   # 최초 배포 후 업데이트
+  _GCS_BUCKET: vibe-eda-artifacts
+  _ALLOWED_DOMAINS: company.com
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+images:
+  - $_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-frontend:$SHORT_SHA
+  - $_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/vibe-eda-backend:$SHORT_SHA
