@@ -70,13 +70,13 @@ export default function CodeEditor({ type, value, onChange, onRun, fixedHeight, 
 
   const style: React.CSSProperties = fixedHeight
     ? { height: fixedHeight, overflow: 'hidden', borderRadius: 6 }
-    : { minHeight: 360, borderRadius: 6 }
+    : { minHeight: 360, height: '100%', borderRadius: 6, display: 'flex', flexDirection: 'column' }
 
   return (
     <div style={style} onClick={(e) => e.stopPropagation()}>
       <CodeMirror
         value={value}
-        height={fixedHeight ? `${fixedHeight}px` : undefined}
+        height={fixedHeight ? `${fixedHeight}px` : '100%'}
         minHeight={fixedHeight ? undefined : '360px'}
         theme={type !== 'markdown' ? 'none' : 'light'}
         extensions={extensions}

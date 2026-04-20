@@ -178,7 +178,7 @@ export default function CellContainer({ cell }: Props) {
       const isMarkdown = cell.type === 'markdown'
       return (
         <div
-          className={cn('relative rounded-md overflow-hidden', stretch && 'h-full flex flex-col [&_.cm-editor]:!h-full [&>*]:flex-1 [&>*]:min-h-0')}
+          className={cn('relative rounded-md overflow-hidden', stretch && 'h-full flex flex-col [&_.cm-editor]:!h-full [&_.cm-theme]:!h-full [&_.cm-theme-light]:!h-full [&_.cm-theme-dark]:!h-full [&>*]:flex-1 [&>*]:min-h-0')}
           style={isMarkdown ? { backgroundColor: '#ffffff', border: '1px solid #ede9dd' } : undefined}
         >
           <CodeEditor
