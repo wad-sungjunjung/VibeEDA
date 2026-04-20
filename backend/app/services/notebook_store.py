@@ -186,6 +186,7 @@ def _fmt_cell(cell: dict, vibe: dict) -> dict:
         "output": _parse_output(cell.get("outputs", [])),
         "insight": m.get("vibe_insight"),
         "agent_generated": m.get("vibe_agent_generated", False),
+        "onboarding": m.get("vibe_onboarding", False),
         "chat_entries": _get_cell_chat_entries(vibe, cell.get("id", "")),
     }
 
@@ -319,6 +320,39 @@ _ONBOARDING_CELLS: list[dict] = [
     },
     {
         "type": "markdown",
+        "name": "setup_connection",
+        "code": (
+            "## 🔌 연결 설정 (최초 1회)\n"
+            "\n"
+            "실제 분석을 시작하기 전에 아래 두 가지를 설정하세요.\n"
+            "\n"
+            "### 1. 모델 / API 키\n"
+            "좌측 사이드바 하단 **설정 아이콘(⚙️)** → 모델 설정에서 API 키 입력:\n"
+            "- **Gemini API 키** — Vibe Chat(셀 단위 코드 생성) 기본 모델\n"
+            "- **Anthropic API 키** — Agent Mode(노트북 전체 자동 분석) 기본 모델\n"
+            "\n"
+            "키는 `localStorage`에 저장되며, 최소 하나만 있어도 작동합니다.\n"
+            "\n"
+            "### 2. Snowflake 연결\n"
+            "좌측 상단 **연결 관리** 버튼에서 계정·웨어하우스·데이터베이스 정보를 입력하고 **SSO 로그인(externalbrowser)** 으로 인증합니다.\n"
+            "연결 성공 후 SQL 셀 실행이 가능해집니다.\n"
+            "\n"
+            "#### 계정 식별자 / Role 찾는 법\n"
+            "Snowflake 웹 콘솔 좌측 하단 프로필 아이콘을 클릭 → 현재 계정 패널에서 **View account details** 를 열면 `Account identifier` 와 `Role` 을 확인할 수 있습니다.\n"
+            "\n"
+            "![Snowflake 계정 메뉴](/onboarding/snowflake-account-menu.png)\n"
+            "\n"
+            "![Account Details 모달](/onboarding/snowflake-account-details.png)\n"
+            "\n"
+            "- **Account identifier** (예: `BVJAEKO-LA86305`) → 연결 관리 모달의 `Account` 필드\n"
+            "- **Role** (예: `HOWSRIO147__U_ROLE`) → `Role` 필드\n"
+            "- **Login name** (이메일) → `User` 필드\n"
+            "\n"
+            "> 💡 연결 정보는 localStorage + 백엔드 세션에 저장되어 재기동 시에도 유지됩니다."
+        ),
+    },
+    {
+        "type": "markdown",
         "name": "quick_start",
         "code": (
             "## 1. 세 가지 셀 타입\n"
@@ -343,6 +377,50 @@ _ONBOARDING_CELLS: list[dict] = [
             "우측 하단 **FAB 버튼** 또는 `Cmd/Ctrl + G`로 토글. 노트북 전체 맥락을 보고 **여러 셀을 자동 생성·실행**합니다.\n"
             "\n"
             "> 예: *\"강남구 세부 분석해줘\"*, *\"전체 인사이트 요약\"*"
+        ),
+    },
+    {
+        "type": "markdown",
+        "name": "top_bar_guide",
+        "code": (
+            "## 🧭 상단 메타 헤더\n"
+            "\n"
+            "노트북 상단에는 분석 맥락과 전역 액션이 모여 있습니다. 화살표(∨)로 펼치면 상세 영역이 나타납니다.\n"
+            "\n"
+            "| 영역 | 설명 |\n"
+            "|---|---|\n"
+            "| **📝 분석 내용** | 이 분석의 목적·가설을 자연어로 기록. **상세할수록 AI 마트 추천 품질이 올라갑니다.** |\n"
+            "| **🗂 사용 마트** | 분석에 사용할 마트를 좌측 패널에서 골라 우측으로 추가. `fact / dim / rpt / obt / 선택됨 / 전체` 필터와 **✨ AI 마트 추천**. |\n"
+            "| **📊 마트 정보** | 선택한 마트의 컬럼/grain/설명. 좌측 목록에서 마트명을 클릭하면 여기에 표시됩니다. |\n"
+            "| **▶ 모두 실행** | 모든 셀을 순차 실행. 셀 간 변수 공유(SQL 결과 → Python 참조)를 살리려면 위에서부터 순서대로 실행되어야 합니다. |\n"
+            "| **📄 리포팅** | 노트북 전체를 Markdown 리포트로 변환. 제목/설명/각 셀의 코드·출력·메모·인사이트가 한 문서로 묶입니다. |\n"
+            "\n"
+            "> 💡 \"사용 마트\"를 먼저 설정하면 Vibe Chat / Agent가 해당 마트 스키마를 컨텍스트로 받아 **훨씬 정확한 SQL**을 생성합니다."
+        ),
+    },
+    {
+        "type": "markdown",
+        "name": "right_sidebar_guide",
+        "code": (
+            "## 🧩 우측 사이드바\n"
+            "\n"
+            "오른쪽 사이드바는 **현재 노트북의 맥락 탐색용** 패널입니다.\n"
+            "\n"
+            "### 📦 데이터\n"
+            "- 선택한 마트의 컬럼 목록과 SQL 셀 실행 결과의 **스키마·샘플**을 탐색.\n"
+            "- 검색창으로 컬럼명을 빠르게 필터링.\n"
+            "- 마트 미선택 + 셀 미실행 상태에서는 안내 메시지만 표시됩니다.\n"
+            "\n"
+            "### 🔖 셀 네비게이션\n"
+            "- 노트북 내 **모든 셀의 요약 목록**. 실행 여부가 배지로 표시됩니다.\n"
+            "- 항목 클릭 → 해당 셀로 **즉시 스크롤 이동**.\n"
+            "- 대규모 노트북에서 목차처럼 활용하세요.\n"
+            "\n"
+            "### 🤖 에이전트 이력\n"
+            "- Agent Mode 세션별 메시지 히스토리.\n"
+            "- 이전 세션을 클릭하면 해당 맥락을 이어서 대화할 수 있습니다.\n"
+            "\n"
+            "> 💡 세 영역 사이 구분선을 드래그해 높이 비율을 조절할 수 있습니다."
         ),
     },
     {
@@ -382,10 +460,11 @@ _ONBOARDING_CELLS: list[dict] = [
         "code": (
             "## 다음 단계\n"
             "\n"
-            "1. **모델 / API 키 설정** — 좌측 사이드바 하단 설정에서 Claude / Gemini API 키를 입력하세요.\n"
-            "2. **Snowflake 연결** — 좌측 상단 \"연결 관리\"에서 계정·웨어하우스 정보를 입력하고 SSO 로그인.\n"
-            "3. **실제 분석 시작** — 좌측 상단 `＋` 버튼으로 **새 분석**을 생성하세요.\n"
+            "1. **실제 분석 시작** — 좌측 상단 `＋` 버튼으로 **새 분석**을 생성하세요.\n"
+            "2. **마트 지정** — 상단 헤더의 *사용 마트*에서 분석 대상 마트를 추가합니다.\n"
+            "3. **Vibe Chat / Agent 활용** — 셀 하단 채팅으로 코드를 생성하거나, `Cmd/Ctrl+G`로 Agent Mode를 켜 전체 흐름을 자동화하세요.\n"
             "4. **Claude Code 연동 (선택)** — `python -m app.api.mcp_server`로 MCP 서버를 실행하면 Claude Code가 이 노트북에 직접 접근할 수 있습니다.\n"
+            "   - 💬 설정이 잘 안 되면 **Claude Code한테 직접 물어보세요** — MCP 등록 경로/명령어를 현재 환경에 맞게 알려줍니다.\n"
             "\n"
             "---\n"
             "\n"

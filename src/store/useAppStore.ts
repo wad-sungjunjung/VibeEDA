@@ -62,20 +62,31 @@ function debounced(key: string, fn: () => void, delay = 800) {
 
 // ─── DB row → Cell converter ─────────────────────────────────────────────────
 
+function defaultCellUi(type: CellType) {
+  if (type === 'markdown') return { splitMode: false, splitDir: 'h' as const, activeTab: 'output' as const, leftTab: 'input' as const, rightTab: 'output' as const }
+  if (type === 'python') return { splitMode: true, splitDir: 'v' as const, activeTab: 'input' as const, leftTab: 'input' as const, rightTab: 'memo' as const }
+  return { splitMode: true, splitDir: 'h' as const, activeTab: 'input' as const, leftTab: 'input' as const, rightTab: 'memo' as const }
+}
+
 function rowToCell(row: CellRow): Cell {
   const savedUi = loadCellUi(row.id)
+  const type = row.type as CellType
+  const defUi = defaultCellUi(type)
+  // 온보딩 SQL/Python 셀은 입력/출력 분할로 고정
+  const isOnboardingCode = row.onboarding && (type === 'sql' || type === 'python')
+  const rightTabDefault = isOnboardingCode ? 'output' : defUi.rightTab
   return {
     id: row.id,
     name: row.name,
-    type: row.type as CellType,
+    type,
     code: row.code,
     memo: row.memo ?? '',
     ordering: row.ordering,
-    splitMode: savedUi.splitMode ?? true,
-    splitDir: savedUi.splitDir ?? 'h',
-    activeTab: row.executed ? 'output' : 'input',
-    leftTab: 'input',
-    rightTab: row.executed ? 'output' : 'memo',
+    splitMode: isOnboardingCode ? true : (savedUi.splitMode ?? defUi.splitMode),
+    splitDir: isOnboardingCode ? (type === 'python' ? 'v' : 'h') : (savedUi.splitDir ?? defUi.splitDir),
+    activeTab: row.executed ? 'output' : defUi.activeTab,
+    leftTab: defUi.leftTab,
+    rightTab: row.executed ? 'output' : rightTabDefault,
     executed: row.executed,
     executedAt: null,
     output: (row.output as Cell['output']) ?? null,
@@ -472,6 +483,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const afterOrdering = cells[afterIndex + 1]?.ordering ?? null
     const ordering = midOrdering(beforeOrdering, afterOrdering)
 
+    const defUi = defaultCellUi(type)
     const newCell: Cell = {
       id: newId,
       name,
@@ -479,11 +491,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
       code: '',
       memo: '',
       ordering,
-      splitMode: true,
-      splitDir: 'h',
-      activeTab: 'input',
-      leftTab: 'input',
-      rightTab: 'memo',
+      splitMode: defUi.splitMode,
+      splitDir: defUi.splitDir,
+      activeTab: defUi.activeTab,
+      leftTab: defUi.leftTab,
+      rightTab: defUi.rightTab,
       executed: type === 'markdown',
       executedAt: null,
       output: null,
@@ -932,6 +944,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const afterOrdering = cells[afterIndex + 1]?.ordering ?? null
     const ordering = midOrdering(beforeOrdering, afterOrdering)
 
+    const defUi = defaultCellUi(type)
     const newCell: Cell = {
       id,
       name,
@@ -939,12 +952,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
       code,
       memo: '',
       ordering,
-      splitMode: true,
-      splitDir: 'h',
-      // 에이전트 셀 기본 레이아웃: 좌=출력, 우=메모. 실행 전엔 출력이 없으므로 input을 우선 표시
-      activeTab: 'input',
-      leftTab: 'input',
-      rightTab: 'memo',
+      splitMode: defUi.splitMode,
+      splitDir: defUi.splitDir,
+      activeTab: defUi.activeTab,
+      leftTab: defUi.leftTab,
+      rightTab: defUi.rightTab,
       executed: false,
       executedAt: null,
       output: null,

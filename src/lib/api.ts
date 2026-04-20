@@ -52,6 +52,7 @@ export interface CellRow {
   output: Record<string, unknown> | null
   insight: string | null
   agent_generated: boolean
+  onboarding?: boolean
   chat_entries: ChatEntryRow[]
 }
 
