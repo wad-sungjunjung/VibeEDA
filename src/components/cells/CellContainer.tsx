@@ -53,9 +53,12 @@ export default function CellContainer({ cell }: Props) {
   const leftColRef = useRef<HTMLDivElement>(null)
   const [splitRatio, setSplitRatio] = useState(() => loadCellUi(cell.id).splitRatio ?? 50)
   const [vSplitRatio, setVSplitRatio] = useState(() => loadCellUi(cell.id).vSplitRatio ?? 50)
+  // 사용자가 직접 드래그로 조정한 패널 높이. 기본값은 360px.
+  const [panelHeight, setPanelHeight] = useState(() => loadCellUi(cell.id).panelHeight ?? 360)
 
   useEffect(() => { saveCellUi(cell.id, { splitRatio }) }, [cell.id, splitRatio])
   useEffect(() => { saveCellUi(cell.id, { vSplitRatio }) }, [cell.id, vSplitRatio])
+  useEffect(() => { saveCellUi(cell.id, { panelHeight }) }, [cell.id, panelHeight])
   useEffect(() => { saveCellUi(cell.id, { splitMode: cell.splitMode, splitDir: cell.splitDir }) }, [cell.id, cell.splitMode, cell.splitDir])
   const [elapsedSecs, setElapsedSecs] = useState(0)
   const [vibeElapsed, setVibeElapsed] = useState(0) // 0.1s 단위
@@ -127,6 +130,28 @@ export default function CellContainer({ cell }: Props) {
     document.body.style.cursor = 'row-resize'
     document.body.style.userSelect = 'none'
   }, [])
+
+  // 셀 패널 세로 리사이즈 — 시작 높이에서 드래그 만큼 증감, [160, 1200] 범위로 클램프
+  const handlePanelResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startY = e.clientY
+    const startH = panelHeight
+    const onMouseMove = (ev: MouseEvent) => {
+      const next = startH + (ev.clientY - startY)
+      setPanelHeight(Math.min(Math.max(next, 160), 1200))
+    }
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    document.body.style.cursor = 'row-resize'
+    document.body.style.userSelect = 'none'
+  }, [panelHeight])
 
   useEffect(() => {
     const el = inputRef.current
@@ -393,54 +418,53 @@ export default function CellContainer({ cell }: Props) {
             )
           }
           if (cell.splitMode) {
-            // 열 높이는 입력/메모의 자연 크기에 맞추고, 출력은 그 높이에 맞춰 늘어나게 한다.
-            // 출력(특히 테이블)이 수백 px 밀어올리는 것을 막기 위해 출력 탭이 있는 열은 "grow 소스"에서 제외
             const leftIsOutput = cell.leftTab === 'output'
             const rightIsOutput = cell.rightTab === 'output'
-            const BASE_HEIGHT = 360
             return (
-              <div
-                ref={splitContainerRef}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: `${splitRatio}% 10px calc(${100 - splitRatio}% - 18px)`,
-                  columnGap: 4,
-                  maxHeight: V_TOTAL,
-                  minHeight: BASE_HEIGHT,
-                  alignItems: 'stretch',
-                }}
-              >
-                <div ref={leftColRef} className="min-w-0 flex flex-col" style={{ maxHeight: V_TOTAL, minHeight: BASE_HEIGHT, overflow: 'hidden' }}>
-                  {renderTabBar(cell.leftTab, (t) => setSplitTab(cell.id, 'left', t))}
-                  <div className={cn('flex-1 min-h-0', leftIsOutput ? 'overflow-hidden' : 'overflow-auto')}>
-                    {renderPanel(cell.leftTab, BASE_HEIGHT, true)}
-                  </div>
-                </div>
+              <>
                 <div
-                  className="flex items-center justify-center cursor-col-resize group/div"
-                  onMouseDown={handleDividerMouseDown}
-                  onClick={(e) => e.stopPropagation()}
+                  ref={splitContainerRef}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: `${splitRatio}% 10px calc(${100 - splitRatio}% - 18px)`,
+                    columnGap: 4,
+                    height: panelHeight,
+                    alignItems: 'stretch',
+                  }}
                 >
-                  <div className="w-px h-full rounded-full transition-colors group-hover/div:bg-primary" style={{ backgroundColor: '#ede9dd' }} />
-                </div>
-                <div className="min-w-0 flex flex-col" style={{ maxHeight: V_TOTAL, minHeight: BASE_HEIGHT, overflow: 'hidden' }}>
-                  {renderTabBar(cell.rightTab, (t) => setSplitTab(cell.id, 'right', t))}
-                  <div className={cn('flex-1 min-h-0', rightIsOutput ? 'overflow-hidden' : 'overflow-auto')}>
-                    {renderPanel(cell.rightTab, BASE_HEIGHT, true)}
+                  <div ref={leftColRef} className="min-w-0 flex flex-col" style={{ height: panelHeight, overflow: 'hidden' }}>
+                    {renderTabBar(cell.leftTab, (t) => setSplitTab(cell.id, 'left', t))}
+                    <div className={cn('flex-1 min-h-0', leftIsOutput ? 'overflow-hidden' : 'overflow-auto')}>
+                      {renderPanel(cell.leftTab, panelHeight, true)}
+                    </div>
+                  </div>
+                  <div
+                    className="flex items-center justify-center cursor-col-resize group/div"
+                    onMouseDown={handleDividerMouseDown}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="w-px h-full rounded-full transition-colors group-hover/div:bg-primary" style={{ backgroundColor: '#ede9dd' }} />
+                  </div>
+                  <div className="min-w-0 flex flex-col" style={{ height: panelHeight, overflow: 'hidden' }}>
+                    {renderTabBar(cell.rightTab, (t) => setSplitTab(cell.id, 'right', t))}
+                    <div className={cn('flex-1 min-h-0', rightIsOutput ? 'overflow-hidden' : 'overflow-auto')}>
+                      {renderPanel(cell.rightTab, panelHeight, true)}
+                    </div>
                   </div>
                 </div>
-              </div>
+                <PanelResizeHandle onMouseDown={handlePanelResizeMouseDown} />
+              </>
             )
           }
-          // 단일 패널 모드: 출력 탭은 기본 셀 크기(360px)로 고정 스크롤, 입력/메모는 내용 크기 허용.
-          const SINGLE_BASE = 360
+          // 단일 패널 모드: 출력 탭은 기본 셀 크기(panelHeight)로 고정 스크롤, 입력/메모는 내용 크기 허용.
           if (cell.activeTab === 'output') {
             return (
               <>
                 {renderTabBar(cell.activeTab, (t) => setCellTab(cell.id, t))}
-                <div style={{ height: SINGLE_BASE, overflow: 'hidden' }}>
-                  {renderPanel(cell.activeTab, SINGLE_BASE, true)}
+                <div style={{ height: panelHeight, overflow: 'hidden' }}>
+                  {renderPanel(cell.activeTab, panelHeight, true)}
                 </div>
+                <PanelResizeHandle onMouseDown={handlePanelResizeMouseDown} />
               </>
             )
           }
@@ -563,6 +587,23 @@ export default function CellContainer({ cell }: Props) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function PanelResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
+  return (
+    <div
+      className="group/resize flex items-center justify-center cursor-row-resize select-none"
+      style={{ height: 8 }}
+      onMouseDown={onMouseDown}
+      onClick={(e) => e.stopPropagation()}
+      title="드래그해 셀 높이 조절"
+    >
+      <div
+        className="rounded-full transition-colors group-hover/resize:bg-primary"
+        style={{ width: 40, height: 3, backgroundColor: '#ede9dd' }}
+      />
     </div>
   )
 }

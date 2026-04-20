@@ -14,6 +14,7 @@ async def get_llm_config(
     x_anthropic_key: Optional[str] = Header(None, alias="X-Anthropic-Key"),
     x_vibe_model: Optional[str] = Header(None, alias="X-Vibe-Model"),
     x_agent_model: Optional[str] = Header(None, alias="X-Agent-Model"),
+    x_report_model: Optional[str] = Header(None, alias="X-Report-Model"),
 ) -> LLMConfig:
     # TODO(auth): After Google OAuth, replace env fallback with user.api_keys from DB
     return LLMConfig(

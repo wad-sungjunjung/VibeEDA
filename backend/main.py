@@ -11,6 +11,7 @@ from app.api.folders import router as folders_router
 from app.api.marts import router as marts_router
 from app.api.execute import router as execute_router
 from app.api.recommend import router as recommend_router
+from app.api.report import router as report_router
 import app.services.notebook_store as notebook_store
 from app.services.notebook_store import _ensure_dir
 
@@ -71,3 +72,4 @@ app.include_router(folders_router, prefix="/v1")
 app.include_router(marts_router, prefix="/v1")
 app.include_router(execute_router, prefix="/v1")
 app.include_router(recommend_router, prefix="/v1")
+app.include_router(report_router, prefix="/v1")

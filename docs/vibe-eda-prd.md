@@ -4,7 +4,7 @@
 **작성일**: 2026-04-18 (최초) / **최신화**: 2026-04-20
 **작성자**: 하우
 **대상 릴리스**: 내부 파일럿 → 사내 분석가 전체 배포
-**현재 구현 상태**: M1~M4 완료 (UI, LLM 연동, 실행 엔진, Claude Code MCP). 로컬 전용 앱으로 구동.
+**현재 구현 상태**: M1~M4 + M6(리포팅) 완료. M5(에이전트 고도화) 진행 중. 로컬 전용 앱으로 구동.
 
 ---
 
@@ -169,17 +169,18 @@
   - **삭제** (빨간색, 파괴적 액션 강조)
 - F6.5 폴더 삭제 시 안의 히스토리는 **루트로 자동 이동** (유실 방지)
 
-#### F7. 리포팅
-- F7.1 상단 헤더 우측 **"리포팅"** 버튼
-- F7.2 모달에서 **포함할 셀 선택** (체크박스)
-- F7.3 Markdown 리포트 자동 생성:
-  - 제목 (분석 주제)
-  - 메타데이터 (날짜, 사용 마트, 셀 수)
-  - 분석 배경 (분석 내용)
-  - 각 셀의 코드 + 출력 (테이블은 샘플 3행)
-  - Markdown 셀은 본문 그대로 삽입
-- F7.4 복사 버튼 → 클립보드로 전체 내용
-- F7.5 실행되지 않은 셀은 선택 불가 (체크박스 disabled)
+#### F7. 리포팅 (LLM 기반, `docs/vibe-eda-reporting-pipeline.md`)
+- F7.1 상단 헤더 우측 **"리포팅"** 버튼 → `ReportModal` 오픈
+- F7.2 모달에서 **분석 목표(선택)** + **모델(Claude/Gemini 전체)** + **포함할 셀(체크박스)** 지정
+- F7.3 `POST /v1/reports/stream` 으로 SSE 호출 → LLM 이 시니어 분석가 역할로 Markdown 본문을 스트리밍
+  - 제목 · TL;DR · 배경 및 가설 · 데이터와 방법 · 발견 · 종합 인사이트 · 한계와 후속 과제 7단 구조 강제
+  - 셀의 출력(테이블 head 20행, 차트 메타 + PNG 이미지)과 `vibe_memo` 를 증거로 사용
+- F7.4 본문에 **차트 이미지 임베드** — `{{CHART:cell_name}}` 플레이스홀더를 서버가 실제 PNG 파일 참조로 치환
+- F7.5 **저장**: `~/vibe-notebooks/reports/{YYYYMMDD_HHMMSS_slug}.md` (YAML frontmatter + 본문) + `_images/` 디렉터리 (참조된 PNG 만)
+- F7.6 생성 중 **진행 단계 트래커**(수집 → 작성 → 삽입·저장) + 실시간 경과 시간 표시
+- F7.7 결과 모달: 복사 · `.md` 다운로드 · 사이드바 "리포트" 섹션에서 재조회
+- F7.8 실행되지 않은 셀은 선택 불가 (체크박스 disabled)
+- F7.9 LLM 후처리: 취소선(`~~...~~`) 제거, 한국어 범위 기호 `~` 를 `\~` 로 이스케이프, 연속 빈 줄 정리
 
 ### 5.2 권장 (Should-have)
 
@@ -244,17 +245,20 @@
 
 ### 7.2 Backend (구현 완료)
 - **Python FastAPI** (`backend/`)
-- **Claude API (Anthropic)** — `claude-opus-4-7` / `sonnet-4-6` / `haiku-4-5`
-- **Gemini API (Google)** — `gemini-2.5-flash` / `pro` 등, 런타임 스위치 지원
+- **Claude API (Anthropic)** — `claude-opus-4-7` / `sonnet-4-6` / `haiku-4-5`, tool use + 이미지 블록
+- **Gemini API (Google)** — `gemini-2.5-flash` / `pro` / `3.x-preview`, function calling + 이미지 Part
+- 두 프로바이더는 **각자 최적 API 를 살려 별도 파이프라인**으로 구현 (에이전트·리포트·바이브 채팅 모두)
 - **Snowflake Python Connector** (externalbrowser SSO)
 - **In-process Python exec** (Jupyter Kernel Gateway 대신 노트북별 namespace 직접 관리)
+- **Plotly + kaleido** — 차트 PNG 렌더링(tool_result 이미지 주입 + 리포트 임베드)
 - **MCP SDK** (Claude Code 연동용 별도 프로세스)
 
 ### 7.3 Infrastructure (로컬 전용)
 - **로컬 전용 앱** — Kubernetes, PostgreSQL, Redis, S3 미사용
-- **노트북 저장**: `~/vibe-notebooks/*.ipynb` (사용자 홈)
+- **노트북 저장**: `~/vibe-notebooks/*.ipynb` (사용자 홈, 경로 변경 가능)
 - **폴더 메타**: `~/vibe-notebooks/.vibe_config.json`
-- **채팅/에이전트 히스토리**: 동일 `.ipynb` 의 `metadata.vibe` 하위에 임베드
+- **리포트 저장**: `~/vibe-notebooks/reports/{id}.md` + `{id}_images/*.png`
+- **채팅/에이전트/리포트 참조**: 동일 `.ipynb` 의 `metadata.vibe` 하위에 임베드 (`chat_history`, `agent_history`, `reports[]`)
 - **향후 확장용 미사용 코드**: `backend/app/database.py`, `models.py` (SQLAlchemy 모델 정의만 존재)
 - **Dockerfile / infra/**: 존재하나 현재는 로컬 구동이 기본 경로
 
@@ -283,8 +287,8 @@
 | M2: LLM 연동 | ✅ 완료 | Vibe 채팅 + Agent 모드 (Claude + Gemini 이중) |
 | M3: 실행 엔진 | ✅ 완료 | Snowflake 쿼리 + in-process Python 커널 + `.ipynb` 저장 |
 | M4: Claude Code MCP 연동 | ✅ 완료 | MCP 서버 (`backend/app/api/mcp_server.py`) |
-| M5: 에이전트 모드 고도화 | 🟡 진행 중 | ask_user, 셀 메모, 재계획 UX 개선 |
-| M6: 리포팅 완성 | 예정 | Markdown 외 포맷 (HTML/PDF) 확장 |
+| M5: 에이전트 모드 고도화 | 🟡 진행 중 | ask_user, 셀 메모 강제 가드, 차트 이미지 tool_result 주입, 반복 호출 가드 |
+| M6: 리포팅 파이프라인 | ✅ 완료 | LLM 기반 Markdown 생성, 차트 이미지 임베드(`_images/` 폴더), 모델 선택, 진행 단계 트래커. 향후 HTML/PDF 포맷 확장 예정 |
 | M7: 파일럿 | 예정 | 5명 내부 테스트 + 피드백 반영 |
 
 ### 9.2 Gating Criteria (출시 기준)

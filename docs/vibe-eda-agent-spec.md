@@ -9,13 +9,14 @@
 | 항목 | 값 |
 |---|---|
 | 엔드포인트 | `POST /agent/stream` (SSE) |
-| 백엔드 모듈 | `backend/app/api/agent.py`, `backend/app/services/claude_agent.py` |
-| 보조 백엔드 | `backend/app/services/mart_tools.py` (마트 조회 헬퍼) |
-| LLM | Claude Opus (`claude-opus-4-7`) / Gemini (`gemini-*`) |
-| 호출 프로토콜 | Anthropic Tool Use / Gemini Function Calling |
-| 최대 턴 수 | `MAX_TURNS = 15` |
+| 백엔드 모듈 | `backend/app/api/agent.py`, `backend/app/services/claude_agent.py`, `backend/app/services/gemini_agent_service.py` |
+| 보조 백엔드 | `backend/app/services/mart_tools.py` (마트 조회 헬퍼), `backend/app/services/kernel.py` (차트 PNG 렌더) |
+| LLM | Claude (`claude-opus-4-7` / `sonnet-4-6` / `haiku-4-5`) · Gemini (`gemini-2.5-pro` / `flash` / `3.x-preview`) — 완전히 분리된 두 구현체 |
+| 호출 프로토콜 | Anthropic Tool Use (이미지 블록 지원) / Gemini Function Calling (Part 기반) |
+| 상한 | `MAX_TURNS = 15`, `TOTAL_TOOL_LIMIT = 40`, `REPEAT_CALL_LIMIT = 3` |
 | 스트리밍 | SSE (`text/event-stream`) |
 | MCP 미러 | `backend/app/api/mcp_server.py` — Claude Code에서 동일 도구 사용 가능 |
+| 심층 가이드 | `docs/vibe-eda-agent-pipeline.md` |
 
 ---
 
@@ -84,9 +85,11 @@
 
 | 이름 | 입력 | 동작 |
 |---|---|---|
-| `write_cell_memo` | `cell_id, memo` | 셀의 메모(노트)에 핵심 인사이트 기록. 실행 결과 확인 후 호출 권장. `cell_memo_updated` SSE 이벤트 발행 + `.ipynb` 즉시 영속화 |
+| `write_cell_memo` | `cell_id, memo` | 셀의 메모(노트)에 핵심 인사이트 기록. 실행 결과 확인 후 호출. `cell_memo_updated` SSE 이벤트 발행 + `.ipynb` 즉시 영속화 |
 
 **에이전트 셀 기본 레이아웃**: 실행 시 자동으로 `splitMode: h` + **좌=출력, 우=메모**로 전환되어 인사이트를 바로 기록할 수 있는 공간이 확보됨.
+
+**🛡️ 메모 강제 가드 (서버 측 차단)**: `create_cell` 호출 시 직전 실행 셀(`type ∈ {sql, python}`, 정상 출력)의 `vibe_memo` 가 비어 있으면 서버가 요청을 거부한다 (`success: false`, `error: "memo_required_before_next_cell"`). 에이전트는 **반드시 `write_cell_memo` 로 인사이트를 기록한 뒤에야** 다음 셀을 만들 수 있다. 구현: `claude_agent.py::_execute_tool` 의 `create_cell` 분기 앞 단 가드.
 
 ### 3.4 사용자 상호작용 도구
 
@@ -116,7 +119,16 @@
 | `cell_memo_updated` | `cell_id, memo` | 셀 메모(노트) 변경됨 — 인사이트 기록 |
 | `ask_user` | `question, options[]` | 사용자 답변 대기 요청 |
 | `complete` | `created_cell_ids[], updated_cell_ids[]` | 세션 종료 (`.ipynb` 영속화 트리거) |
-| `error` | `message` | 오류 |
+| `error` | `message` | 오류 (내부 예외, 가드 위반, API 오류 등) |
+
+### 4.1 차트 이미지 tool_result 주입
+
+Python 셀이 `plotly.graph_objs.Figure` 를 출력하면 kernel이 600×400 PNG를 렌더해 `imagePngBase64` 필드로 셀 output에 저장한다(`kernel.py::_render_figure_png_base64`, 내부 `fig.to_image(format="png")` — **kaleido 필수**). 이 base64는 이후 tool_result 에 아래 형태로 LLM에 함께 전달:
+
+- **Claude**: `tool_result.content = [{"type":"text", ...}, {"type":"image", "source":{"type":"base64", "media_type":"image/png", "data":"..."}}]`
+- **Gemini**: `Part.from_function_response(...)` 다음에 `Part.from_bytes(data=..., mime_type="image/png")` 를 같은 `Content` 의 parts 리스트에 append
+
+즉 에이전트는 "무엇이 그려졌는지" 텍스트 메타(제목/축/trace 요약)와 **실제 시각화 PNG** 를 모두 보고 다음 행동을 결정한다. 이미지가 없으면 텍스트 메타만 전달됨.
 
 ---
 
@@ -132,12 +144,15 @@
 
 ## 6. 시스템 프롬프트 규칙 (요약)
 
-1. **셀 파이프라인**: 생성/수정 → 자동 실행 → 출력 확인 → 수정 or 다음 셀
+1. **셀 파이프라인**: 입력 → 자동 실행 → 출력 확인 → **인사이트 메모 작성** → 수정 or 다음 셀
 2. **맥락 수집 우선순위**: `get_mart_schema` → `preview_mart` → (모호하면) `ask_user`
 3. **분석 순서**: SQL 셀 → Python 시각화 (Plotly only, matplotlib 금지) → Markdown 인사이트
 4. **변수 공유**: SQL 셀의 결과 DataFrame은 **셀 이름**으로 커널 namespace에 저장되며 Python 셀에서 직접 참조 (`_cells["..."]` 같은 존재하지 않는 접근자 금지)
 5. **네이밍**: 모든 셀 이름은 snake_case
-6. 모든 응답·설명·인사이트는 **한국어**
+6. **한 루프당 한 문단 내레이션**: tool_result 를 받은 직후 반드시 관찰·해석 + 다음 행동을 한국어 한 문단으로 먼저 출력. 위반 시 시스템 리마인더 재주입
+7. **인사이트 기록 강제**: 다음 셀을 만들기 전 반드시 `write_cell_memo` 호출 (서버 가드가 강제)
+8. **차트 생략 금지**: 차트 이미지가 tool_result에 첨부된 경우 실제로 이미지를 보고 의미 있는 패턴을 서술
+9. 모든 응답·설명·인사이트는 **한국어**
 
 전체 내용은 `claude_agent.py::_build_system_prompt()` 참고.
 
@@ -166,9 +181,14 @@ python -m app.api.mcp_server
 | 항목 | 현재 | 향후 |
 |---|---|---|
 | 전역 턴 제한 | `MAX_TURNS = 15` | ✅ |
+| 세션 당 총 tool 호출 상한 | `TOTAL_TOOL_LIMIT = 40` | ✅ |
+| 동일 (tool, input) 반복 가드 | `REPEAT_CALL_LIMIT = 3` (정규화된 키 비교) | ✅ |
+| 메모 강제 가드 | 직전 실행 셀 메모 없으면 `create_cell` 거부 | ✅ |
+| 내레이션 강제 | 텍스트 없이 tool_use만 오면 1회 재요청 + 시스템 리마인더 | ✅ |
+| 장시간 분석 리마인더 | 30초 경과 시 `ask_user` 고려 유도 | ✅ |
+| 차트 이미지 tool_result | Claude/Gemini 모두 이미지 블록 주입 | ✅ (kaleido 필요) |
 | 셀별 수정 재시도 제한 | ❌ | 같은 셀 3회 수정 실패 시 강제 종료 권장 |
 | 플래닝 산출물 | 채팅 텍스트만 | 첫 Markdown 플랜 셀로 영속화 권장 |
-| 재계획(replan) 분기 | 암묵적 | 명시적 프롬프트 규칙화 권장 |
 | `ask_user` UI | 일반 텍스트로 노출 | 전용 카드 + options 버튼 UI 권장 |
 
 ---

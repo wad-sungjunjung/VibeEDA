@@ -17,6 +17,7 @@
 |---|---|---|
 | `X-Vibe-Model` | `gemini-2.5-flash` / `claude-haiku-4-5-20251001` | env의 `DEFAULT_VIBE_MODEL`을 override |
 | `X-Agent-Model` | `claude-opus-4-7` / `gemini-2.5-pro` | env의 `DEFAULT_AGENT_MODEL`을 override |
+| `X-Report-Model` | `claude-opus-4-7` / `gemini-2.5-pro` | env의 `DEFAULT_REPORT_MODEL`을 override (리포트 엔드포인트 전용) |
 | `X-Anthropic-Api-Key` | `sk-ant-...` | env의 `ANTHROPIC_API_KEY`를 override |
 | `X-Gemini-Api-Key` | `AIza...` | env의 `GEMINI_API_KEY`를 override |
 
@@ -210,7 +211,7 @@ Plotly는 `output.data.plotly_json`으로 전달.
 ```
 `X-Agent-Model` 헤더로 모델 선택. `gemini-`로 시작하면 Gemini agent loop, 그 외 Claude tool-use loop.
 
-**SSE 이벤트** — 상세는 `docs/vibe-eda-agent-spec.md` 참고.
+**SSE 이벤트** — 상세는 `docs/vibe-eda-agent-spec.md` 와 `docs/vibe-eda-agent-pipeline.md` 참고.
 
 | `type` | 필드 |
 |---|---|
@@ -224,6 +225,15 @@ Plotly는 `output.data.plotly_json`으로 전달.
 | `ask_user` | `question`, `options[]` |
 | `complete` | `created_cell_ids[]`, `updated_cell_ids[]` |
 | `error` | `message` |
+
+#### tool_result 이미지 첨부
+Python 셀이 `plotly.graph_objs.Figure` 를 출력하면 실행 결과에 **저해상도 PNG(600×400, base64)** 가 포함되어 LLM에게 이미지 블록으로 함께 전달된다. Claude는 `tool_result.content = [text, image_block]` 혼합 리스트, Gemini는 `Part.from_function_response` 뒤에 `Part.from_bytes(mime_type="image/png")` 를 이어 붙이는 방식으로 동일한 맥락을 주입. 이 기능은 `kaleido` 파이썬 패키지를 필요로 한다 (미설치 시 무음 실패 → 이미지만 빠짐).
+
+#### `create_cell` 사전 조건 — 메모 강제 가드
+직전에 실행된 SQL/Python 셀의 `vibe_memo` 가 비어 있으면 `create_cell` 호출은 거부된다. 응답: `{"success": false, "error": "memo_required_before_next_cell", "message": "..."}`. 에이전트는 반드시 `write_cell_memo` 로 인사이트를 기록한 뒤에 다음 셀을 만들어야 한다.
+
+#### 반복 호출 가드
+같은 `(tool_name, 정규화된 input)` 이 `REPEAT_CALL_LIMIT = 3` 회를 초과하면 세션을 중단하고 `error` 이벤트를 보낸다. 전체 tool 호출 상한 `TOTAL_TOOL_LIMIT = 40`.
 
 ### 6.2 `POST /agent/title`
 에이전트 첫 메시지에서 노트북 제목 자동 생성.
@@ -306,7 +316,84 @@ LLM 기반 마트 추천.
 
 ---
 
-## 10. MCP 서버 — `backend/app/api/mcp_server.py`
+## 10. 리포트 (Reports) — `backend/app/api/report.py`
+
+시니어 분석가 수준의 Markdown 리포트를 LLM 으로 스트리밍 생성하고 `.md` 파일로 저장한다. 상세는 `docs/vibe-eda-reporting-pipeline.md` 참고.
+
+### 10.1 `POST /v1/reports/stream` (SSE)
+선택된 셀의 코드·메모·출력(테이블/차트)을 증거로 삼아 리포트를 생성.
+
+**Request Body**
+```json
+{
+  "notebook_id": "...",
+  "cell_ids": ["cell-a", "cell-b", "cell-c"],
+  "goal": "강남권 매장 쏠림 현상을 경영진에 설명"
+}
+```
+`goal` 은 선택 입력. 비우면 `analysisTheme`/`Description` 을 기반으로 추론.
+
+**헤더**: `X-Report-Model` 로 모델 선택 (`claude-` → Anthropic, `gemini-` → Google).
+
+**SSE 이벤트**
+
+| `type` | 필드 | 의미 |
+|---|---|---|
+| `stage` | `stage`, `label` | 진행 단계 (`collecting` → `collected` → `writing` → `finalizing`) |
+| `delta` | `content` | LLM 본문 청크 (원본 — 차트 플레이스홀더·취소선 포함 가능) |
+| `complete` | `id`, `title`, `path`, `created_at`, `byte_size`, `model`, `source_notebook_id` | 저장 완료. 프론트는 이후 `GET /v1/reports/{id}` 로 후처리 완료본 재수신 |
+| `error` | `message` | 오류 |
+
+### 10.2 `GET /v1/reports`
+저장된 리포트 요약 목록 (최근 수정 순).
+```json
+[
+  {
+    "id": "20260420_2126_우선입장_분석",
+    "title": "우선입장 분석",
+    "created_at": "2026-04-20T21:26:13",
+    "model": "claude-opus-4-7",
+    "source_notebook_id": "...",
+    "goal": "...",
+    "byte_size": 4354
+  }
+]
+```
+
+### 10.3 `GET /v1/reports/{report_id}`
+단일 리포트 조회. frontmatter 파싱 결과 + 본문 Markdown. 본문의 이미지 참조는 **상대 경로** (`./{report_id}_images/xxx.png`) 로 저장돼 있음.
+```json
+{
+  "id": "...",
+  "title": "...",
+  "created_at": "...",
+  "model": "...",
+  "source_notebook_id": "...",
+  "source_cell_ids": [...],
+  "goal": "...",
+  "markdown": "# ..."
+}
+```
+
+### 10.4 `DELETE /v1/reports/{report_id}`
+`.md` 파일과 `{report_id}_images/` 디렉터리를 함께 제거. 없는 리포트면 404.
+
+### 10.5 `GET /v1/reports/{report_id}/assets/{filename}`
+리포트에 임베드된 PNG 이미지 서빙. 경로 이탈 방지를 위해 파일명은 `[A-Za-z0-9_\-]+\.png` 화이트리스트만 허용. 프론트는 본문의 `./{report_id}_images/` 상대 경로를 이 URL 로 치환해 렌더링.
+
+### 10.6 저장 구조
+```
+~/vibe-notebooks/reports/
+├── 20260420_2126_우선입장_분석.md           # YAML frontmatter + Markdown 본문
+└── 20260420_2126_우선입장_분석_images/      # 참조된 차트만 PNG 파일로 저장
+    ├── group_comparison_analysis.png
+    └── ...
+```
+`.md` 는 `reports/` 디렉터리에 저장되며 파일명에 초 단위 타임스탬프 + slug 를 사용해 충돌을 방지. 동일 초에 생성될 경우 `_2`, `_3` 접미. 원본 노트북의 `metadata.vibe.reports[]` 에도 `{report_id, title, created_at}` 참조 포인터가 append 된다.
+
+---
+
+## 11. MCP 서버 — `backend/app/api/mcp_server.py`
 
 FastAPI와 별도 프로세스로 실행되는 MCP(stdio) 서버. Claude Code에서 동일 도구 호출 가능.
 
@@ -321,7 +408,7 @@ python -m app.api.mcp_server
 
 ---
 
-## 11. TypeScript 타입 (프론트 `src/types/index.ts` 발췌)
+## 12. TypeScript 타입 (프론트 `src/types/index.ts` 발췌)
 
 ```typescript
 export type CellType = 'sql' | 'python' | 'markdown';
@@ -362,7 +449,7 @@ export interface AgentMessage {
 
 ---
 
-## 12. 미구현 / 제거된 엔드포인트
+## 13. 미구현 / 제거된 엔드포인트
 
 v1.0 스펙에는 있었으나 로컬 MVP에 포함되지 않는 항목:
 
@@ -370,16 +457,17 @@ v1.0 스펙에는 있었으나 로컬 MVP에 포함되지 않는 항목:
 - `POST /notebooks/{id}:duplicate`, `POST /notebooks/{id}:move` — 프론트가 복제/이동을 조합 호출로 처리
 - `POST /cells/{id}:cycleType`, `POST /cells/{id}:reorder` — PATCH cell로 통합
 - `WS /ws/notebooks/{id}` — 단일 사용자이므로 실시간 구독 불필요
-- `POST /notebooks/{id}/reports`, `GET /reports/*` — 리포트는 프론트에서 생성 (`src/components/reporting/`)
 - `GET /usage/current` — 사용량 트래킹 미도입
 
 ---
 
-## 13. 관련 문서
+## 14. 관련 문서
 
 - 에이전트 프로토콜 상세: `docs/vibe-eda-agent-spec.md`
+- **에이전트 파이프라인 가이드**: `docs/vibe-eda-agent-pipeline.md`
+- **리포팅 파이프라인 가이드**: `docs/vibe-eda-reporting-pipeline.md`
 - 기능 명세: `docs/vibe-eda-functional-spec.md`
 - PRD: `docs/vibe-eda-prd.md`
 - 데이터 모델: `docs/vibe-eda-data-model.md` (현재 `.ipynb` 파일 기반, DB는 미사용)
 
-*Last updated: 2026-04-20*
+*Last updated: 2026-04-20 (v2.1 — 리포트 API, 차트 이미지 tool_result, 메모 가드 추가)*

@@ -224,11 +224,13 @@ function MarkdownOutput({ content }: { content: string }) {
     )
   }
   return (
-    <div className="relative group/output rounded-md border border-border bg-white px-5 py-4">
+    <div className="relative group/output rounded-md border border-border bg-white h-full overflow-y-auto">
       <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
         <CopyButton label="마크다운 복사" onCopy={() => navigator.clipboard.writeText(content)} />
       </div>
-      <Markdown content={content} />
+      <div className="px-5 py-4">
+        <Markdown content={content} />
+      </div>
     </div>
   )
 }

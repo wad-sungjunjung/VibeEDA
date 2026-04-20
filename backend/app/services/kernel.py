@@ -78,6 +78,57 @@ def get_dataframe_summaries(notebook_id: str) -> dict[str, str]:
     return result
 
 
+def _summarize_figure(fig) -> dict:
+    """Figure 메타데이터를 LLM이 읽기 쉬운 dict로 요약."""
+    try:
+        layout = fig.layout
+        title = ""
+        try:
+            title = (layout.title.text or "") if layout.title else ""
+        except Exception:
+            pass
+
+        def _axis(ax):
+            try:
+                t = ax.title.text if ax and ax.title else ""
+            except Exception:
+                t = ""
+            return t or ""
+
+        x_title = _axis(getattr(layout, "xaxis", None))
+        y_title = _axis(getattr(layout, "yaxis", None))
+
+        traces = []
+        for tr in (fig.data or []):
+            info = {
+                "type": getattr(tr, "type", "") or "",
+                "name": getattr(tr, "name", "") or "",
+            }
+            try:
+                x = getattr(tr, "x", None)
+                y = getattr(tr, "y", None)
+                if x is not None:
+                    info["n_points"] = len(list(x))
+                if y is not None:
+                    info["y_n"] = len(list(y))
+            except Exception:
+                pass
+            traces.append(info)
+        return {"title": title, "x_title": x_title, "y_title": y_title, "traces": traces}
+    except Exception:
+        return {}
+
+
+def _render_figure_png_base64(fig) -> str | None:
+    """Plotly Figure를 저해상도 PNG로 렌더링하여 base64 문자열 반환. 실패 시 None."""
+    try:
+        img_bytes = fig.to_image(format="png", width=600, height=400, scale=1)
+        import base64
+        return base64.b64encode(img_bytes).decode("ascii")
+    except Exception:
+        return None
+
+
 def _to_cell_output(ns: dict, cell_name: str, stdout: str) -> dict:
     var = ns.get(cell_name)
 
@@ -88,7 +139,15 @@ def _to_cell_output(ns: dict, cell_name: str, stdout: str) -> dict:
             (v for v in ns.values() if isinstance(v, go.Figure)), None
         )
         if candidate is not None:
-            return {"type": "chart", "plotlyJson": json.loads(candidate.to_json())}
+            result = {
+                "type": "chart",
+                "plotlyJson": json.loads(candidate.to_json()),
+                "chartMeta": _summarize_figure(candidate),
+            }
+            png_b64 = _render_figure_png_base64(candidate)
+            if png_b64:
+                result["imagePngBase64"] = png_b64
+            return result
     except ImportError:
         pass
 

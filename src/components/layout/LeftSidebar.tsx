@@ -14,6 +14,7 @@ import {
   X,
   User,
   Plus,
+  FileText,
 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useConnectionStore } from '@/store/connectionStore'
@@ -39,6 +40,10 @@ export default function LeftSidebar() {
     setHistoryMenuView,
     newAnalysis,
     loadAnalysis,
+    reports,
+    openReport,
+    removeReport,
+    currentReportId,
   } = useAppStore()
 
   const sfUser = useConnectionStore((s) => s.sfUser)
@@ -201,6 +206,52 @@ export default function LeftSidebar() {
             onDuplicate={() => duplicateHistory(h.id)} onDelete={() => deleteHistory(h.id)} onMove={(fid) => moveHistory(h.id, fid)}
             onLoad={() => loadAnalysis(h.id)} />
         ))}
+      </div>
+
+      {/* Reports */}
+      <div className="border-t border-border-subtle max-h-[30%] flex flex-col">
+        <div className="flex items-center gap-1.5 px-3 py-2 text-[11px] text-text-tertiary font-semibold uppercase tracking-wide shrink-0">
+          <FileText size={12} />
+          리포트
+          {reports.length > 0 && (
+            <span className="text-[10px] text-text-disabled font-normal">{reports.length}</span>
+          )}
+        </div>
+        <div className="overflow-y-auto hide-scrollbar px-2 pb-2 space-y-0.5">
+          {reports.length === 0 && (
+            <div className="px-2 py-1 text-[11px] text-text-disabled italic">생성된 리포트 없음</div>
+          )}
+          {reports.map((r) => (
+            <div
+              key={r.id}
+              className={cn(
+                'group flex items-center gap-1 px-2 py-1 rounded cursor-pointer',
+                currentReportId === r.id ? 'bg-white border border-primary-border' : 'hover:bg-white',
+              )}
+              onClick={() => openReport(r.id)}
+              title={`${r.title} · ${r.created_at}`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className={cn('text-[12px] truncate', currentReportId === r.id && 'text-primary font-semibold')}>
+                  {r.title}
+                </div>
+                <div className="text-[10px] text-text-disabled truncate">
+                  {r.created_at?.slice(0, 16).replace('T', ' ')}
+                </div>
+              </div>
+              <button
+                title="리포트 삭제"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (confirm(`리포트 "${r.title}" 을 삭제할까요?`)) removeReport(r.id)
+                }}
+                className="p-1 text-text-tertiary hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Trash2 size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Settings */}

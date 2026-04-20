@@ -242,10 +242,19 @@ interface AppStore {
   showReportModal: boolean
   generatingReport: boolean
   reportContent: string
+  reportTitle: string
+  reportError: string | null
+  currentReportId: string | null
   showReport: boolean
+  reports: import('@/lib/api').ReportSummary[]
+  reportStages: { stage: import('@/lib/api').ReportStage; label: string; at: number }[]
+  reportStartedAt: number | null
   setShowReportModal: (v: boolean) => void
-  generateReport: (cellIds: string[]) => void
+  generateReport: (args: { cellIds: string[]; goal?: string }) => Promise<void>
   setShowReport: (v: boolean) => void
+  fetchReports: () => Promise<void>
+  openReport: (id: string) => Promise<void>
+  removeReport: (id: string) => Promise<void>
 
   // ── Toast ──────────────────────────────────────────────────────────────────
   rollbackToast: ToastData | null
@@ -285,6 +294,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }))
 
       set({ histories, folders: folderItems, martCatalog: marts })
+
+      // 리포트 목록도 초기 로드 (실패해도 앱 동작에 영향 없음)
+      void get().fetchReports()
 
       if (notebooks.length > 0) {
         // Load most recent notebook. 백엔드는 분석이 하나도 없으면
@@ -1430,53 +1442,106 @@ export const useAppStore = create<AppStore>((set, get) => ({
   showReportModal: false,
   generatingReport: false,
   reportContent: '',
+  reportTitle: '',
+  reportError: null,
+  currentReportId: null,
   showReport: false,
+  reports: [],
+  reportStages: [],
+  reportStartedAt: null,
   setShowReportModal: (v) => set({ showReportModal: v }),
 
-  generateReport: (cellIds) => {
-    const { cells, analysisTheme, analysisDescription, selectedMarts } = get()
-    set({ generatingReport: true, showReportModal: false })
-
-    setTimeout(() => {
-      const selectedCells = cells.filter((c) => cellIds.includes(c.id))
-      const today = new Date().toLocaleDateString('ko-KR')
-
-      const lines = [
-        `# ${analysisTheme}`,
-        '',
-        `> **분석일자**: ${today}  `,
-        `> **사용 마트**: ${selectedMarts.join(', ')}  `,
-        `> **분석 셀 수**: ${selectedCells.length}개`,
-        '',
-        '## 분석 배경',
-        '',
-        analysisDescription,
-        '',
-        '---',
-        '',
-        ...selectedCells.flatMap((c) => [
-          `## ${c.name} (${c.type.toUpperCase()})`,
-          '',
-          '```' + c.type,
-          c.code,
-          '```',
-          '',
-          c.type === 'markdown' ? c.code : '*(실행 결과 생략)*',
-          '',
-          c.insight ? `> **인사이트**: ${c.insight}` : '',
-          '',
-        ]),
-      ]
-
+  generateReport: async ({ cellIds, goal }) => {
+    const { notebookId, analysisTheme } = get()
+    if (!notebookId) return
+    set({
+      generatingReport: true,
+      showReportModal: false,
+      showReport: true,
+      reportContent: '',
+      reportTitle: analysisTheme || '분석 리포트',
+      reportError: null,
+      currentReportId: null,
+      reportStages: [],
+      reportStartedAt: Date.now(),
+    })
+    try {
+      const api = await import('@/lib/api')
+      await api.streamReport(
+        { notebook_id: notebookId, cell_ids: cellIds, goal: goal || '' },
+        (event) => {
+          if (event.type === 'delta') {
+            set((s) => ({ reportContent: s.reportContent + event.content }))
+          } else if (event.type === 'stage') {
+            set((s) => ({
+              reportStages: [...s.reportStages, { stage: event.stage, label: event.label, at: Date.now() }],
+            }))
+          } else if (event.type === 'complete') {
+            set((s) => ({
+              generatingReport: false,
+              currentReportId: event.id,
+              reportTitle: event.title,
+              reportStages: [...s.reportStages, { stage: 'finalizing', label: '완료', at: Date.now() }],
+            }))
+            // 저장된 최종(후처리 완료) 본문으로 교체 — 차트 이미지 data URI 삽입 + 취소선 제거 반영
+            void api.getReport(event.id).then((r) => {
+              set({ reportContent: r.markdown })
+            }).catch((err) => console.warn('getReport after complete failed', err))
+            void get().fetchReports()
+          } else if (event.type === 'error') {
+            set({ generatingReport: false, reportError: event.message })
+          }
+        },
+      )
+    } catch (e) {
       set({
         generatingReport: false,
-        reportContent: lines.filter((l) => l !== undefined).join('\n'),
-        showReport: true,
+        reportError: e instanceof Error ? e.message : String(e),
       })
-    }, 1500)
+    }
   },
 
   setShowReport: (v) => set({ showReport: v }),
+
+  fetchReports: async () => {
+    try {
+      const api = await import('@/lib/api')
+      const list = await api.listReports()
+      set({ reports: list })
+    } catch (e) {
+      console.warn('fetchReports failed', e)
+    }
+  },
+
+  openReport: async (id) => {
+    try {
+      const api = await import('@/lib/api')
+      const r = await api.getReport(id)
+      set({
+        showReport: true,
+        generatingReport: false,
+        reportContent: r.markdown,
+        reportTitle: r.title,
+        currentReportId: r.id,
+        reportError: null,
+      })
+    } catch (e) {
+      set({ reportError: e instanceof Error ? e.message : String(e) })
+    }
+  },
+
+  removeReport: async (id) => {
+    try {
+      const api = await import('@/lib/api')
+      await api.deleteReport(id)
+      set((s) => ({
+        reports: s.reports.filter((r) => r.id !== id),
+        currentReportId: s.currentReportId === id ? null : s.currentReportId,
+      }))
+    } catch (e) {
+      console.warn('removeReport failed', e)
+    }
+  },
 
   // ── Toast ──────────────────────────────────────────────────────
   rollbackToast: null,

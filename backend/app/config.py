@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
     default_agent_model: str = Field(default="claude-opus-4-7", alias="DEFAULT_AGENT_MODEL")
     default_vibe_model: str = Field(default="gemini-2.5-flash", alias="DEFAULT_VIBE_MODEL")
+    default_report_model: str = Field(default="claude-opus-4-7", alias="DEFAULT_REPORT_MODEL")
 
     allowed_origins: list[str] = Field(
         default=["http://localhost:5173", "http://localhost:4173"],

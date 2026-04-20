@@ -231,7 +231,7 @@ export default function AgentChatPanel() {
                           <StopCircle size={11} />중지
                         </button>
                       </span>
-                      {agentElapsed >= 300 && (
+                      {agentElapsed >= 300 && !agentChatHistory.slice(0, idx).some((m) => m.role === 'assistant' && !!m.content) && (
                         <div
                           className="flex items-start gap-1.5 text-[11px] leading-relaxed px-2 py-1.5 rounded-md"
                           style={{ backgroundColor: '#fff7ed', border: '1px dashed #f5c5b5', color: '#7a3a22' }}

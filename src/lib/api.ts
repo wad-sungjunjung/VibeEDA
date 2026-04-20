@@ -2,6 +2,7 @@ import type { CellType, MartMeta } from '@/types'
 import { useModelStore } from '@/store/modelStore'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000/v1'
+export const API_BASE_URL = API_BASE
 
 // ─── SSE event types ──────────────────────────────────────────────────────────
 
@@ -85,12 +86,13 @@ export interface FolderRow {
 
 
 function getLLMHeaders(): Record<string, string> {
-  const { geminiApiKey, anthropicApiKey, vibeModel, agentModel } = useModelStore.getState()
+  const { geminiApiKey, anthropicApiKey, vibeModel, agentModel, reportModel } = useModelStore.getState()
   const headers: Record<string, string> = {}
   if (geminiApiKey) headers['X-Gemini-Key'] = geminiApiKey
   if (anthropicApiKey) headers['X-Anthropic-Key'] = anthropicApiKey
   if (vibeModel) headers['X-Vibe-Model'] = vibeModel
   if (agentModel) headers['X-Agent-Model'] = agentModel
+  if (reportModel) headers['X-Report-Model'] = reportModel
   return headers
 }
 
@@ -319,3 +321,63 @@ export async function streamAgentMessage(
   if (!response.ok) throw new Error(`API error: ${response.status}`)
   await readSSEStream(response, onEvent)
 }
+
+// ─── Reports ─────────────────────────────────────────────────────────────────
+
+export interface ReportSummary {
+  id: string
+  title: string
+  created_at: string
+  model: string
+  source_notebook_id: string
+  goal: string
+  byte_size: number
+}
+
+export interface ReportDetail extends ReportSummary {
+  source_cell_ids: string[]
+  markdown: string
+}
+
+export type ReportStage = 'collecting' | 'collected' | 'writing' | 'finalizing'
+
+export type ReportEvent =
+  | { type: 'delta'; content: string }
+  | { type: 'stage'; stage: ReportStage; label: string }
+  | {
+      type: 'complete'
+      id: string
+      title: string
+      path: string
+      created_at: string
+      byte_size: number
+      model: string
+      source_notebook_id: string
+    }
+  | { type: 'error'; message: string }
+
+export interface ReportRequest {
+  notebook_id: string
+  cell_ids: string[]
+  goal?: string
+}
+
+export async function streamReport(
+  req: ReportRequest,
+  onEvent: (event: ReportEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/reports/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getLLMHeaders() },
+    body: JSON.stringify(req),
+    signal,
+  })
+  if (!response.ok) throw new Error(`API error: ${response.status}`)
+  await readSSEStream(response, onEvent)
+}
+
+export const listReports = () => apiFetch<ReportSummary[]>('/reports')
+export const getReport = (id: string) => apiFetch<ReportDetail>(`/reports/${id}`)
+export const deleteReport = (id: string) =>
+  apiFetch<{ ok: boolean }>(`/reports/${id}`, { method: 'DELETE' })

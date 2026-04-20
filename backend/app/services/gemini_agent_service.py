@@ -303,12 +303,22 @@ async def run_agent_stream_gemini(
                         updated_cell_ids.append(event["cell_id"])
 
                 payload = dict(result) if isinstance(result, dict) else {"result": result}
+                image_b64 = payload.pop("image_png_base64", None)
                 if reminder_msgs and idx == len(func_call_parts) - 1:
                     payload["_system_reminder"] = " / ".join(reminder_msgs)
 
                 tool_response_parts.append(
                     types.Part.from_function_response(name=fc.name, response=payload)
                 )
+                if image_b64:
+                    try:
+                        import base64 as _b64
+                        img_bytes = _b64.b64decode(image_b64)
+                        tool_response_parts.append(
+                            types.Part.from_bytes(data=img_bytes, mime_type="image/png")
+                        )
+                    except Exception:
+                        pass
 
             if long_run_trigger:
                 long_run_warning_used = True

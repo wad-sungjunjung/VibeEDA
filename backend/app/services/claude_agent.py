@@ -237,7 +237,26 @@ def _format_output_for_claude(output: dict) -> str:
         return f"[테이블 결과]\n{header}\n{sep}\n{body}{note}"
 
     if otype == "chart":
-        return "[차트 생성됨] Plotly 시각화가 성공적으로 생성되었습니다."
+        meta = output.get("chartMeta") or {}
+        title = meta.get("title") or "(제목 없음)"
+        x_title = meta.get("x_title") or ""
+        y_title = meta.get("y_title") or ""
+        traces = meta.get("traces") or []
+        trace_lines = []
+        for i, tr in enumerate(traces[:10]):
+            parts = [f"#{i + 1}", tr.get("type") or "?", tr.get("name") or ""]
+            if tr.get("n_points") is not None:
+                parts.append(f"n={tr['n_points']}")
+            trace_lines.append(" ".join(p for p in parts if p))
+        trace_block = "\n".join(trace_lines) if trace_lines else "(trace 정보 없음)"
+        img_note = "\n첨부: 렌더링된 차트 PNG가 함께 전달됨 — 이미지를 보고 의도에 부합하는지 검증하세요." if output.get("imagePngBase64") else ""
+        return (
+            f"[차트 생성됨]\n"
+            f"제목: {title}\n"
+            f"x축: {x_title} / y축: {y_title}\n"
+            f"Traces ({len(traces)}):\n{trace_block}"
+            f"{img_note}"
+        )
 
     if otype == "stdout":
         content = output.get("content", "")
@@ -272,6 +291,30 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
         }, []
 
     if name == "create_cell":
+        # 메모 미작성 가드: 직전 실행 셀(sql/python, 정상 출력)에 memo가 비어 있으면 거부.
+        # 에이전트가 '다음 셀'을 만들기 전에 반드시 인사이트를 기록하도록 강제한다.
+        if state.cells:
+            prev = state.cells[-1]
+            prev_output_type = (prev.output or {}).get("type") if prev.output else None
+            if (
+                prev.type in ("sql", "python")
+                and prev.executed
+                and prev_output_type not in ("error", None)
+                and not (prev.memo or "").strip()
+            ):
+                return {
+                    "success": False,
+                    "error": "memo_required_before_next_cell",
+                    "message": (
+                        f"직전 셀 `{prev.name}` (id={prev.id})의 메모가 비어 있습니다. "
+                        "다음 셀을 만들기 전에 반드시 `write_cell_memo`를 호출해 "
+                        "(1) 직전 출력에서 얻은 핵심 수치·인사이트·이상치, "
+                        "(2) 이를 근거로 다음 셀을 만드는 이유 — 를 2~5줄로 기록하세요. "
+                        "메모 작성 후 다시 `create_cell`을 호출하면 됩니다."
+                    ),
+                    "require_memo_for_cell_id": prev.id,
+                }, []
+
         cell_id = str(uuid.uuid4())
         cell_type = inp["cell_type"]
         raw_name = inp.get("name") or f"cell_{len(state.cells) + 1}"
@@ -317,12 +360,15 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
                 "execute_cell", {"cell_id": cell_id}, state
             )
             events.extend(exec_events)
-            return {
+            payload = {
                 "cell_id": cell_id,
                 "success": True,
                 "auto_executed": True,
                 "output_summary": exec_result.get("output_summary"),
-            }, events
+            }
+            if exec_result.get("image_png_base64"):
+                payload["image_png_base64"] = exec_result["image_png_base64"]
+            return payload, events
 
         return {"cell_id": cell_id, "success": True}, events
 
@@ -353,11 +399,14 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
                 "execute_cell", {"cell_id": cell.id}, state
             )
             events.extend(exec_events)
-            return {
+            payload = {
                 "success": True,
                 "auto_executed": True,
                 "output_summary": exec_result.get("output_summary"),
-            }, events
+            }
+            if exec_result.get("image_png_base64"):
+                payload["image_png_base64"] = exec_result["image_png_base64"]
+            return payload, events
 
         return {"success": True}, events
 
@@ -388,8 +437,15 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
         cell.output = output
 
         output_summary = _format_output_for_claude(output)
+        result_payload: dict = {
+            "cell_id": cell.id,
+            "executed": True,
+            "output_summary": output_summary,
+        }
+        if isinstance(output, dict) and output.get("imagePngBase64"):
+            result_payload["image_png_base64"] = output["imagePngBase64"]
         return (
-            {"cell_id": cell.id, "executed": True, "output_summary": output_summary},
+            result_payload,
             [{"type": "cell_executed", "cell_id": cell.id, "output": output}],
         )
 
@@ -517,9 +573,12 @@ You help analysts explore ad platform data by creating, modifying, and executing
   - 선택 마트만으로 데이터가 부족해 보임
   - 같은 요청을 두 번 다른 방식으로 해석 가능할 때
 
-## 인사이트 기록 규칙
-- SQL/Python 셀 실행 후 결과가 의미 있다고 판단되면 **반드시 `write_cell_memo` 호출**
-- 메모 내용 예: "서울·경기가 전체 예약의 62% 차지", "강남점 1개 매장이 서울 매출의 38% — 이상치", "매장 수 대비 예약은 비선형 (log 관계 의심)"
+## 인사이트 기록 규칙 (절대 준수 — 서버가 강제)
+- **`create_cell` 호출 전에, 직전 실행 셀(sql/python, 정상 출력)의 메모가 비어 있다면 반드시 먼저 `write_cell_memo` 를 호출하라.**
+  - 서버는 메모 없이 다음 셀을 만들려 하면 `memo_required_before_next_cell` 에러를 반환하며 거부한다.
+  - 메모에는 반드시 (1) 직전 출력에서 관찰한 핵심 수치·인사이트·이상치, (2) 그로부터 "왜 이 다음 셀을 만드는가"의 근거 — 둘 다 담아라. 2~5줄 불릿.
+- 차트 셀의 경우 tool_result 에 **렌더링된 PNG 이미지**가 함께 전달된다. 이미지를 실제로 보고(축/범례/분포) 의도에 부합하는지 검증한 뒤 메모를 작성하라. 같은 차트를 반복 생성하지 말고, 의도와 다르면 `update_cell_code`로 수정하라.
+- 메모 내용 예: "서울·경기가 전체 예약의 62% 차지 → 지역별 편중을 매장 단위로 분해하기 위해 다음 셀 생성", "강남점 1개 매장이 서울 매출의 38%, 이상치로 판단 → 이 매장을 제외한 분포 재확인"
 - 전체 분석 요약은 마지막 Markdown 셀로 별도 작성 (메모는 개별 셀 단위 통찰)
 
 ## 맥락 수집 우선순위 (SQL 작성 전 필수)
@@ -541,13 +600,14 @@ You help analysts explore ad platform data by creating, modifying, and executing
 ## 셀 파이프라인 (반드시 준수)
 모든 셀은 아래 사이클을 따른다:
 
-  [입력 작성] → [자동 실행] → [출력 확인] → [수정 OR 다음 셀 생성]
+  [입력 작성] → [자동 실행] → [출력 확인] → [인사이트 메모 작성] → [수정 OR 다음 셀 생성]
 
 - `create_cell` 또는 `update_cell_code`를 호출하면 **자동으로 즉시 실행**되고 tool result에 실제 출력이 포함됨
 - 출력을 반드시 확인한 뒤 다음 행동을 결정할 것:
   - 오류 또는 의도와 다른 결과 → `update_cell_code`로 수정 (재실행 자동)
-  - 결과가 올바름 → 다음 셀 생성
+  - 결과가 올바름 → **반드시 `write_cell_memo` 호출** → 그 다음 셀 생성
 - `execute_cell`을 직접 호출할 필요 없음 (생성/수정 시 자동 실행됨)
+- 서버가 "메모 없이는 다음 셀 생성 금지"를 강제한다. 예외 없음.
 
 ## ⚠️ 한 루프당 한 문단 내레이션 — 가장 중요한 규칙 (절대 준수)
 - tool_result 를 받은 **직후**, **다음 도구를 호출하기 전에** 반드시 한국어 텍스트 한 문단을 먼저 출력한다.
@@ -747,11 +807,29 @@ async def run_agent_stream(
                     elif sse_event["type"] == "cell_code_updated":
                         updated_cell_ids.append(sse_event["cell_id"])
 
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tool_block.id,
-                    "content": json.dumps(result, ensure_ascii=False),
-                })
+                image_b64 = result.pop("image_png_base64", None) if isinstance(result, dict) else None
+                if image_b64:
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_block.id,
+                        "content": [
+                            {"type": "text", "text": json.dumps(result, ensure_ascii=False)},
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "image/png",
+                                    "data": image_b64,
+                                },
+                            },
+                        ],
+                    })
+                else:
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_block.id,
+                        "content": json.dumps(result, ensure_ascii=False),
+                    })
 
             messages.append({"role": "assistant", "content": _content_to_dict(response.content)})
 
@@ -784,7 +862,16 @@ async def run_agent_stream(
             if reminders and tool_results:
                 reminder_text = "\n\n[시스템 리마인더]\n" + "\n".join(f"- {r}" for r in reminders)
                 last = tool_results[-1]
-                last["content"] = last.get("content", "") + reminder_text
+                existing = last.get("content", "")
+                if isinstance(existing, list):
+                    for blk in existing:
+                        if isinstance(blk, dict) and blk.get("type") == "text":
+                            blk["text"] = blk.get("text", "") + reminder_text
+                            break
+                    else:
+                        existing.append({"type": "text", "text": reminder_text})
+                else:
+                    last["content"] = (existing or "") + reminder_text
 
             messages.append({"role": "user", "content": tool_results})
             turn_index += 1
