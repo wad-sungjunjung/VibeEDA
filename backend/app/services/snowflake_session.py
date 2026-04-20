@@ -46,6 +46,9 @@ def connect(params: dict) -> None:
             # 자동 재접속 시 브라우저 팝업 없이 조용히 연결되도록 한다.
             client_store_temporary_credential=True,
             client_request_mfa_token=True,
+            # fetch_pandas_all()이 동작하려면 세션 결과 포맷이 ARROW여야 함.
+            # 일부 계정/웨어하우스가 JSON을 기본값으로 갖는 경우 방어.
+            session_parameters={"PYTHON_CONNECTOR_QUERY_RESULT_FORMAT": "ARROW"},
         )
         _conn_params = params.copy()
 

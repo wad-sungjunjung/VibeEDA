@@ -144,16 +144,27 @@ def run_sql(notebook_id: str, cell_name: str, sql: str) -> dict:
         from decimal import Decimal
         import datetime as _dt
         conn = get_connection()
-        cur = conn.cursor()
-        cur.execute(sql)
-        # fetch_pandas_all()은 세션 결과 포맷이 ARROW일 때만 동작. JSON 포맷이거나
-        # pyarrow/connector 버전 호환 이슈로 NotSupportedError가 나면 fetchall로 폴백.
+        # fetch_pandas_all()은 세션 결과 포맷이 ARROW일 때만 동작. ARROW 실패 시
+        # 커서 내부 상태가 망가져 fetchall()도 연쇄 실패하므로, 실패하면 별도
+        # 세션 파라미터로 쿼리를 재실행해 JSON 결과를 fetchall로 읽는다.
         try:
+            cur = conn.cursor()
+            try:
+                cur.execute("ALTER SESSION SET PYTHON_CONNECTOR_QUERY_RESULT_FORMAT = 'ARROW'")
+            except Exception:
+                pass
+            cur.execute(sql)
             raw_df = cur.fetch_pandas_all()
         except Exception:
             import pandas as _pd
-            rows_raw = cur.fetchall()
-            cols = [d[0] for d in (cur.description or [])]
+            cur2 = conn.cursor()
+            try:
+                cur2.execute("ALTER SESSION SET PYTHON_CONNECTOR_QUERY_RESULT_FORMAT = 'JSON'")
+            except Exception:
+                pass
+            cur2.execute(sql)
+            rows_raw = cur2.fetchall()
+            cols = [d[0] for d in (cur2.description or [])]
             raw_df = _pd.DataFrame(rows_raw, columns=cols)
         df = _make_vibe_df(raw_df)
         ns[cell_name] = df

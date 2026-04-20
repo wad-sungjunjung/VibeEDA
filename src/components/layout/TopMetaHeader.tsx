@@ -366,8 +366,8 @@ export default function TopMetaHeader() {
                 ) : (
                   <div className="space-y-1">
                     {pagedMarts.map((mart, idx) => {
-                      const isTop = idx === 0 && martPage === 0 && !martSearchQuery
                       const score = mart.recommendationScore ?? 0
+                      const isTop = idx === 0 && martPage === 0 && !martSearchQuery && score > 0
                       const isRecommended = score > 0 && !martSearchQuery
                       const isViewed = viewedMarts.includes(mart.key)
                       const isSelected = selectedMarts.includes(mart.key)
