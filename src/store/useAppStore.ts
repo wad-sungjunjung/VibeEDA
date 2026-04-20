@@ -62,19 +62,17 @@ function debounced(key: string, fn: () => void, delay = 800) {
 
 // ─── DB row → Cell converter ─────────────────────────────────────────────────
 
-function defaultCellUi(type: CellType) {
-  if (type === 'markdown') return { splitMode: false, splitDir: 'h' as const, activeTab: 'output' as const, leftTab: 'input' as const, rightTab: 'output' as const }
-  if (type === 'python') return { splitMode: true, splitDir: 'v' as const, activeTab: 'input' as const, leftTab: 'input' as const, rightTab: 'memo' as const }
-  return { splitMode: true, splitDir: 'h' as const, activeTab: 'input' as const, leftTab: 'input' as const, rightTab: 'memo' as const }
+function defaultCellUi(_type: CellType) {
+  // 모든 셀 기본 레이아웃: 좌우 분할, 좌=입력, 우=출력
+  return { splitMode: true, splitDir: 'h' as const, activeTab: 'input' as const, leftTab: 'input' as const, rightTab: 'output' as const }
 }
 
 function rowToCell(row: CellRow): Cell {
   const savedUi = loadCellUi(row.id)
   const type = row.type as CellType
   const defUi = defaultCellUi(type)
-  // 온보딩 SQL/Python 셀은 입력/출력 분할로 고정
-  const isOnboardingCode = row.onboarding && (type === 'sql' || type === 'python')
-  const rightTabDefault = isOnboardingCode ? 'output' : defUi.rightTab
+  // 온보딩 마크다운 셀은 분할 없이 출력 탭으로 고정 (읽기용 가이드)
+  const isOnboardingMarkdown = row.onboarding && type === 'markdown'
   return {
     id: row.id,
     name: row.name,
@@ -82,11 +80,11 @@ function rowToCell(row: CellRow): Cell {
     code: row.code,
     memo: row.memo ?? '',
     ordering: row.ordering,
-    splitMode: isOnboardingCode ? true : (savedUi.splitMode ?? defUi.splitMode),
-    splitDir: isOnboardingCode ? (type === 'python' ? 'v' : 'h') : (savedUi.splitDir ?? defUi.splitDir),
-    activeTab: row.executed ? 'output' : defUi.activeTab,
+    splitMode: isOnboardingMarkdown ? false : (savedUi.splitMode ?? defUi.splitMode),
+    splitDir: savedUi.splitDir ?? defUi.splitDir,
+    activeTab: isOnboardingMarkdown ? 'output' : (row.executed ? 'output' : defUi.activeTab),
     leftTab: defUi.leftTab,
-    rightTab: row.executed ? 'output' : rightTabDefault,
+    rightTab: defUi.rightTab,
     executed: row.executed,
     executedAt: null,
     output: (row.output as Cell['output']) ?? null,

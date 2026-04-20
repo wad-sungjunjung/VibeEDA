@@ -82,7 +82,7 @@ export default function CellOutput({ cell }: Props) {
 
   if (!cell.executed || !cell.output) {
     return (
-      <div className="flex items-center justify-center h-24 text-[12px] text-text-disabled rounded-md border border-border bg-[#ede9dd]">
+      <div className="flex items-center justify-center h-full min-h-[360px] text-[12px] text-text-disabled rounded-md border border-border bg-[#ede9dd]">
         실행 전 — 버튼을 누르거나 채팅으로 요청하세요
       </div>
     )

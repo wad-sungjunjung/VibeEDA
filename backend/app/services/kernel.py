@@ -146,7 +146,16 @@ def run_sql(notebook_id: str, cell_name: str, sql: str) -> dict:
         conn = get_connection()
         cur = conn.cursor()
         cur.execute(sql)
-        df = _make_vibe_df(cur.fetch_pandas_all())
+        # fetch_pandas_all()은 세션 결과 포맷이 ARROW일 때만 동작. JSON 포맷이거나
+        # pyarrow/connector 버전 호환 이슈로 NotSupportedError가 나면 fetchall로 폴백.
+        try:
+            raw_df = cur.fetch_pandas_all()
+        except Exception:
+            import pandas as _pd
+            rows_raw = cur.fetchall()
+            cols = [d[0] for d in (cur.description or [])]
+            raw_df = _pd.DataFrame(rows_raw, columns=cols)
+        df = _make_vibe_df(raw_df)
         ns[cell_name] = df
 
         def _safe(v):

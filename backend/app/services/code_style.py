@@ -125,5 +125,25 @@ PYTHON_RULES = """
   (새 브라우저 탭이 열리는 문제 발생) — 마지막 줄은 `fig_xxx` 변수 식별자만 둔다
 - plotly: `import plotly.express as px` 사용 (plotly_express 금지)
 - DataFrame 변수명은 SQL 셀 이름과 동일하다 (예: query_1, code_2)
-- pandas/plotly 이외 외부 라이브러리 설치가 필요한 것은 사용하지 않는다
+- 기본 제공 라이브러리 (requirements.txt): pandas, numpy, plotly, scikit-learn, scipy, statsmodels
+  - 전처리/정제: pandas
+  - 시각화: plotly
+  - 통계/검정: scipy.stats, statsmodels
+  - 머신러닝(분류·회귀·군집·차원축소 등): scikit-learn
+- 사용자가 **"<패키지>를 설치해줘 / 설치해서 ~"** 또는 목록 밖 패키지가 필요한 요청을 하면
+  **반드시 아래 패턴을 셀 상단에 포함**하여 런타임 설치 후 import한다.
+  (`!pip` / `%pip` / `os.system` 은 금지 — 커널이 Jupyter 매직을 지원하지 않음)
+
+  ```python
+  import importlib, subprocess, sys
+  for _pkg in ("<패키지명>",):               # 여러 개면 여기 추가
+      try:
+          importlib.import_module(_pkg.split('==')[0].split('[')[0])
+      except ImportError:
+          subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", _pkg])
+  import <패키지명> as <alias>              # 실제 import
+  ```
+
+  - 이미 설치돼 있으면 건너뛰고, 없을 때만 설치해 재실행이 빨라진다.
+  - 딥러닝/수GB급 라이브러리(tensorflow, torch, transformers 등)는 지양.
 """

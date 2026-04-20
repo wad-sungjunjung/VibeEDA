@@ -41,6 +41,14 @@ export default function Markdown({ content, className }: Props) {
             <a className="text-primary hover:underline" target="_blank" rel="noreferrer" {...props} />
           ),
           hr: () => <hr className="my-3 border-border-subtle" />,
+          img: ({ node: _n, alt, ...props }) => (
+            <img
+              alt={alt}
+              className="my-2 max-w-full rounded-md border border-border-subtle"
+              loading="lazy"
+              {...props}
+            />
+          ),
           table: ({ node: _n, ...props }) => (
             <div className="my-2 overflow-x-auto">
               <table className="text-[12px] border-collapse" {...props} />
