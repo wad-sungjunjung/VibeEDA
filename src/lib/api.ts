@@ -10,6 +10,8 @@ export type VibeEvent =
   | { type: 'complete'; full_code: string; explanation: string }
   | { type: 'error'; message: string }
 
+// 에이전트 SSE 이벤트 타입.
+// **백엔드 `app/services/agent_events.py` 와 동기화 필수** — 둘 중 하나만 수정시 drift 발생.
 export type AgentEvent =
   | { type: 'thinking'; content: string }
   | { type: 'tool_use'; tool: string; input: Record<string, unknown> }
@@ -18,6 +20,7 @@ export type AgentEvent =
   | { type: 'cell_code_updated'; cell_id: string; code: string }
   | { type: 'cell_executed'; cell_id: string; output?: import('@/types').CellOutput | null }
   | { type: 'cell_memo_updated'; cell_id: string; memo: string }
+  | { type: 'ask_user'; question: string; options: string[] }
   | { type: 'complete'; created_cell_ids: string[]; updated_cell_ids: string[] }
   | { type: 'error'; message: string }
 
@@ -38,6 +41,7 @@ export interface ChatEntryRow {
   user_message: string
   assistant_reply: string
   code_snapshot: string
+  code_result?: string
   created_at: string
 }
 
@@ -279,6 +283,7 @@ export interface AgentRequest {
   message: string
   cells: AgentCellSnapshot[]
   selected_marts: string[]
+  mart_metadata?: VibeMartMeta[]
   analysis_theme: string
   analysis_description: string
   conversation_history: { role: 'user' | 'assistant'; content: string }[]

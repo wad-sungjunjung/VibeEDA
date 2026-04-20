@@ -42,10 +42,23 @@ class ConversationMessage(BaseModel):
     content: str
 
 
+class MartColumnInput(BaseModel):
+    name: str
+    type: str = ""
+    desc: str = ""
+
+
+class MartMetaInput(BaseModel):
+    key: str
+    description: str = ""
+    columns: list[MartColumnInput] = []
+
+
 class AgentRequest(BaseModel):
     message: str
     cells: list[CellSnapshot] = []
     selected_marts: list[str] = []
+    mart_metadata: list[MartMetaInput] = []
     analysis_theme: str = ""
     analysis_description: str = ""
     conversation_history: list[ConversationMessage] = []
@@ -66,6 +79,7 @@ async def agent_stream_endpoint(
     notebook_state = NotebookState(
         cells=[CellState(id=c.id, name=c.name, type=c.type, code=c.code, executed=c.executed) for c in req.cells],
         selected_marts=req.selected_marts,
+        mart_metadata=[m.model_dump() for m in req.mart_metadata],
         analysis_theme=req.analysis_theme,
         analysis_description=req.analysis_description,
         notebook_id=req.notebook_id or "",

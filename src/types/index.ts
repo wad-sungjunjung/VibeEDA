@@ -9,7 +9,8 @@ export interface ChatEntry {
   user: string
   assistant: string
   timestamp: string
-  codeSnapshot: string
+  codeSnapshot: string  // 요청 직전 (pre) 코드
+  codeResult: string    // 요청 결과 (post) 코드
 }
 
 export interface CellOutput {
@@ -114,6 +115,7 @@ export interface AgentSession {
   id: string
   title: string
   startedAt: string
+  createdAtMs?: number  // 정렬용 타임스탬프 (생성 순서 유지)
   messages: AgentMessage[]
 }
 

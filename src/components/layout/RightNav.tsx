@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Layers, Compass, Telescope, Database, MessageSquare, RotateCcw, User, GripVertical, Search, X, Check, Copy, Trash2, ChevronDown, ChevronRight, SquarePen } from 'lucide-react'
+import { Layers, Compass, Telescope, Database, MessageSquare, RotateCcw, User, GripVertical, Search, X, Check, Copy, Trash2, ChevronDown, ChevronRight, SquarePen, Pencil } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { cn } from '@/lib/utils'
 
@@ -34,6 +34,7 @@ export default function RightNav() {
     updateCellChatInput,
     setCellEditOrigin,
     deleteCell,
+    cellActiveEntryId,
   } = useAppStore()
 
   const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set())
@@ -363,10 +364,16 @@ export default function RightNav() {
                     </div>
                   </div>
 
-                  {cell.chatHistory.length > 0 && cell.historyOpen && (
+                  {cell.chatHistory.length > 0 && cell.historyOpen && (() => {
+                    // "현재" 배지: 활성 엔트리가 지정되어 있으면 그 항목, 아니면 마지막 항목.
+                    const activeId = cellActiveEntryId[cell.id] ?? null
+                    const activeIdx = activeId !== null
+                      ? cell.chatHistory.findIndex((e) => e.id === activeId)
+                      : cell.chatHistory.length - 1
+                    return (
                     <div className="ml-3 pl-2 border-l-2 border-border-subtle mt-1 space-y-1.5 pb-2">
                           {cell.chatHistory.map((entry, hIdx) => {
-                            const isCurrent = entry.codeSnapshot === cell.code
+                            const isCurrent = hIdx === activeIdx
                             return (
                               <div
                                 key={entry.id}
@@ -382,8 +389,7 @@ export default function RightNav() {
                                   <div className={cn('text-[10px] text-text-primary font-medium flex-1', expandedEntry === `${cell.id}-${entry.id}` ? 'whitespace-normal break-words' : 'truncate')}>{entry.user}</div>
                                   <div className="flex items-center gap-1 shrink-0">
                                     <button
-                                      className="text-[8px] font-semibold px-1 py-0.5 rounded border opacity-0 group-hover:opacity-100 transition-opacity"
-                                      style={{ color: '#57534e', borderColor: '#e7e5e0', backgroundColor: '#ffffff' }}
+                                      className="p-1 rounded text-text-disabled opacity-0 group-hover:opacity-100 transition-opacity hover:text-text-secondary hover:bg-stone-100"
                                       title="이 메시지를 채팅 입력창에 불러오기"
                                       onClick={(e) => {
                                         e.stopPropagation()
@@ -395,16 +401,17 @@ export default function RightNav() {
                                         }, 50)
                                       }}
                                     >
-                                      수정
+                                      <Pencil size={10} />
                                     </button>
                                     {isCurrent ? (
                                       <span className="text-[8px] font-semibold px-1 py-0.5 rounded border" style={{ color: '#D95C3F', borderColor: '#ebc2b5', backgroundColor: '#ffffff' }}>현재</span>
                                     ) : (
                                       <button
-                                        className="text-[8px] font-semibold text-text-disabled opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 hover:text-primary"
+                                        className="p-1 rounded text-text-disabled opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary hover:bg-primary-light/40"
+                                        title="이 시점 코드로 되돌리기"
                                         onClick={(e) => { e.stopPropagation(); rollbackCell(cell.id, entry.id) }}
                                       >
-                                        <RotateCcw size={9} /> 되돌리기
+                                        <RotateCcw size={10} />
                                       </button>
                                     )}
                                     <button
@@ -420,7 +427,8 @@ export default function RightNav() {
                             )
                           })}
                     </div>
-                  )}
+                    )
+                  })()}
                   {navDrop?.id === cell.id && !navDrop.before && (
                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary z-10 pointer-events-none rounded" />
                   )}

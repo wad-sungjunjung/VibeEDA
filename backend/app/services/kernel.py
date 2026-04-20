@@ -144,15 +144,10 @@ def run_sql(notebook_id: str, cell_name: str, sql: str) -> dict:
         from decimal import Decimal
         import datetime as _dt
         conn = get_connection()
-        # fetch_pandas_all()은 세션 결과 포맷이 ARROW일 때만 동작. ARROW 실패 시
-        # 커서 내부 상태가 망가져 fetchall()도 연쇄 실패하므로, 실패하면 별도
-        # 세션 파라미터로 쿼리를 재실행해 JSON 결과를 fetchall로 읽는다.
+        # 세션 ARROW 포맷은 connect()의 session_parameters로 이미 설정됨.
+        # fetch_pandas_all 실패 시에만 새 커서로 JSON 결과 + fetchall 폴백.
         try:
             cur = conn.cursor()
-            try:
-                cur.execute("ALTER SESSION SET PYTHON_CONNECTOR_QUERY_RESULT_FORMAT = 'ARROW'")
-            except Exception:
-                pass
             cur.execute(sql)
             raw_df = cur.fetch_pandas_all()
         except Exception:

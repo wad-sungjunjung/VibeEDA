@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import re
 from typing import AsyncGenerator
 
 from google import genai
@@ -9,7 +10,7 @@ from google.genai import types
 
 from .claude_agent import _execute_tool, _build_system_prompt, NotebookState
 
-GENERATE_TIMEOUT_SEC = 90  # Gemini 단일 호출 타임아웃
+GENERATE_TIMEOUT_SEC = 300  # Gemini 단일 호출 타임아웃 (5분)
 REPEAT_CALL_LIMIT = 3      # 동일 tool+input 반복 허용 횟수
 
 logger = logging.getLogger(__name__)
@@ -152,42 +153,81 @@ async def run_agent_stream_gemini(
     contents.append(types.Content(role="user", parts=[types.Part.from_text(text=user_message)]))
 
     created_cell_ids: list[str] = []
+    import time as _time
     updated_cell_ids: list[str] = []
     MAX_TURNS = 15
+    NARRATION_MIN_CHARS = 20
+    LONG_RUN_SEC = 30
+    TOTAL_TOOL_LIMIT = 40
     repeat_counter: dict[str, int] = {}  # 동일 툴 호출 반복 감지
+    total_tool_calls = 0
+    narration_warning_used = False
+    long_run_warning_used = False
+    loop_started_at = _time.monotonic()
+    ask_user_called = False
+
+    def _norm_key(tool_name: str, inp: dict) -> str:
+        def _norm(v):
+            if isinstance(v, str):
+                return re.sub(r"\s+", " ", v.strip().lower())
+            if isinstance(v, dict):
+                return {k: _norm(vv) for k, vv in v.items()}
+            if isinstance(v, list):
+                return [_norm(vv) for vv in v]
+            return v
+        return f"{tool_name.lower()}:{json.dumps(_norm(inp), sort_keys=True, ensure_ascii=False)}"
 
     try:
         for turn in range(MAX_TURNS):
-            try:
-                response = await asyncio.wait_for(
-                    client.aio.models.generate_content(
-                        model=model,
-                        contents=contents,
-                        config=types.GenerateContentConfig(
-                            system_instruction=system_prompt,
-                            tools=[_GEMINI_TOOL],
-                            temperature=0.2,
+            retried_for_narration = False
+            while True:
+                try:
+                    response = await asyncio.wait_for(
+                        client.aio.models.generate_content(
+                            model=model,
+                            contents=contents,
+                            config=types.GenerateContentConfig(
+                                system_instruction=system_prompt,
+                                tools=[_GEMINI_TOOL],
+                                temperature=0.2,
+                            ),
                         ),
-                    ),
-                    timeout=GENERATE_TIMEOUT_SEC,
-                )
-            except asyncio.TimeoutError:
-                logger.error("Gemini generate_content timeout after %ss (turn=%d)", GENERATE_TIMEOUT_SEC, turn)
-                yield {
-                    "type": "error",
-                    "message": f"Gemini 응답이 {GENERATE_TIMEOUT_SEC}초 내에 오지 않아 중단했습니다. 모델을 Gemini 2.5 Pro로 변경하거나 잠시 후 다시 시도해주세요.",
-                }
-                return
+                        timeout=GENERATE_TIMEOUT_SEC,
+                    )
+                except asyncio.TimeoutError:
+                    logger.error("Gemini generate_content timeout after %ss (turn=%d)", GENERATE_TIMEOUT_SEC, turn)
+                    yield {
+                        "type": "error",
+                        "message": f"Gemini 응답이 {GENERATE_TIMEOUT_SEC}초 내에 오지 않아 중단했습니다. 모델을 Gemini 2.5 Pro로 변경하거나 잠시 후 다시 시도해주세요.",
+                    }
+                    return
 
-            if not response.candidates:
-                yield {"type": "error", "message": "Gemini가 빈 응답을 반환했습니다."}
-                return
+                if not response.candidates:
+                    yield {"type": "error", "message": "Gemini가 빈 응답을 반환했습니다."}
+                    return
 
-            candidate = response.candidates[0]
-            parts = (candidate.content.parts if candidate.content else None) or []
+                candidate = response.candidates[0]
+                parts = (candidate.content.parts if candidate.content else None) or []
 
-            text_parts = [p for p in parts if getattr(p, "text", None)]
-            func_call_parts = [p for p in parts if getattr(p, "function_call", None)]
+                text_parts = [p for p in parts if getattr(p, "text", None)]
+                func_call_parts = [p for p in parts if getattr(p, "function_call", None)]
+                text_total = sum(len(getattr(p, "text", "") or "") for p in text_parts)
+
+                # 내레이션 거부: 첫 턴 아니고 tool call 있고 텍스트 부족 → 재요청
+                if (turn > 0 and func_call_parts and text_total < NARRATION_MIN_CHARS
+                        and not retried_for_narration):
+                    retried_for_narration = True
+                    yield {"type": "message_delta", "content": "\n\n_[규칙 위반 감지: 텍스트 없이 도구 호출 — 재요청]_\n\n"}
+                    contents.append(types.Content(
+                        role="user",
+                        parts=[types.Part.from_text(text=(
+                            "❗ 방금 응답은 텍스트 해설 없이 function_call 만 있었습니다. "
+                            "도구를 호출하지 말고, 먼저 한국어 텍스트 한 문단으로 "
+                            "(1) 직전 결과 관찰·해석 1~3문장 + (2) 다음 행동·이유를 출력하세요."
+                        ))],
+                    ))
+                    continue
+                break
 
             for p in text_parts:
                 yield {"type": "message_delta", "content": p.text}
@@ -200,13 +240,21 @@ async def run_agent_stream_gemini(
             for p in func_call_parts:
                 fc = p.function_call
                 args = dict(fc.args) if fc.args else {}
-                key = f"{fc.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
+                total_tool_calls += 1
+                if total_tool_calls > TOTAL_TOOL_LIMIT:
+                    yield {
+                        "type": "error",
+                        "message": f"총 도구 호출이 {TOTAL_TOOL_LIMIT}회를 넘어 중단했습니다. 요청을 더 작게 쪼개거나 모델을 변경해주세요.",
+                    }
+                    safety_break = True
+                    break
+                key = _norm_key(fc.name, args)
                 repeat_counter[key] = repeat_counter.get(key, 0) + 1
                 if repeat_counter[key] > REPEAT_CALL_LIMIT:
                     logger.warning("Gemini repeat-call guard triggered: %s", key)
                     yield {
                         "type": "error",
-                        "message": f"같은 도구(`{fc.name}`) 를 {REPEAT_CALL_LIMIT}회 초과로 반복 호출해 중단했습니다. "
+                        "message": f"같은 도구(`{fc.name}`)를 {REPEAT_CALL_LIMIT}회 초과로 반복 호출해 중단했습니다. "
                                     "Snowflake 연결 또는 입력값을 확인해주세요.",
                     }
                     safety_break = True
@@ -216,11 +264,34 @@ async def run_agent_stream_gemini(
 
             contents.append(candidate.content)
 
+            # 리마인더 준비 (내레이션 규칙 위반은 매 턴 재주입)
+            text_total = sum(len(getattr(p, "text", "") or "") for p in text_parts)
+            narration_short = turn > 0 and text_total < NARRATION_MIN_CHARS
+            elapsed = _time.monotonic() - loop_started_at
+            long_run_trigger = elapsed > LONG_RUN_SEC and not long_run_warning_used and not ask_user_called
+            reminder_msgs: list[str] = []
+            if narration_short:
+                reminder_msgs.append(
+                    "❗규칙 위반: 직전 응답에 도구 호출 전 해설 텍스트가 없거나 너무 짧았습니다. "
+                    "다음 턴에서는 반드시 도구 호출 전에 (1) tool_result 관찰·해석 1~3문장 "
+                    "+ (2) 지금 취할 행동과 이유 — 한 문단의 한국어 텍스트를 먼저 출력한 뒤 도구를 호출하세요. "
+                    "이 규칙은 매 턴 적용됩니다."
+                )
+            if long_run_trigger:
+                reminder_msgs.append(
+                    f"분석이 {int(elapsed)}초째 진행 중입니다. "
+                    "지금 시점에서 (1) 현재 선택된 마트로 정말 답이 되는가, "
+                    "(2) 질문의 범위·기간·지표가 모호하지 않은가를 자문하세요. "
+                    "조금이라도 불확실하면 즉시 `ask_user` 를 호출해 사용자에게 재질문하세요."
+                )
+
             tool_response_parts = []
-            for p in func_call_parts:
+            for idx, p in enumerate(func_call_parts):
                 fc = p.function_call
                 args = dict(fc.args) if fc.args else {}
                 yield {"type": "tool_use", "tool": fc.name, "input": args}
+                if fc.name == "ask_user":
+                    ask_user_called = True
 
                 result, sse_events = await _execute_tool(fc.name, args, notebook_state)
 
@@ -231,9 +302,16 @@ async def run_agent_stream_gemini(
                     elif event["type"] == "cell_code_updated":
                         updated_cell_ids.append(event["cell_id"])
 
+                payload = dict(result) if isinstance(result, dict) else {"result": result}
+                if reminder_msgs and idx == len(func_call_parts) - 1:
+                    payload["_system_reminder"] = " / ".join(reminder_msgs)
+
                 tool_response_parts.append(
-                    types.Part.from_function_response(name=fc.name, response=result)
+                    types.Part.from_function_response(name=fc.name, response=payload)
                 )
+
+            if long_run_trigger:
+                long_run_warning_used = True
 
             contents.append(types.Content(role="user", parts=tool_response_parts))
 

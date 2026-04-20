@@ -16,6 +16,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
+import { useConnectionStore } from '@/store/connectionStore'
 import { cn } from '@/lib/utils'
 import ModelSettingsModal from '@/components/common/ModelSettingsModal'
 import ConnectionModal from '@/components/common/ConnectionModal'
@@ -39,6 +40,9 @@ export default function LeftSidebar() {
     newAnalysis,
     loadAnalysis,
   } = useAppStore()
+
+  const sfUser = useConnectionStore((s) => s.sfUser)
+  const displayName = sfUser ? sfUser.split('@')[0] : '하우'
 
   const [addingFolder, setAddingFolder] = useState(false)
   const [folderInput, setFolderInput] = useState('')
@@ -230,7 +234,7 @@ export default function LeftSidebar() {
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary-pale to-primary flex items-center justify-center shrink-0">
           <User size={14} className="text-white" />
         </div>
-        <span className="text-[12px] font-medium text-text-secondary">하우</span>
+        <span className="text-[12px] font-medium text-text-secondary truncate" title={sfUser || displayName}>{displayName}</span>
       </div>
 
       {showModelSettings && (

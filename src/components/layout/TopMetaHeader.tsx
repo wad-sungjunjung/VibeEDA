@@ -36,7 +36,6 @@ export default function TopMetaHeader() {
     addMart,
     removeMart,
     setMartSearchQuery,
-    setMartInfoExpanded,
     setShowReportModal,
     executeAllCells,
     executingCells,
@@ -93,16 +92,6 @@ export default function TopMetaHeader() {
     setViewedMarts((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     )
-  }
-
-  function toggleFilter(key: string) {
-    setActiveFilters((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-    setMartPage(0)
   }
 
   async function handleAiRecommend() {
@@ -166,7 +155,6 @@ export default function TopMetaHeader() {
   const unselectedMarts = prefixFiltered
   const totalPages = Math.ceil(unselectedMarts.length / PAGE_SIZE)
   const pagedMarts = unselectedMarts.slice(martPage * PAGE_SIZE, (martPage + 1) * PAGE_SIZE)
-  const selectedMartObjects = martCatalog.filter((m) => selectedMarts.includes(m.key))
 
   return (
     <div className="bg-white border-b border-border-subtle shrink-0">

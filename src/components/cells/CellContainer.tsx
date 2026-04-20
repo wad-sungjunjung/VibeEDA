@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
-import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown } from 'lucide-react'
+import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useModelStore, VIBE_MODELS } from '@/store/modelStore'
 import type { Cell, CellPanelTab } from '@/types'
@@ -36,6 +36,7 @@ export default function CellContainer({ cell }: Props) {
     vibingCells,
     updateCellChatInput,
     submitVibe,
+    cancelVibe,
     cells,
     notebookAreaHeight,
   } = useAppStore()
@@ -50,16 +51,6 @@ export default function CellContainer({ cell }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const splitContainerRef = useRef<HTMLDivElement>(null)
   const leftColRef = useRef<HTMLDivElement>(null)
-  const [leftColHeight, setLeftColHeight] = useState<number | null>(null)
-
-  useEffect(() => {
-    const el = leftColRef.current
-    if (!el) { setLeftColHeight(null); return }
-    const ro = new ResizeObserver(() => setLeftColHeight(el.clientHeight))
-    ro.observe(el)
-    setLeftColHeight(el.clientHeight)
-    return () => ro.disconnect()
-  }, [cell.splitMode, cell.splitDir, cell.leftTab, cell.rightTab])
   const [splitRatio, setSplitRatio] = useState(() => loadCellUi(cell.id).splitRatio ?? 50)
   const [vSplitRatio, setVSplitRatio] = useState(() => loadCellUi(cell.id).vSplitRatio ?? 50)
 
@@ -402,7 +393,11 @@ export default function CellContainer({ cell }: Props) {
             )
           }
           if (cell.splitMode) {
-            const rightHeight = leftColHeight ? Math.min(leftColHeight, V_TOTAL) : undefined
+            // 열 높이는 입력/메모의 자연 크기에 맞추고, 출력은 그 높이에 맞춰 늘어나게 한다.
+            // 출력(특히 테이블)이 수백 px 밀어올리는 것을 막기 위해 출력 탭이 있는 열은 "grow 소스"에서 제외
+            const leftIsOutput = cell.leftTab === 'output'
+            const rightIsOutput = cell.rightTab === 'output'
+            const BASE_HEIGHT = 360
             return (
               <div
                 ref={splitContainerRef}
@@ -411,30 +406,42 @@ export default function CellContainer({ cell }: Props) {
                   gridTemplateColumns: `${splitRatio}% 10px calc(${100 - splitRatio}% - 18px)`,
                   columnGap: 4,
                   maxHeight: V_TOTAL,
-                  alignItems: 'start',
+                  minHeight: BASE_HEIGHT,
+                  alignItems: 'stretch',
                 }}
               >
-                <div ref={leftColRef} className="min-w-0 flex flex-col" style={{ maxHeight: V_TOTAL, overflow: 'hidden' }}>
+                <div ref={leftColRef} className="min-w-0 flex flex-col" style={{ maxHeight: V_TOTAL, minHeight: BASE_HEIGHT, overflow: 'hidden' }}>
                   {renderTabBar(cell.leftTab, (t) => setSplitTab(cell.id, 'left', t))}
-                  <div className="flex-1 min-h-0 overflow-auto">
-                    {renderPanel(cell.leftTab, 360, true)}
+                  <div className={cn('flex-1 min-h-0', leftIsOutput ? 'overflow-hidden' : 'overflow-auto')}>
+                    {renderPanel(cell.leftTab, BASE_HEIGHT, true)}
                   </div>
                 </div>
                 <div
                   className="flex items-center justify-center cursor-col-resize group/div"
-                  style={{ height: rightHeight }}
                   onMouseDown={handleDividerMouseDown}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="w-px h-full rounded-full transition-colors group-hover/div:bg-primary" style={{ backgroundColor: '#ede9dd' }} />
                 </div>
-                <div className="min-w-0 flex flex-col" style={{ height: rightHeight, overflow: 'hidden' }}>
+                <div className="min-w-0 flex flex-col" style={{ maxHeight: V_TOTAL, minHeight: BASE_HEIGHT, overflow: 'hidden' }}>
                   {renderTabBar(cell.rightTab, (t) => setSplitTab(cell.id, 'right', t))}
-                  <div className="flex-1 min-h-0 overflow-auto">
-                    {renderPanel(cell.rightTab, 360, true)}
+                  <div className={cn('flex-1 min-h-0', rightIsOutput ? 'overflow-hidden' : 'overflow-auto')}>
+                    {renderPanel(cell.rightTab, BASE_HEIGHT, true)}
                   </div>
                 </div>
               </div>
+            )
+          }
+          // 단일 패널 모드: 출력 탭은 기본 셀 크기(360px)로 고정 스크롤, 입력/메모는 내용 크기 허용.
+          const SINGLE_BASE = 360
+          if (cell.activeTab === 'output') {
+            return (
+              <>
+                {renderTabBar(cell.activeTab, (t) => setCellTab(cell.id, t))}
+                <div style={{ height: SINGLE_BASE, overflow: 'hidden' }}>
+                  {renderPanel(cell.activeTab, SINGLE_BASE, true)}
+                </div>
+              </>
             )
           }
           return (
@@ -488,6 +495,14 @@ export default function CellContainer({ cell }: Props) {
                   {(vibeElapsed / 10).toFixed(1)}s
                 </span>
               </div>
+              <button
+                title="생성 중지"
+                onClick={(e) => { e.stopPropagation(); cancelVibe(cell.id) }}
+                className="absolute top-1/2 right-3 -translate-y-1/2 z-[50] flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
+                style={{ backgroundColor: '#fdede8', color: '#c94a2e', border: '1px solid #f5c5b5' }}
+              >
+                <StopCircle size={12} />중지
+              </button>
             </>
           )}
 

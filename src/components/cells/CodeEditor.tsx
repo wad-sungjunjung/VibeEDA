@@ -14,6 +14,12 @@ const fnCallTheme = EditorView.theme({
   '.cm-fn-call, .cm-fn-call span': { color: '#56d364 !important' },
 })
 
+// .cm-editor가 wrapper 전체 높이를 채우도록 강제. 내부 .cm-scroller가 끝까지
+// 늘어나 가로 스크롤바가 박스 하단에 붙는다 (콘텐츠가 짧을 때도 동일).
+const fillHeightTheme = EditorView.theme({
+  '&': { height: '100%' },
+})
+
 const fnCallMark = Decoration.mark({ class: 'cm-fn-call' })
 const IDENT_RE = /[A-Za-z_][A-Za-z0-9_]*/g
 
@@ -66,14 +72,15 @@ export default function CodeEditor({ type, value, onChange, onRun, fixedHeight, 
     type === 'sql' ? sql() : type === 'python' ? python() : markdown(),
     keymap.of([indentWithTab]),
     ...(type !== 'markdown' ? [...snowflakeTheme, fnCallTheme, fnCallHighlighter] : []),
+    fillHeightTheme,
   ], [type, runKeymap])
 
   const style: React.CSSProperties = fixedHeight
     ? { height: fixedHeight, overflow: 'hidden', borderRadius: 6 }
-    : { minHeight: 360, borderRadius: 6 }
+    : { minHeight: 360, borderRadius: 6, display: 'flex', flexDirection: 'column' }
 
   return (
-    <div style={style} onClick={(e) => e.stopPropagation()}>
+    <div style={style} onClick={(e) => e.stopPropagation()} className={fixedHeight ? undefined : '[&>*]:flex-1 [&>*]:min-h-0'}>
       <CodeMirror
         value={value}
         height={fixedHeight ? `${fixedHeight}px` : undefined}

@@ -51,6 +51,8 @@ import { useModelStore } from '@/store/modelStore'
 // ─── Debounce utility ────────────────────────────────────────────────────────
 
 const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const _vibeControllers = new Map<string, AbortController>()
+let _agentController: AbortController | null = null
 function debounced(key: string, fn: () => void, delay = 800) {
   const t = _debounceTimers.get(key)
   if (t) clearTimeout(t)
@@ -89,7 +91,7 @@ function rowToCell(row: CellRow): Cell {
     executedAt: null,
     output: (row.output as Cell['output']) ?? null,
     chatInput: '',
-    chatHistory: row.chat_entries.map((e, i) => ({
+    chatHistory: row.chat_entries.map((e, i, arr) => ({
       id: i + 1,
       user: e.user_message,
       assistant: e.assistant_reply,
@@ -98,6 +100,9 @@ function rowToCell(row: CellRow): Cell {
         minute: '2-digit',
       }),
       codeSnapshot: e.code_snapshot,
+      // legacy 엔트리(code_result 없음): 다음 엔트리의 snapshot(=N+1 pre=N post).
+      // 마지막 엔트리이면서 code_result 비어있으면 현재 row.code로 폴백.
+      codeResult: e.code_result ?? (i < arr.length - 1 ? arr[i + 1].code_snapshot : row.code),
     })),
     historyOpen: row.chat_entries.length > 0,
     insight: row.insight ?? null,
@@ -189,7 +194,9 @@ interface AppStore {
   updateCellChatInput: (id: string, input: string) => void
   cellEditOrigins: Record<string, number>
   setCellEditOrigin: (cellId: string, idx: number | null) => void
+  cellActiveEntryId: Record<string, number | null>
   submitVibe: (cellId: string, message: string) => void
+  cancelVibe: (cellId: string) => void
   rollbackCell: (cellId: string, entryId: number) => void
   deleteChatEntry: (cellId: string, index: number) => void
   toggleCellHistory: (id: string) => void
@@ -201,13 +208,16 @@ interface AppStore {
   agentChatHistory: AgentMessage[]
   agentSessions: AgentSession[]
   agentSessionTitle: string | null
+  currentSessionCreatedAtMs: number | null
   agentLoading: boolean
+  agentStartedAtMs: number | null
   agentStatus: string | null
   agentRefCells: string[]
   toggleAgentRefCell: (id: string) => void
   toggleAgentMode: () => void
   setAgentChatInput: (v: string) => void
   submitAgentMessage: (message: string) => void
+  cancelAgent: () => void
   newAgentSession: () => void
   resumeAgentSession: (id: string) => void
   deleteAgentSession: (id: string) => void
@@ -698,6 +708,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   cellEditOrigins: {},
+  cellActiveEntryId: {},
 
   setCellEditOrigin: (cellId, idx) =>
     set((s) => {
@@ -739,6 +750,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
 
     let finalCode = ''
+    const controller = new AbortController()
+    _vibeControllers.set(cellId, controller)
 
     try {
       await streamVibeChat(
@@ -770,15 +783,26 @@ export const useAppStore = create<AppStore>((set, get) => ({
               assistant: event.explanation || finalCode.slice(0, 80),
               timestamp: nowTimestamp(),
               codeSnapshot,
+              codeResult: finalCode,
             }
             set((s) => ({
               cells: s.cells.map((c) =>
                 c.id === cellId ? { ...c, code: finalCode, chatHistory: [...c.chatHistory, entry] } : c
               ),
+              cellActiveEntryId: { ...s.cellActiveEntryId, [cellId]: null },
             }))
             const { notebookId: nbId } = get()
-            if (nbId) debounced(`code-${cellId}`, () => updateCell(nbId!, cellId, { code: finalCode }).catch(() => {}), 200)
-            get().executeCell(cellId)
+            // 실행 전에 최종 코드가 파일에 반영돼 있어야 한다. debounce 취소 후 동기 저장.
+            const debounceKey = `code-${cellId}`
+            const t = _debounceTimers.get(debounceKey)
+            if (t) { clearTimeout(t); _debounceTimers.delete(debounceKey) }
+            if (nbId) {
+              updateCell(nbId, cellId, { code: finalCode })
+                .catch(() => {})
+                .finally(() => { get().executeCell(cellId) })
+            } else {
+              get().executeCell(cellId)
+            }
           } else if (event.type === 'error') {
             console.error('Vibe error:', event.message)
             set((s) => ({
@@ -788,18 +812,29 @@ export const useAppStore = create<AppStore>((set, get) => ({
             }))
           }
         },
+        controller.signal,
       )
     } catch (err) {
-      console.error('Vibe chat failed:', err)
+      const aborted = (err as { name?: string })?.name === 'AbortError'
+      if (!aborted) console.error('Vibe chat failed:', err)
       set((s) => ({
         cells: s.cells.map((c) =>
           c.id === cellId ? { ...c, code: codeSnapshot } : c
         ),
       }))
     } finally {
+      _vibeControllers.delete(cellId)
       set((s) => ({
         vibingCells: new Set([...s.vibingCells].filter((id) => id !== cellId)),
       }))
+    }
+  },
+
+  cancelVibe: (cellId) => {
+    const ctrl = _vibeControllers.get(cellId)
+    if (ctrl) {
+      ctrl.abort()
+      _vibeControllers.delete(cellId)
     }
   },
 
@@ -810,13 +845,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const entry = cell.chatHistory.find((e) => e.id === entryId)
     if (!entry) return
 
+    const targetCode = entry.codeResult
+
     set((s) => ({
-      cells: s.cells.map((c) => (c.id === cellId ? { ...c, code: entry.codeSnapshot } : c)),
+      cells: s.cells.map((c) => (c.id === cellId ? { ...c, code: targetCode } : c)),
+      cellActiveEntryId: { ...s.cellActiveEntryId, [cellId]: entryId },
       rollbackToast: { cellName: cell.name, timestamp: entry.timestamp },
     }))
 
     const { notebookId } = get()
-    if (notebookId) updateCell(notebookId, cellId, { code: entry.codeSnapshot }).catch(() => {})
+    if (notebookId) updateCell(notebookId, cellId, { code: targetCode }).catch(() => {})
     setTimeout(() => set({ rollbackToast: null }), 3000)
   },
 
@@ -849,7 +887,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   agentChatHistory: [],
   agentSessions: [],
   agentSessionTitle: null,
+  currentSessionCreatedAtMs: null,
   agentLoading: false,
+  agentStartedAtMs: null,
   agentStatus: null,
   agentRefCells: [],
 
@@ -871,7 +911,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })),
 
   newAgentSession: () => {
-    const { agentChatHistory, agentSessions, agentSessionTitle, notebookId } = get()
+    const { agentChatHistory, agentSessions, agentSessionTitle, notebookId, currentSessionCreatedAtMs } = get()
     if (!agentChatHistory.length) return
     const firstUser = agentChatHistory.find((m) => m.role === 'user')
     const fallback = (firstUser?.content ?? '새 대화').trim().replace(/\s+/g, ' ')
@@ -881,41 +921,52 @@ export const useAppStore = create<AppStore>((set, get) => ({
       id: generateId('as'),
       title,
       startedAt: agentChatHistory[0]?.timestamp ?? nowTimestamp(),
+      createdAtMs: currentSessionCreatedAtMs ?? Date.now(),
       messages: agentChatHistory,
     }
-    const updated = [...agentSessions, session]
-    set({ agentChatHistory: [], agentSessions: updated, agentSessionTitle: null, agentRefCells: [] })
+    // 생성 시점 오름차순 위치에 삽입 (기존 순서 유지)
+    const updated = [...agentSessions]
+    const insertAt = updated.findIndex((s) => (s.createdAtMs ?? 0) > (session.createdAtMs ?? 0))
+    if (insertAt < 0) updated.push(session)
+    else updated.splice(insertAt, 0, session)
+    set({ agentChatHistory: [], agentSessions: updated, agentSessionTitle: null, currentSessionCreatedAtMs: null, agentRefCells: [] })
     if (notebookId) saveAgentSessions(notebookId, updated)
   },
 
   resumeAgentSession: (id) => {
-    const { agentChatHistory, agentSessions, agentSessionTitle, agentLoading, notebookId } = get()
+    const { agentChatHistory, agentSessions, agentSessionTitle, agentLoading, notebookId, currentSessionCreatedAtMs } = get()
     if (agentLoading) return
-    const target = agentSessions.find((s) => s.id === id)
-    if (!target) return
+    const targetIdx = agentSessions.findIndex((s) => s.id === id)
+    if (targetIdx < 0) return
+    const target = agentSessions[targetIdx]
 
-    let sessions = agentSessions.filter((s) => s.id !== id)
-
+    // 현재 대화가 있으면 원래 생성 순서 위치에 아카이브 (가장 아래로 밀리지 않게).
+    let sessions: AgentSession[] = [...agentSessions]
     if (agentChatHistory.length > 0) {
       const firstUser = agentChatHistory.find((m) => m.role === 'user')
       const fallback = (firstUser?.content ?? '새 대화').trim().replace(/\s+/g, ' ')
       const fallbackTitle = fallback.length > 40 ? fallback.slice(0, 40) + '…' : fallback
       const title = agentSessionTitle?.trim() || fallbackTitle
-      sessions = [
-        ...sessions,
-        {
-          id: generateId('as'),
-          title,
-          startedAt: agentChatHistory[0]?.timestamp ?? nowTimestamp(),
-          messages: agentChatHistory,
-        },
-      ]
+      const archived: AgentSession = {
+        id: generateId('as'),
+        title,
+        startedAt: agentChatHistory[0]?.timestamp ?? nowTimestamp(),
+        createdAtMs: currentSessionCreatedAtMs ?? Date.now(),
+        messages: agentChatHistory,
+      }
+      // 생성 시점 오름차순으로 정렬된 위치에 삽입
+      const insertAt = sessions.findIndex((s) => (s.createdAtMs ?? 0) > (archived.createdAtMs ?? 0))
+      if (insertAt < 0) sessions.push(archived)
+      else sessions.splice(insertAt, 0, archived)
     }
+    // resume한 세션은 목록에서 제거 (활성 대화로 올라감)
+    sessions = sessions.filter((s) => s.id !== id)
 
     set({
       agentChatHistory: target.messages,
       agentSessions: sessions,
       agentSessionTitle: target.title,
+      currentSessionCreatedAtMs: target.createdAtMs ?? Date.now(),
       agentRefCells: [],
       agentMode: true,
     })
@@ -1004,7 +1055,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((s) => ({
       agentChatHistory: [...s.agentChatHistory, userMsg],
       agentChatInput: '',
+      currentSessionCreatedAtMs: isFirstUserMsg ? Date.now() : (s.currentSessionCreatedAtMs ?? Date.now()),
       agentLoading: true,
+      agentStartedAtMs: Date.now(),
       agentStatus: '생각 중',
     }))
 
@@ -1031,7 +1084,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return
     }
 
-    const { cells, selectedMarts, analysisTheme, analysisDescription, agentChatHistory, notebookId } = get()
+    const { cells, selectedMarts, martCatalog, analysisTheme, analysisDescription, agentChatHistory, notebookId } = get()
     const assistantMsgId = generateId('am')
     set((s) => ({
       agentChatHistory: [
@@ -1042,6 +1095,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     const createdCellIds: string[] = []
     let currentAssistantMsgId: string = assistantMsgId
+    _agentController = new AbortController()
 
     try {
       await streamAgentMessage(
@@ -1049,6 +1103,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
           message,
           cells: cells.map((c) => ({ id: c.id, name: c.name, type: c.type, code: c.code, executed: c.executed })),
           selected_marts: selectedMarts,
+          mart_metadata: martCatalog
+            .filter((m) => selectedMarts.includes(m.key))
+            .map((m) => ({ key: m.key, description: m.description, columns: m.columns })),
           analysis_theme: analysisTheme,
           analysis_description: analysisDescription,
           conversation_history: agentChatHistory
@@ -1157,15 +1214,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
               agentStatus: '출력 분석 중',
               cells: s.cells.map((c) => {
                 if (c.id !== event.cell_id) return c
+                const out = event.output ?? null
                 if (c.agentGenerated) {
                   return {
                     ...c,
-                    executed: true, executedAt, output: event.output,
-                    splitMode: true, splitDir: 'h',
-                    activeTab: 'output', leftTab: 'output', rightTab: 'memo',
+                    executed: true, executedAt, output: out,
+                    splitMode: true, splitDir: 'h' as const,
+                    activeTab: 'output' as const, leftTab: 'output' as const, rightTab: 'memo' as const,
                   }
                 }
-                return { ...c, executed: true, executedAt, output: event.output, activeTab: 'output', rightTab: 'output' }
+                return { ...c, executed: true, executedAt, output: out, activeTab: 'output' as const, rightTab: 'output' as const }
               }),
             }))
             enrichLastStep({
@@ -1207,12 +1265,33 @@ export const useAppStore = create<AppStore>((set, get) => ({
             }))
           }
         },
+        _agentController.signal,
       )
     } catch (err) {
-      console.error('Agent stream failed:', err)
+      const aborted = (err as { name?: string })?.name === 'AbortError'
+      if (!aborted) console.error('Agent stream failed:', err)
     } finally {
-      set({ agentLoading: false, agentStatus: null })
+      _agentController = null
+      set({ agentLoading: false, agentStartedAtMs: null, agentStatus: null })
     }
+  },
+
+  cancelAgent: () => {
+    if (_agentController) {
+      _agentController.abort()
+      _agentController = null
+    }
+    set((s) => {
+      const history = [...s.agentChatHistory]
+      for (let i = history.length - 1; i >= 0; i--) {
+        const m = history[i]
+        if (m.kind !== 'step' && m.role === 'assistant' && !m.content) {
+          history[i] = { ...m, content: '중지되었습니다.' }
+          break
+        }
+      }
+      return { agentChatHistory: history }
+    })
   },
 
   // ── History & Folders ──────────────────────────────────────────

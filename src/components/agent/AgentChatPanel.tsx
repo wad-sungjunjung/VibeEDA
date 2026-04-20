@@ -1,7 +1,8 @@
 import { useRef, useEffect, useState } from 'react'
-import { Telescope, X, User, ArrowUp, Plus, FileCode, Search, SquarePen, ChevronDown, ChevronRight, Loader2, Wrench, FileCode2, PlayCircle, StickyNote, AlertTriangle } from 'lucide-react'
+import { Telescope, X, User, ArrowUp, Plus, FileCode, Search, SquarePen, ChevronDown, ChevronRight, Loader2, Wrench, FileCode2, PlayCircle, StickyNote, AlertTriangle, StopCircle } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useModelStore, AGENT_MODELS } from '@/store/modelStore'
+import { useConnectionStore } from '@/store/connectionStore'
 import { cn } from '@/lib/utils'
 import Markdown from '@/components/common/Markdown'
 
@@ -20,15 +21,31 @@ export default function AgentChatPanel() {
     agentChatInput,
     agentRefCells,
     agentLoading,
+    agentStartedAtMs,
     agentStatus,
     toggleAgentMode,
     setAgentChatInput,
     submitAgentMessage,
+    cancelAgent,
     toggleAgentRefCell,
     newAgentSession,
   } = useAppStore()
 
+  // 에이전트 실행 경과 시간 — 스토어의 시작 시각을 기준으로 현재 시각에서 빼서 계산.
+  // 컴포넌트 mount/unmount와 무관하게 올바른 경과 시간이 표시됨.
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!agentLoading) return
+    const t = setInterval(() => setTick((v) => v + 1), 100)
+    return () => clearInterval(t)
+  }, [agentLoading])
+  const agentElapsed = agentLoading && agentStartedAtMs
+    ? Math.floor((Date.now() - agentStartedAtMs) / 100)
+    : 0
+
   const { agentModel, setAgentModel } = useModelStore()
+  const sfUser = useConnectionStore((s) => s.sfUser)
+  const displayName = sfUser ? sfUser.split('@')[0] : '하우'
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -60,8 +77,6 @@ export default function AgentChatPanel() {
       chatItems.push({ kind: 'msg', msg: m, idx: i })
     }
   }
-
-  const currentAgentModel = AGENT_MODELS.find((m) => m.value === agentModel) ?? AGENT_MODELS[0]
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -192,7 +207,7 @@ export default function AgentChatPanel() {
               </div>
               <div className={cn('flex-1 min-w-0 max-w-[80%] flex flex-col', msg.role === 'user' ? 'items-end' : 'items-start')}>
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-[10px] font-semibold text-text-secondary">{msg.role === 'user' ? '하우' : '에이전트'}</span>
+                  <span className="text-[10px] font-semibold text-text-secondary">{msg.role === 'user' ? displayName : '에이전트'}</span>
                   <span className="text-[9px] text-text-disabled">{msg.timestamp}</span>
                 </div>
                 <div
@@ -200,10 +215,34 @@ export default function AgentChatPanel() {
                   style={{ backgroundColor: msg.role === 'user' ? '#fdede8' : '#faf8f2', border: '1px solid', borderColor: msg.role === 'user' ? '#f5d5c8' : '#ede9dd' }}
                 >
                   {msg.role === 'assistant' && !msg.content && agentLoading && isLast ? (
-                    <span className="flex items-center gap-1.5 whitespace-nowrap" style={{ color: '#c94a2e' }}>
-                      <Loader2 size={12} className="animate-spin" />
-                      <span className="text-[12px] font-semibold">{agentStatus ?? '생각 중'}</span>
-                    </span>
+                    <div className="flex flex-col gap-1.5">
+                      <span className="flex items-center gap-2 whitespace-nowrap" style={{ color: '#c94a2e' }}>
+                        <Loader2 size={12} className="animate-spin" />
+                        <span className="text-[12px] font-semibold">{agentStatus ?? '생각 중'}</span>
+                        <span className="font-mono text-[11px]" style={{ color: '#c94a2e99' }}>
+                          {(agentElapsed / 10).toFixed(1)}s
+                        </span>
+                        <button
+                          title="에이전트 중지"
+                          onClick={() => cancelAgent()}
+                          className="ml-1 flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors"
+                          style={{ backgroundColor: '#fdede8', color: '#c94a2e', border: '1px solid #f5c5b5' }}
+                        >
+                          <StopCircle size={11} />중지
+                        </button>
+                      </span>
+                      {agentElapsed >= 300 && (
+                        <div
+                          className="flex items-start gap-1.5 text-[11px] leading-relaxed px-2 py-1.5 rounded-md"
+                          style={{ backgroundColor: '#fff7ed', border: '1px dashed #f5c5b5', color: '#7a3a22' }}
+                        >
+                          <AlertTriangle size={11} className="shrink-0 mt-0.5" />
+                          <span>
+                            30초가 지났어요. 혹시 <b>질문이 모호</b>하거나 <b>선택된 마트가 부족</b>하진 않은지 한 번 확인해보세요. 그대로 진행해도 되지만 더 빨리 답을 받으려면 중지 후 질문을 구체화하거나 마트를 추가해보세요.
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   ) : msg.role === 'assistant' ? (
                     <Markdown content={msg.content} />
                   ) : (

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import uuid
 from dataclasses import dataclass, field
 from typing import Literal, Optional, AsyncGenerator
@@ -9,6 +10,42 @@ import anthropic
 from .naming import to_snake_case
 from . import mart_tools
 from .code_style import SQL_STYLE_GUIDE, PYTHON_RULES
+
+
+# ─── SQL whitelist 검증 ───────────────────────────────────────────────────────
+
+_TABLE_REF_RE = re.compile(
+    r"\b(?:from|join)\s+([a-zA-Z_][\w.]*)", re.IGNORECASE
+)
+
+
+def _extract_referenced_tables(sql: str) -> set[str]:
+    """SQL 문자열에서 from/join 뒤의 테이블 참조를 추출해 소문자 단일 이름으로 반환.
+    - 스키마/DB 경로가 포함돼 있으면 마지막 토큰만 취함
+    - CTE 이름은 WITH 블록에서 정의된 것들과 겹치면 별도 판단 필요 (여기선 간단히 제외)
+    """
+    refs: set[str] = set()
+    for m in _TABLE_REF_RE.finditer(sql):
+        full = m.group(1)
+        bare = full.rsplit(".", 1)[-1].lower()
+        refs.add(bare)
+    # CTE 정의: `with foo as (`, `), bar as (` 패턴에서 이름 추출
+    cte_names: set[str] = set()
+    for m in re.finditer(r"(?:with|,)\s+([a-zA-Z_]\w*)\s+as\s*\(", sql, re.IGNORECASE):
+        cte_names.add(m.group(1).lower())
+    return refs - cte_names
+
+
+def _whitelist_violation(sql: str, selected_marts: list[str]) -> Optional[str]:
+    """SQL이 선택 밖의 테이블을 참조하면 위반 테이블명 반환. 통과하면 None."""
+    if not selected_marts:
+        return None   # 선택 없음 = 체크 생략 (초기 상태)
+    allowed = {m.lower() for m in selected_marts}
+    refs = _extract_referenced_tables(sql)
+    for r in refs:
+        if r not in allowed:
+            return r
+    return None
 
 
 # ─── Notebook state ──────────────────────────────────────────────────────────
@@ -28,6 +65,7 @@ class CellState:
 class NotebookState:
     cells: list[CellState] = field(default_factory=list)
     selected_marts: list[str] = field(default_factory=list)
+    mart_metadata: list[dict] = field(default_factory=list)
     analysis_theme: str = ""
     analysis_description: str = ""
     notebook_id: str = ""
@@ -241,6 +279,22 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
         code = inp.get("code", "")
         after_id = inp.get("after_cell_id")
 
+        # SQL 셀 whitelist 검증: 선택 밖 마트 참조 차단
+        if cell_type == "sql":
+            viol = _whitelist_violation(code, state.selected_marts)
+            if viol:
+                return {
+                    "success": False,
+                    "error": "mart_not_selected_in_sql",
+                    "message": (
+                        f"작성한 SQL이 '{viol}' 테이블을 참조하는데, 이 마트는 "
+                        f"'사용 마트'에 포함되어 있지 않습니다. 선택된 마트는 "
+                        f"[{', '.join(state.selected_marts)}] 뿐입니다. "
+                        "ask_user를 호출해 사용자에게 상단 헤더의 '사용 마트'에서 "
+                        "해당 마트 추가를 요청하거나, 선택된 마트만으로 쿼리를 다시 작성하세요."
+                    ),
+                }, []
+
         new_cell = CellState(id=cell_id, name=name_val, type=cell_type, code=code)
         if after_id:
             idx = next((i for i, c in enumerate(state.cells) if c.id == after_id), -1)
@@ -276,7 +330,21 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
         cell = next((c for c in state.cells if c.id == inp["cell_id"]), None)
         if not cell:
             return {"success": False, "error": "Cell not found"}, []
-        cell.code = inp["code"]
+        new_code = inp["code"]
+        if cell.type == "sql":
+            viol = _whitelist_violation(new_code, state.selected_marts)
+            if viol:
+                return {
+                    "success": False,
+                    "error": "mart_not_selected_in_sql",
+                    "message": (
+                        f"수정한 SQL이 '{viol}' 테이블을 참조하는데, 이 마트는 "
+                        f"'사용 마트'에 포함되어 있지 않습니다. 선택된 마트는 "
+                        f"[{', '.join(state.selected_marts)}] 뿐입니다. "
+                        "ask_user로 마트 추가 요청하거나, 선택된 마트만으로 다시 작성하세요."
+                    ),
+                }, []
+        cell.code = new_code
         events: list[dict] = [{"type": "cell_code_updated", "cell_id": cell.id, "code": cell.code}]
 
         # 코드 변경 후 즉시 재실행
@@ -333,21 +401,30 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
             return {"error": "Cell has not been executed"}, []
         return {"cell_id": cell.id, "output_summary": _format_output_for_claude(cell.output)}, []
 
-    if name == "get_mart_schema":
+    if name in ("get_mart_schema", "preview_mart", "profile_mart"):
+        mart_key = inp.get("mart_key", "")
+        # 선택된 마트 whitelist 체크.
+        selected_lc = {m.lower() for m in state.selected_marts}
+        if state.selected_marts and mart_key.lower() not in selected_lc:
+            return {
+                "error": "mart_not_selected",
+                "message": (
+                    f"'{mart_key}'는 현재 '사용 마트'에 포함되어 있지 않습니다. "
+                    f"선택된 마트는 [{', '.join(state.selected_marts)}] 뿐입니다. "
+                    "이 마트가 필요하면 ask_user를 호출해 사용자에게 "
+                    "상단 헤더의 '사용 마트'에서 해당 마트 추가를 요청하세요."
+                ),
+            }, []
+        # 이벤트 루프 블로킹 방지: Snowflake 동기 드라이버 호출은 executor에서 실행
+        import asyncio as _asyncio
+        loop = _asyncio.get_event_loop()
         try:
-            return mart_tools.get_mart_schema(inp["mart_key"]), []
-        except Exception as e:
-            return {"error": str(e)}, []
-
-    if name == "preview_mart":
-        try:
-            return mart_tools.preview_mart(inp["mart_key"], inp.get("limit", 5)), []
-        except Exception as e:
-            return {"error": str(e)}, []
-
-    if name == "profile_mart":
-        try:
-            return mart_tools.profile_mart(inp["mart_key"]), []
+            if name == "get_mart_schema":
+                return await loop.run_in_executor(None, mart_tools.get_mart_schema, mart_key), []
+            if name == "preview_mart":
+                limit = inp.get("limit", 5)
+                return await loop.run_in_executor(None, mart_tools.preview_mart, mart_key, limit), []
+            return await loop.run_in_executor(None, mart_tools.profile_mart, mart_key), []
         except Exception as e:
             return {"error": str(e)}, []
 
@@ -393,6 +470,25 @@ def _build_system_prompt(state: NotebookState) -> str:
     from . import snowflake_session
     sf_connected = snowflake_session.is_connected()
     sf_status = "연결됨" if sf_connected else "미연결 — Snowflake 관련 도구(get_mart_schema, preview_mart, profile_mart, SQL 실행) 사용 불가. 필요 시 ask_user로 연결 요청"
+
+    # 선택된 마트의 컬럼 스키마를 프롬프트에 미리 주입 → get_mart_schema 재호출 불필요
+    mart_schema_block = ""
+    if state.mart_metadata:
+        lines = []
+        for m in state.mart_metadata:
+            cols = m.get("columns") or []
+            col_descs = ", ".join(
+                f"{c.get('name', '')}({c.get('type', '')})"
+                + (f" — {c['desc']}" if c.get("desc") else "")
+                for c in cols
+            )
+            lines.append(
+                f"- [{m.get('key', '')}] {m.get('description', '')}\n  Columns: {col_descs}"
+            )
+        mart_schema_block = (
+            "\n## 선택된 마트 스키마 (이미 로드됨 — `get_mart_schema` 재호출 불필요)\n"
+            + "\n".join(lines) + "\n"
+        )
     return f"""You are an expert data analyst AI for an advertising platform analytics tool called Vibe EDA.
 You help analysts explore ad platform data by creating, modifying, and executing notebook cells.
 
@@ -401,6 +497,7 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - Description: {state.analysis_description}
 - Data Marts: {marts}
 - Snowflake: {sf_status}
+{mart_schema_block}
 
 ## Tools
 - read_notebook_context: See all current cells and their state
@@ -412,7 +509,13 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - preview_mart: 노트북에 셀을 남기지 않고 상위 N행만 확인 (데이터 생김새 파악용)
 - profile_mart: 행수, NULL 비율, 카디널리티, 수치형 min/max/avg — 이상치·결측 탐지 목적
 - write_cell_memo: **출력을 확인한 뒤 핵심 인사이트·이상치·후속 가설을 해당 셀의 메모(노트)에 기록**. 2~5줄의 불릿이 적당
-- ask_user: 요청이 모호하거나 필요한 맥락(기간·지역·지표 등)이 빠졌을 때 사용자에게 질문. 호출 후엔 더 이상 도구를 부르지 말고 짧은 안내 텍스트로 응답을 마감
+- ask_user: 요청이 모호하거나 필요한 맥락(기간·지역·지표 등)이 빠졌을 때 **빠르게** 사용자에게 질문한다.
+  **헷갈리면 추측하지 말고 반드시 `ask_user` 를 먼저 호출**하라. 호출 후엔 도구를 더 부르지 말고 짧은 안내 텍스트로 응답을 마감.
+  `ask_user` 를 써야 하는 대표 시그널:
+  - 기간 미지정 ("최근 매출" — 7일? 30일? 이번 달?)
+  - 지표 모호 ("많다" / "쏠림" — 어떤 기준?)
+  - 선택 마트만으로 데이터가 부족해 보임
+  - 같은 요청을 두 번 다른 방식으로 해석 가능할 때
 
 ## 인사이트 기록 규칙
 - SQL/Python 셀 실행 후 결과가 의미 있다고 판단되면 **반드시 `write_cell_memo` 호출**
@@ -420,9 +523,20 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - 전체 분석 요약은 마지막 Markdown 셀로 별도 작성 (메모는 개별 셀 단위 통찰)
 
 ## 맥락 수집 우선순위 (SQL 작성 전 필수)
-1. 선택된 마트마다 `get_mart_schema` 호출 → 실제 컬럼명 확인
+
+### 0단계 — **현재 선택 마트만으로 질문을 답할 수 있는지 판단 (첫 턴에 반드시 수행)**
+사용자 요청을 받자마자, 다른 도구를 부르기 전에 먼저 **한 문단**으로 아래를 분석해 텍스트로 출력한다:
+- (a) 질문이 어떤 지표·차원을 요구하는가 (예: "지역별 매출" → 차원=지역, 지표=매출)
+- (b) 현재 **선택된 마트**의 이름과 일반적인 성격만 보고, 해당 지표/차원이 담겨 있을 법한지 판단
+- (c) 판단 결과에 따라 분기:
+  - **충분해 보임** → 1단계로 진행 ("선택된 마트 [X, Y]로 답할 수 있을 것 같아요. 스키마 확인 후 쿼리 작성할게요.")
+  - **부족해 보임 / 모호** → **반드시 `ask_user` 를 호출**하여 추가 마트 선택 또는 범위 재확인을 사용자에게 요청. 금지: 추측으로 다른 테이블 이름 조회 시도
+- 예: 선택 마트가 `dim_shop_base` 뿐인데 "예약수" 를 물어봤다면 → `dim_`은 dimension이라 예약 사실(fact)이 없을 가능성이 큼 → `ask_user`로 `fact_reservation` 계열 마트 추가 요청
+
+### 1단계 이후
+1. **선택된 마트 스키마는 이미 위에 주입되어 있다** — 해당 컬럼명만으로 SQL 작성 가능하면 `get_mart_schema` 호출 생략 (시간 절약). 컬럼 해석이 애매하거나 description이 비어 있을 때만 호출.
 2. 필요시 `preview_mart` 로 샘플 1~5행 확인
-3. 요청이 모호하면 즉시 `ask_user`로 재질문 — 추측해서 엉뚱한 쿼리 작성 금지
+3. 추가 모호함이 남으면 `ask_user`로 재질문 — 추측해서 엉뚱한 쿼리 작성 금지
 
 ## 셀 파이프라인 (반드시 준수)
 모든 셀은 아래 사이클을 따른다:
@@ -435,8 +549,10 @@ You help analysts explore ad platform data by creating, modifying, and executing
   - 결과가 올바름 → 다음 셀 생성
 - `execute_cell`을 직접 호출할 필요 없음 (생성/수정 시 자동 실행됨)
 
-## 한 루프당 한 문단 내레이션 (반드시 준수)
-- 도구 실행 결과(tool_result)를 받은 직후 **다음 도구를 호출하기 전에 반드시 짧은 한국어 텍스트 한 문단을 먼저 출력**한다.
+## ⚠️ 한 루프당 한 문단 내레이션 — 가장 중요한 규칙 (절대 준수)
+- tool_result 를 받은 **직후**, **다음 도구를 호출하기 전에** 반드시 한국어 텍스트 한 문단을 먼저 출력한다.
+- 순서: `[텍스트 출력]` → `[다음 tool_use]` — 이 순서가 바뀌거나 텍스트가 생략되면 규칙 위반.
+- 한 응답에 여러 tool_use 를 한꺼번에 넣지 말 것. 텍스트 해설 → tool 1개 → (결과 받고) 다시 텍스트 해설 → tool 1개 → ... 의 리듬을 유지.
 - 그 문단은 아래 두 가지를 모두 담는다:
   1. 방금 본 결과에 대한 해석·관찰·인사이트 (수치·이상치·에러 원인 등 구체적으로)
   2. 바로 다음에 취할 행동과 그 이유
@@ -501,49 +617,114 @@ async def run_agent_stream(
     messages: list[dict] = list(conversation_history)
     messages.append({"role": "user", "content": user_message})
 
+    import time as _time
     created_cell_ids: list[str] = []
     updated_cell_ids: list[str] = []
     MAX_TURNS = 15
     REPEAT_CALL_LIMIT = 3
+    TOTAL_TOOL_LIMIT = 40      # 세션당 총 tool_call 상한 (우회 방지)
+    NARRATION_MIN_CHARS = 20   # 도구 호출 전 내레이션 최소 길이
+    LONG_RUN_SEC = 30          # 이 시간 넘게 분석하면 재질문 고려 리마인더 주입
     repeat_counter: dict[str, int] = {}
+    total_tool_calls = 0
+    turn_index = 0
+    narration_warning_used = False
+    long_run_warning_used = False
+    loop_started_at = _time.monotonic()
+    ask_user_called = False
+
+    def _norm_key(tool_name: str, inp: dict) -> str:
+        """tool_use 정규화 키 — 대소문자·공백 변형으로 repeat 우회하는 것을 방지."""
+        def _norm(v):
+            if isinstance(v, str):
+                return re.sub(r"\s+", " ", v.strip().lower())
+            if isinstance(v, dict):
+                return {k: _norm(vv) for k, vv in v.items()}
+            if isinstance(v, list):
+                return [_norm(vv) for vv in v]
+            return v
+        return f"{tool_name.lower()}:{json.dumps(_norm(inp), sort_keys=True, ensure_ascii=False)}"
 
     try:
         for _ in range(MAX_TURNS):
-            full_text = ""
-            response = None
+            # 내레이션 누락 시 1회 재요청 — tool_use만 있고 text가 부족하면 턴을 폐기하고
+            # "텍스트 먼저" 강제 지시를 주입해 다시 호출한다.
+            retried_for_narration = False
+            while True:
+                full_text = ""
+                response = None
 
-            async with client.messages.stream(
-                model=model,
-                max_tokens=16000,
-                system=system_prompt,
-                tools=TOOLS,  # type: ignore[arg-type]
-                messages=messages,  # type: ignore[arg-type]
-                thinking={"type": "adaptive"},  # type: ignore[arg-type]
-            ) as stream:
-                async for event in stream:
-                    if event.type == "content_block_delta":
-                        delta = event.delta
-                        if delta.type == "thinking_delta":
-                            yield {"type": "thinking", "content": delta.thinking}
-                        elif delta.type == "text_delta":
-                            full_text += delta.text
-                            yield {"type": "message_delta", "content": delta.text}
-                response = await stream.get_final_message()
+                # Anthropic prompt caching: system + tools 를 ephemeral 캐싱
+                # 턴마다 대용량 상수 부분 재전송 비용/지연 절감
+                cached_system = [
+                    {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
+                ]
+                cached_tools = list(TOOLS)
+                if cached_tools:
+                    last = dict(cached_tools[-1])
+                    last["cache_control"] = {"type": "ephemeral"}
+                    cached_tools[-1] = last
+                async with client.messages.stream(
+                    model=model,
+                    max_tokens=16000,
+                    system=cached_system,  # type: ignore[arg-type]
+                    tools=cached_tools,  # type: ignore[arg-type]
+                    messages=messages,  # type: ignore[arg-type]
+                    thinking={"type": "adaptive"},  # type: ignore[arg-type]
+                ) as stream:
+                    async for event in stream:
+                        if event.type == "content_block_delta":
+                            delta = event.delta
+                            if delta.type == "thinking_delta":
+                                yield {"type": "thinking", "content": delta.thinking}
+                            elif delta.type == "text_delta":
+                                full_text += delta.text
+                                yield {"type": "message_delta", "content": delta.text}
+                    response = await stream.get_final_message()
 
-            tool_uses = [b for b in response.content if b.type == "tool_use"]
+                tool_uses = [b for b in response.content if b.type == "tool_use"]
+
+                # 내레이션 거부 조건: 첫 턴 아니고, tool 호출이 있고, 텍스트 부족 → 재요청
+                if (turn_index > 0 and tool_uses
+                        and len(full_text.strip()) < NARRATION_MIN_CHARS
+                        and not retried_for_narration):
+                    retried_for_narration = True
+                    # 프론트에 시각적 알림
+                    yield {"type": "message_delta", "content": "\n\n_[규칙 위반 감지: 텍스트 없이 도구 호출 — 재요청]_\n\n"}
+                    # 응답을 메시지에 추가하지 않고, 강제 지시를 user 메시지로 주입 후 재루프
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "❗ 방금 응답은 텍스트 해설 없이 도구만 호출해 규칙을 위반했습니다. "
+                            "**도구를 호출하지 말고**, 먼저 한국어 텍스트 한 문단으로 "
+                            "(1) 직전 tool_result에 대한 관찰·해석 1~3문장 + "
+                            "(2) 다음 행동과 그 이유를 출력하세요. "
+                            "그 다음 응답에서 도구를 호출하세요."
+                        ),
+                    })
+                    continue
+                break
 
             if not tool_uses:
                 break
 
-            # 무한 루프 방지: 동일 tool+input 반복 호출 감지
+            # 무한 루프 방지: 정규화된 tool+input 반복 호출 감지 + 총 호출 상한
             safety_break = False
             for tb in tool_uses:
-                key = f"{tb.name}:{json.dumps(tb.input, sort_keys=True, ensure_ascii=False)}"
+                total_tool_calls += 1
+                if total_tool_calls > TOTAL_TOOL_LIMIT:
+                    yield {
+                        "type": "error",
+                        "message": f"총 도구 호출이 {TOTAL_TOOL_LIMIT}회를 넘어 중단했습니다. 요청을 더 작게 쪼개거나 모델을 변경해주세요.",
+                    }
+                    safety_break = True
+                    break
+                key = _norm_key(tb.name, tb.input)
                 repeat_counter[key] = repeat_counter.get(key, 0) + 1
                 if repeat_counter[key] > REPEAT_CALL_LIMIT:
                     yield {
                         "type": "error",
-                        "message": f"같은 도구(`{tb.name}`) 를 {REPEAT_CALL_LIMIT}회 초과로 반복 호출해 중단했습니다. "
+                        "message": f"같은 도구(`{tb.name}`)를 {REPEAT_CALL_LIMIT}회 초과로 반복 호출해 중단했습니다. "
                                     "Snowflake 연결 또는 입력값을 확인해주세요.",
                     }
                     safety_break = True
@@ -554,6 +735,8 @@ async def run_agent_stream(
             tool_results = []
             for tool_block in tool_uses:
                 yield {"type": "tool_use", "tool": tool_block.name, "input": tool_block.input}
+                if tool_block.name == "ask_user":
+                    ask_user_called = True
 
                 result, sse_events = await _execute_tool(tool_block.name, tool_block.input, notebook_state)
 
@@ -571,7 +754,40 @@ async def run_agent_stream(
                 })
 
             messages.append({"role": "assistant", "content": _content_to_dict(response.content)})
+
+            reminders: list[str] = []
+            # 내레이션 강제: 규칙 위반시 매 턴마다 리마인더 재주입 (1회 한정 X)
+            if turn_index > 0 and len(full_text.strip()) < NARRATION_MIN_CHARS:
+                reminders.append(
+                    "❗규칙 위반: 직전 응답에 도구 호출 전 해설 텍스트가 없거나 너무 짧았습니다. "
+                    "다음 턴에서는 **반드시** 도구를 호출하기 **전에** "
+                    "(1) 방금 받은 tool_result에 대한 관찰·해석 1~3문장 + "
+                    "(2) 지금 취할 행동과 그 이유 "
+                    "를 한 문단의 한국어 텍스트로 먼저 출력하고, 그 다음에 도구를 호출하세요. "
+                    "이 규칙은 매 턴 적용됩니다."
+                )
+                narration_warning_used = True
+
+            # 장시간 분석 리마인더 — 데이터 충분성/질문 모호성 재점검 유도
+            elapsed = _time.monotonic() - loop_started_at
+            if elapsed > LONG_RUN_SEC and not long_run_warning_used and not ask_user_called:
+                reminders.append(
+                    f"이 요청을 분석한 지 {int(elapsed)}초가 지났습니다. "
+                    "지금 시점에서 다음을 자문하세요: "
+                    "(1) 현재 선택된 마트로 정말 답이 되는가? "
+                    "(2) 사용자 질문에 모호한 범위·기간·지표가 남아있지 않은가? "
+                    "**조금이라도 불확실하면 지금 즉시 `ask_user`를 호출**해 사용자에게 재질문하세요. "
+                    "(예: 분석 대상 기간, 추가로 필요한 마트, 집계 단위 등)"
+                )
+                long_run_warning_used = True
+
+            if reminders and tool_results:
+                reminder_text = "\n\n[시스템 리마인더]\n" + "\n".join(f"- {r}" for r in reminders)
+                last = tool_results[-1]
+                last["content"] = last.get("content", "") + reminder_text
+
             messages.append({"role": "user", "content": tool_results})
+            turn_index += 1
 
     except anthropic.APIStatusError as e:
         yield {"type": "error", "message": f"Claude API 오류: {e.message}"}

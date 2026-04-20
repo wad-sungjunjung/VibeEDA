@@ -162,7 +162,8 @@ export default function CellOutput({ cell }: Props) {
             data={(pj.data ?? []) as Plotly.Data[]}
             layout={{
               ...baseLayout,
-              template: 'plotly_white',
+              // plotly TS 타입이 문자열 템플릿명을 직접 받지 않아 명시적 cast
+              template: 'plotly_white' as unknown as Plotly.Template,
               autosize: true,
               margin: { l: 16, r: 16, t: 40, b: 16, pad: 4 },
               paper_bgcolor: '#ffffff',

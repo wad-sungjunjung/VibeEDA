@@ -163,6 +163,7 @@ def _get_cell_chat_entries(vibe: dict, cell_id: str) -> list[dict]:
                     "user_message": user_msg.get("content", ""),
                     "assistant_reply": asst_msg.get("content", ""),
                     "code_snapshot": user_msg.get("code_snapshot", ""),
+                    "code_result": asst_msg.get("code_result", ""),
                     "created_at": user_msg.get("ts", datetime.now().isoformat()),
                 })
                 i += 2
@@ -702,7 +703,7 @@ def get_cell_above_name(nb_id: str, cell_id: str) -> Optional[str]:
 
 # ── 채팅 저장 ─────────────────────────────────────────────────────────────────
 
-def add_chat_entry(nb_id: str, cell_id: str, user_msg: str, assistant_reply: str, code_snapshot: str) -> None:
+def add_chat_entry(nb_id: str, cell_id: str, user_msg: str, assistant_reply: str, code_snapshot: str, code_result: str = "") -> None:
     nb = _read_nb(nb_id)
     vibe = nb.setdefault("metadata", {}).setdefault("vibe", {})
     chat_history = vibe.setdefault("chat_history", [])
@@ -712,7 +713,7 @@ def add_chat_entry(nb_id: str, cell_id: str, user_msg: str, assistant_reply: str
         chat_history.append(entry)
     ts = datetime.now().isoformat()
     entry["messages"].append({"role": "user", "content": user_msg, "code_snapshot": code_snapshot, "ts": ts})
-    entry["messages"].append({"role": "assistant", "content": assistant_reply, "ts": ts})
+    entry["messages"].append({"role": "assistant", "content": assistant_reply, "code_result": code_result, "ts": ts})
     _write_nb(nb_id, nb)
 
 

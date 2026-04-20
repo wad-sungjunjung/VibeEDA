@@ -104,66 +104,11 @@ async def stream_vibe_chat(
             "Output: ONLY the markdown content."
         )
 
-    if cell_type == "sql":
-        prompt = (
-            f"아래 예시를 보고 동일한 스타일로 SQL을 재작성하라.\n\n"
-            f"## 변환 예시\n"
-            f"### Before (이런 스타일은 절대 출력하지 말 것)\n"
-            f"```sql\n"
-            f"SELECT\n"
-            f"    SI_DO_NAME,\n"
-            f"    SI_GUN_GU_NAME,\n"
-            f"    COUNT(DISTINCT SHOP_ID) AS shop_count\n"
-            f"FROM dim_shop_base\n"
-            f"GROUP BY SI_DO_NAME, SI_GUN_GU_NAME\n"
-            f"ORDER BY SI_DO_NAME\n"
-            f"```\n\n"
-            f"### After (반드시 이 스타일로 출력)\n"
-            f"```sql\n"
-            f"WITH shop_cnt AS (\n"
-            f"    SELECT\n"
-            f"        CASE WHEN GROUPING(si_do_name) = 1 THEN '0. 전체' ELSE si_do_name END AS si_do_name,\n"
-            f"        CASE WHEN GROUPING(si_gun_gu_name) = 1 THEN '0. 전체' ELSE si_gun_gu_name END AS si_gun_gu_name,\n"
-            f"        COUNT(DISTINCT shop_id) AS \"매장수\"\n"
-            f"    FROM dim_shop_base\n"
-            f"    GROUP BY GROUPING SETS (\n"
-            f"        (si_do_name, si_gun_gu_name),\n"
-            f"        (si_do_name),\n"
-            f"        ()\n"
-            f"    )\n"
-            f")\n"
-            f"SELECT *\n"
-            f"FROM shop_cnt\n"
-            f"ORDER BY ALL\n"
-            f"```\n\n"
-            f"## 스타일 규칙 (After 예시에서 반드시 확인)\n"
-            f"- 컬럼명·테이블명은 모두 소문자 스네이크케이스 (si_do_name, shop_id, dim_shop_base)\n"
-            f"- 전체를 WITH ... AS (...) CTE로 감쌀 것\n"
-            f"- GROUP BY → 반드시 GROUPING SETS으로 대체\n"
-            f"- CASE WHEN GROUPING(col)=1 THEN '0. 전체' ELSE col END 패턴\n"
-            f"- 집계 컬럼 별칭은 한국어 큰따옴표 (\"매장수\")\n"
-            f"- ORDER BY ALL\n\n"
-            f"## 현재 코드\n{current_code}\n\n"
-            f"## 요청\n{message}\n\n"
-            f"After 스타일로 재작성한 SQL 코드만 출력하라 (설명, 마크다운 fence 금지):"
-        )
-    elif cell_type == "python":
-        prompt = (
-            f"아래 Python 코드를 요청에 맞게 수정하라.\n\n"
-            f"[현재 코드]\n{current_code}\n\n"
-            f"[요청]\n{message}\n\n"
-            f"[필수 규칙]\n"
-            f"- 시각화 결과는 반드시 마지막 줄을 변수 참조로 끝낼 것\n"
-            f"- 변수명은 fig_<주제>_<차트타입> 형식 (예: fig_sido_bar, fig_daily_trend_line)\n"
-            f"- `fig` 단독 사용 절대 금지 — 주제와 차트 유형을 반드시 포함할 것\n\n"
-            f"Python 코드만 출력하라:"
-        )
-    else:
-        prompt = (
-            f"[현재 내용]\n{current_code}\n\n"
-            f"[요청]\n{message}\n\n"
-            f"마크다운 내용만 출력하라:"
-        )
+    # user prompt는 최소한으로 — 스타일/규칙은 system_instruction에 이미 포함.
+    prompt = (
+        f"[현재 코드]\n{current_code}\n\n"
+        f"[요청]\n{message}"
+    )
 
     accumulated = ""
     try:
@@ -173,6 +118,7 @@ async def stream_vibe_chat(
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 temperature=0.2,
+                max_output_tokens=2048,
             ),
         ):
             if chunk.text:

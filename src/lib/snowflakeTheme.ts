@@ -40,25 +40,13 @@ const snowflakeBaseTheme = EditorView.theme({
   },
   '.cm-scroller': {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-    scrollbarWidth: 'thin',
-    scrollbarColor: '#3a4160 transparent',
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
   },
   '.cm-scroller::-webkit-scrollbar': {
-    width: '6px',
-    height: '6px',
-  },
-  '.cm-scroller::-webkit-scrollbar-track': {
-    background: 'transparent',
-  },
-  '.cm-scroller::-webkit-scrollbar-thumb': {
-    backgroundColor: '#3a4160',
-    borderRadius: '3px',
-  },
-  '.cm-scroller::-webkit-scrollbar-thumb:hover': {
-    backgroundColor: '#4a5270',
-  },
-  '.cm-scroller::-webkit-scrollbar-corner': {
-    background: 'transparent',
+    display: 'none',
+    width: '0',
+    height: '0',
   },
   '.cm-line': {
     padding: '0 12px',

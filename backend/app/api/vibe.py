@@ -82,7 +82,8 @@ async def vibe_endpoint(
             try:
                 notebook_store.add_chat_entry(
                     req.notebook_id, req.cell_id,
-                    req.message, explanation or full_code[:80], req.current_code
+                    req.message, explanation or full_code[:80], req.current_code,
+                    code_result=full_code,
                 )
             except Exception as e:
                 logger.warning("Failed to save chat entry: %s", e)
