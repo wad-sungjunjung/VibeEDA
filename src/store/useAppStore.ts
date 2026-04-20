@@ -268,14 +268,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({ histories, folders: folderItems, martCatalog: marts })
 
       if (notebooks.length > 0) {
-        // Load most recent notebook
+        // Load most recent notebook. 백엔드는 분석이 하나도 없으면
+        // `Vibe EDA 시작하기` 온보딩 노트북을 자동 시딩하므로,
+        // 이 분기 내에 그 온보딩이 가장 최근 노트북으로 잡힌다.
         const current = notebooks[0]
         const detail = await getNotebook(current.id)
         _applyNotebookDetail(detail, true)
-      } else {
-        // Create a default notebook
-        await get().newAnalysis()
       }
+      // notebooks.length === 0 인 경우는 시딩이 실패한 예외 상황.
+      // 좌측 '새 분석' 버튼으로 사용자가 직접 생성하도록 빈 상태 유지.
     } catch (err) {
       console.error('initApp failed:', err)
     } finally {

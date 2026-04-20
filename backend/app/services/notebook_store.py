@@ -225,6 +225,12 @@ def _migrate_legacy_notebook(p: Path) -> str:
 
 def list_notebooks() -> list[dict]:
     _ensure_dir()
+    # 분석이 하나도 없으면 온보딩 노트북을 한 번 시딩한다.
+    if not any(NOTEBOOKS_DIR.glob("*.ipynb")):
+        try:
+            create_onboarding_notebook()
+        except Exception:
+            pass
     cfg = _read_config()
     registered_files = set(cfg.get("id_to_file", {}).values())
     result = []
@@ -293,6 +299,155 @@ def create_notebook(title: str = "새 분석", folder_id: Optional[str] = None) 
         "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
         "updated_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
     }
+
+
+_ONBOARDING_TITLE = "Vibe EDA 시작하기"
+
+_ONBOARDING_CELLS: list[dict] = [
+    {
+        "type": "markdown",
+        "name": "welcome",
+        "code": (
+            "# 👋 Vibe EDA에 오신 것을 환영합니다\n"
+            "\n"
+            "**Vibe EDA**는 광고 플랫폼 데이터 분석가를 위한 **AI 네이티브 EDA 도구**입니다.  \n"
+            "Jupyter 노트북의 상위 버전 — 자연어 채팅으로 SQL/Python 코드를 생성·수정하고 리포트를 자동 생성합니다.\n"
+            "\n"
+            "이 노트북은 **첫 실행용 가이드**입니다. 아래 셀을 위에서부터 훑어보며 기능을 익혀보세요.\n"
+            "좌측 상단 **＋ 새 분석**으로 언제든 빈 노트북을 새로 시작할 수 있습니다."
+        ),
+    },
+    {
+        "type": "markdown",
+        "name": "quick_start",
+        "code": (
+            "## 1. 세 가지 셀 타입\n"
+            "\n"
+            "- **SQL 셀** — Snowflake에 쿼리. 결과는 테이블로 표시되고 셀 이름(예: `daily_sales`)으로 DataFrame namespace에 저장됨.\n"
+            "- **Python 셀** — in-process 커널에서 실행. Plotly 차트, 통계 분석 등.\n"
+            "- **Markdown 셀** — 분석 메모와 인사이트 기록.\n"
+            "\n"
+            "셀 좌측 타입 배지를 클릭하면 `SQL → Python → Markdown` 순으로 순환 전환됩니다.\n"
+            "\n"
+            "## 2. 바이브 채팅 (셀 단위)\n"
+            "\n"
+            "활성 셀 하단 채팅창에 **자연어로 요청**하면 코드가 자동 수정·실행됩니다.\n"
+            "\n"
+            "> 예: *\"시도별로 group by 해줘\"*, *\"최근 7일 필터 추가\"*, *\"pie 차트로 시각화\"*\n"
+            "\n"
+            "- `Enter` 전송 · `Shift+Enter` 줄바꿈\n"
+            "- 대화 이력을 클릭해 이전 코드 시점으로 **롤백** 가능\n"
+            "\n"
+            "## 3. 에이전트 모드 (노트북 전체)\n"
+            "\n"
+            "우측 하단 **FAB 버튼** 또는 `Cmd/Ctrl + G`로 토글. 노트북 전체 맥락을 보고 **여러 셀을 자동 생성·실행**합니다.\n"
+            "\n"
+            "> 예: *\"강남구 세부 분석해줘\"*, *\"전체 인사이트 요약\"*"
+        ),
+    },
+    {
+        "type": "sql",
+        "name": "example_query",
+        "code": (
+            "-- 예시 SQL 셀\n"
+            "-- 1) 좌측 사이드바에서 Snowflake 연결을 먼저 설정하세요.\n"
+            "-- 2) 우측 상단 \"사용할 마트\"에 분석 대상 마트를 추가한 뒤, 아래 채팅창에\n"
+            "--    \"최근 7일 매출을 시도별로 집계\" 같은 자연어 요청을 입력해 보세요.\n"
+            "\n"
+            "SELECT 1 AS hello, 'vibe-eda' AS tool;"
+        ),
+    },
+    {
+        "type": "python",
+        "name": "example_chart",
+        "code": (
+            "# 예시 Python 셀 — Plotly로 간단한 막대 그래프를 그려봅니다.\n"
+            "# 위 SQL 셀을 실행한 뒤 `example_query` DataFrame을 바로 참조할 수 있어요.\n"
+            "\n"
+            "import pandas as pd\n"
+            "import plotly.express as px\n"
+            "\n"
+            "df = pd.DataFrame({\n"
+            "    'category': ['서울', '경기', '부산', '대구'],\n"
+            "    'revenue': [145, 98, 42, 31],\n"
+            "})\n"
+            "\n"
+            "fig_region_bar = px.bar(df, x='category', y='revenue', title='지역별 매출 (예시)')\n"
+            "fig_region_bar"
+        ),
+    },
+    {
+        "type": "markdown",
+        "name": "next_steps",
+        "code": (
+            "## 다음 단계\n"
+            "\n"
+            "1. **모델 / API 키 설정** — 좌측 사이드바 하단 설정에서 Claude / Gemini API 키를 입력하세요.\n"
+            "2. **Snowflake 연결** — 좌측 상단 \"연결 관리\"에서 계정·웨어하우스 정보를 입력하고 SSO 로그인.\n"
+            "3. **실제 분석 시작** — 좌측 상단 `＋` 버튼으로 **새 분석**을 생성하세요.\n"
+            "4. **Claude Code 연동 (선택)** — `python -m app.api.mcp_server`로 MCP 서버를 실행하면 Claude Code가 이 노트북에 직접 접근할 수 있습니다.\n"
+            "\n"
+            "---\n"
+            "\n"
+            "📚 자세한 문서: `docs/vibe-eda-prd.md`, `docs/vibe-eda-functional-spec.md`, `docs/vibe-eda-agent-spec.md`\n"
+            "\n"
+            "이 노트북은 언제든 삭제할 수 있으며, 모든 노트북을 지우면 다시 생성됩니다."
+        ),
+    },
+]
+
+
+def create_onboarding_notebook() -> dict:
+    """첫 실행 시 사용자가 기능을 빠르게 익힐 수 있도록 예시 셀이 채워진
+    '온보딩' 노트북을 생성한다. 분석이 하나도 없을 때 한 번 시딩된다."""
+    _ensure_dir()
+    nb_id = str(uuid.uuid4())
+    fname = _unique_filename(_ONBOARDING_TITLE)
+    _register_file(nb_id, fname)
+
+    description = (
+        "Vibe EDA를 처음 사용하는 분들을 위한 가이드 노트북입니다. "
+        "셀 타입, 바이브 채팅, 에이전트 모드 사용법을 담고 있어요."
+    )
+
+    cells: list[dict] = []
+    for i, spec in enumerate(_ONBOARDING_CELLS):
+        cells.append({
+            "id": str(uuid.uuid4()),
+            "cell_type": "code" if spec["type"] in ("sql", "python") else "markdown",
+            "source": spec["code"],
+            "metadata": {
+                "vibe_type": spec["type"],
+                "vibe_name": spec["name"],
+                "vibe_memo": "",
+                "vibe_ordering": float(i + 1) * 1000.0,
+                "vibe_agent_generated": False,
+                "vibe_onboarding": True,
+            },
+            "outputs": [],
+            "execution_count": None,
+        })
+
+    nb = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {
+            "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+            "vibe": {
+                "id": nb_id,
+                "title": _ONBOARDING_TITLE,
+                "description": description,
+                "selected_marts": [],
+                "folder_id": None,
+                "chat_history": [],
+                "agent_history": [],
+                "onboarding": True,
+            },
+        },
+        "cells": cells,
+    }
+    _write_nb(nb_id, nb)
+    return get_notebook(nb_id)
 
 
 def get_notebook(nb_id: str) -> dict:
