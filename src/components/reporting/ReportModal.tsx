@@ -36,14 +36,14 @@ export default function ReportModal() {
   }
 
   const TYPE_STYLES: Record<string, string> = {
-    sql: 'bg-[#e8e4d8] text-[#5c4a1e]',
-    python: 'bg-[#e6ede0] text-[#3d5226]',
-    markdown: 'bg-[#eae4df] text-[#4a3c2e]',
+    sql: 'bg-sql-bg text-sql-text',
+    python: 'bg-python-bg text-python-text',
+    markdown: 'bg-markdown-bg text-markdown-text',
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-xl shadow-2xl w-[520px] max-h-[85vh] flex flex-col">
+      <div className="bg-surface rounded-xl shadow-2xl w-[520px] max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-2 px-5 py-4 border-b border-border-subtle">
           <FileText size={16} className="text-primary" />
@@ -77,7 +77,7 @@ export default function ReportModal() {
               <select
                 value={reportModel}
                 onChange={(e) => setReportModel(e.target.value)}
-                className="w-full appearance-none text-[12px] font-medium text-text-primary bg-white border border-border-subtle rounded-md pl-3 pr-8 py-2 cursor-pointer hover:border-primary outline-none"
+                className="w-full appearance-none text-[12px] font-medium text-text-primary bg-surface border border-border-subtle rounded-md pl-3 pr-8 py-2 cursor-pointer hover:border-primary outline-none"
               >
                 {REPORT_MODELS.map((m) => (
                   <option key={m.value} value={m.value}>{m.label}</option>

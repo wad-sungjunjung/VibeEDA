@@ -16,9 +16,9 @@ const PREFIX_FILTERS = [
 const PAGE_SIZE = 5
 
 function scoreBadgeClass(score: number) {
-  if (score >= 3) return 'bg-[#fde68a] text-[#92400e]'
-  if (score >= 2) return 'bg-[#fef3c7] text-[#a16207]'
-  return 'bg-[#fafaf9] text-[#a8a29e]'
+  if (score >= 3) return 'bg-warning-bg text-warning-text'
+  if (score >= 2) return 'bg-warning-bg/70 text-warning'
+  return 'bg-chip text-text-disabled'
 }
 
 export default function TopMetaHeader() {
@@ -157,13 +157,13 @@ export default function TopMetaHeader() {
   const pagedMarts = unselectedMarts.slice(martPage * PAGE_SIZE, (martPage + 1) * PAGE_SIZE)
 
   return (
-    <div className="bg-white border-b border-border-subtle shrink-0">
+    <div className="bg-surface border-b border-border-subtle shrink-0">
       {/* Fixed header bar */}
       <div className="h-header flex items-center gap-3 px-6">
         <button
           title={metaCollapsed ? '펼치기' : '접기'}
           onClick={() => setMetaCollapsed(!metaCollapsed)}
-          className="p-1 -ml-1 rounded hover:bg-stone-100 transition-colors shrink-0"
+          className="p-1 -ml-1 rounded hover:bg-chip transition-colors shrink-0"
         >
           {metaCollapsed ? <ChevronRight size={16} className="text-text-tertiary" /> : <ChevronDown size={16} className="text-text-tertiary" />}
         </button>
@@ -192,8 +192,10 @@ export default function TopMetaHeader() {
               title="모든 셀 순서대로 실행"
               disabled={isRunningAll || !hasRunnable}
               onClick={executeAllCells}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-all shrink-0 border disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ borderColor: '#ede9dd', color: '#5c4a1e', backgroundColor: isRunningAll ? '#faf8f2' : '#ffffff' }}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-all shrink-0 border border-border-subtle text-sql-text disabled:cursor-not-allowed disabled:opacity-50',
+                isRunningAll ? 'bg-bg-output' : 'bg-surface'
+              )}
             >
               {isRunningAll ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
               모두 실행
@@ -221,18 +223,16 @@ export default function TopMetaHeader() {
               <span className="text-text-disabled normal-case font-normal">· 상세할수록 좋은 마트를 추천받을 수 있어요</span>
             </label>
             <textarea
-              className="flex-1 text-[13px] bg-white border border-border rounded px-3 py-2.5 outline-none resize-none text-text-primary placeholder-text-tertiary leading-relaxed"
+              className="flex-1 text-[13px] bg-surface border border-border rounded px-3 py-2.5 outline-none resize-none text-text-primary placeholder-text-tertiary leading-relaxed focus:border-primary focus:ring-2 focus:ring-primary-pale"
               style={{ minHeight: '260px' }}
               placeholder="무엇을, 어떤 관점에서, 왜 분석하려고 하는지 구체적으로 적어주세요."
               value={analysisDescription}
               onChange={(e) => setAnalysisDescription(e.target.value)}
-              onFocus={(e) => { e.target.style.borderColor = '#D95C3F'; e.target.style.boxShadow = '0 0 0 2px #f8e5dd' }}
-              onBlur={(e) => { e.target.style.borderColor = ''; e.target.style.boxShadow = '' }}
             />
           </div>
 
           {/* ── Col 2: 마트 풀 ── */}
-          <div className="flex flex-col border-r border-border-subtle min-h-0 px-5 pt-3 pb-5 bg-white">
+          <div className="flex flex-col border-r border-border-subtle min-h-0 px-5 pt-3 pb-5 bg-surface">
             {/* Label */}
             <div className="flex items-center gap-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide mb-1.5 shrink-0">
               <Layers size={12} strokeWidth={2} />
@@ -241,7 +241,7 @@ export default function TopMetaHeader() {
             </div>
 
             {/* Panel with rounded border */}
-            <div className="flex-1 flex flex-col min-h-0 border border-stone-200 rounded-lg overflow-hidden bg-white">
+            <div className="flex-1 flex flex-col min-h-0 border border-border rounded-lg overflow-hidden bg-surface">
               {/* Prefix filter chips */}
               <div className="flex items-center gap-1 px-2 pt-2 pb-1 shrink-0 flex-wrap">
                 {PREFIX_FILTERS.map(({ key, label }) => (
@@ -252,7 +252,7 @@ export default function TopMetaHeader() {
                       'px-2 py-0.5 rounded text-[10px] font-mono font-semibold border transition-colors',
                       activeFilters.has(key) && !showSelectedOnly
                         ? 'bg-primary text-white border-primary'
-                        : 'bg-white text-text-tertiary border-border hover:border-primary hover:text-primary'
+                        : 'bg-surface text-text-tertiary border-border hover:border-primary hover:text-primary'
                     )}
                   >
                     {label}
@@ -264,7 +264,7 @@ export default function TopMetaHeader() {
                     'px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors',
                     showSelectedOnly
                       ? 'bg-primary text-white border-primary'
-                      : 'bg-white text-text-tertiary border-border hover:border-primary hover:text-primary'
+                      : 'bg-surface text-text-tertiary border-border hover:border-primary hover:text-primary'
                   )}
                 >
                   선택됨{selectedMarts.length > 0 && ` ${selectedMarts.length}`}
@@ -274,7 +274,7 @@ export default function TopMetaHeader() {
                   className={cn(
                     'px-2 py-0.5 rounded text-[10px] border transition-colors',
                     activeFilters.size === 0 && !martSearchQuery
-                      ? 'text-text-secondary border-border bg-stone-100'
+                      ? 'text-text-secondary border-border bg-chip'
                       : 'text-text-disabled border-transparent hover:text-text-secondary'
                   )}
                 >
@@ -287,12 +287,10 @@ export default function TopMetaHeader() {
                 <div className="relative">
                   <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
                   <input
-                    className="w-full pl-7 pr-7 py-1.5 text-[11px] bg-white border border-border rounded focus:outline-none"
+                    className="w-full pl-7 pr-7 py-1.5 text-[11px] bg-surface border border-border rounded focus:outline-none focus:border-primary"
                     placeholder="마트명 검색..."
                     value={martSearchQuery}
                     onChange={(e) => { setMartSearchQuery(e.target.value); setMartPage(0) }}
-                    onFocus={(e) => { e.target.style.borderColor = '#D95C3F' }}
-                    onBlur={(e) => { e.target.style.borderColor = '' }}
                   />
                   {martSearchQuery && (
                     <button onClick={() => { setMartSearchQuery(''); setMartPage(0) }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary">
@@ -309,7 +307,7 @@ export default function TopMetaHeader() {
                   <div className="mb-1.5">
                     {aiRecs ? (
                       <div className="flex items-center gap-1.5">
-                        <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: '#8f3a22' }}>
+                        <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-primary-text">
                           <Sparkles size={9} /> AI 추천 완료
                         </div>
                         <button
@@ -332,15 +330,17 @@ export default function TopMetaHeader() {
                         <button
                           onClick={handleAiRecommend}
                           disabled={aiRecommending}
-                          className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-md text-[10px] font-semibold transition-all disabled:opacity-60"
-                          style={{ background: aiRecommending ? '#f5ede8' : 'linear-gradient(135deg,#fdf0eb,#fde8e0)', color: '#c0391a', border: '1px solid #f0c0a8' }}
+                          className={cn(
+                            'flex items-center justify-center gap-1.5 w-full py-1.5 rounded-md text-[10px] font-semibold transition-all disabled:opacity-60 text-primary-hover border border-primary-border',
+                            aiRecommending ? 'bg-primary-pale' : 'bg-primary-light'
+                          )}
                         >
                           {aiRecommending
                             ? <><Loader2 size={10} className="animate-spin" /> AI가 분석 중...</>
                             : <><Sparkles size={10} /> AI 마트 추천받기</>}
                         </button>
                         {aiError && (
-                          <div className="text-[9px] text-red-500 px-1">{aiError}</div>
+                          <div className="text-[9px] text-danger px-1">{aiError}</div>
                         )}
                       </div>
                     )}
@@ -359,13 +359,17 @@ export default function TopMetaHeader() {
                       const isRecommended = score > 0 && !martSearchQuery
                       const isViewed = viewedMarts.includes(mart.key)
                       const isSelected = selectedMarts.includes(mart.key)
-                      const borderColor = isSelected ? '#D95C3F' : isViewed ? '#f0b99e' : isRecommended ? '#f0d9b5' : '#e7e5e0'
-                      const bgColor = isSelected ? '#fff8f6' : isViewed ? '#fdf6ed' : isRecommended ? '#fdf6ed' : '#fff'
+                      const stateClass = isSelected
+                        ? 'bg-primary-light border-primary'
+                        : isViewed
+                          ? 'bg-primary-pale/40 border-primary-border/60'
+                          : isRecommended
+                            ? 'bg-warning-bg/30 border-warning-bg'
+                            : 'bg-surface border-border'
                       return (
                         <div
                           key={mart.key}
-                          className="rounded transition-all border overflow-hidden min-w-0"
-                          style={{ backgroundColor: bgColor, borderColor }}
+                          className={cn('rounded transition-all border overflow-hidden min-w-0', stateClass)}
                         >
                           <div className="flex items-center gap-1 px-1.5 py-1 min-w-0">
                             <button
@@ -373,13 +377,13 @@ export default function TopMetaHeader() {
                               onClick={() => { toggleViewed(mart.key); if (!isViewed) setExpandedMart(mart.key) }}
                               className="flex-1 min-w-0 text-left flex items-center gap-1.5 overflow-hidden"
                             >
-                              {isTop && <Sparkles size={9} className="shrink-0" strokeWidth={2.5} style={{ color: '#d97706' } as React.CSSProperties} />}
-                              <Database size={11} className="shrink-0" style={{ color: isSelected || isViewed ? '#D95C3F' : '#a8a29e' }} />
+                              {isTop && <Sparkles size={9} className="shrink-0 text-warning" strokeWidth={2.5} />}
+                              <Database size={11} className={cn('shrink-0', isSelected || isViewed ? 'text-primary' : 'text-text-disabled')} />
                               <span className={cn('text-[11px] font-mono font-semibold truncate', isSelected ? 'text-primary' : 'text-text-primary')}>
                                 {mart.key}
                               </span>
                               {isSelected && (
-                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0" style={{ backgroundColor: '#fdede8', color: '#D95C3F' }}>
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 bg-primary-light text-primary">
                                   선택됨
                                 </span>
                               )}
@@ -393,8 +397,7 @@ export default function TopMetaHeader() {
                               <button
                                 title="선택 해제"
                                 onClick={(e) => { e.stopPropagation(); removeMart(mart.key) }}
-                                className="p-0.5 rounded shrink-0 transition-colors"
-                                style={{ color: '#D95C3F' }}
+                                className="p-0.5 rounded shrink-0 transition-colors text-primary"
                               >
                                 <Check size={13} />
                               </button>
@@ -402,8 +405,7 @@ export default function TopMetaHeader() {
                               <button
                                 title="분석에 추가"
                                 onClick={(e) => { e.stopPropagation(); addMart(mart.key) }}
-                                className="p-0.5 rounded shrink-0"
-                                style={{ color: '#D95C3F' }}
+                                className="p-0.5 rounded shrink-0 text-primary"
                               >
                                 <Plus size={13} />
                               </button>
@@ -416,7 +418,7 @@ export default function TopMetaHeader() {
                                 <div className="px-2 pb-0.5 text-[10px] text-text-tertiary truncate w-full">{mart.description}</div>
                               )}
                               {mart.aiReason && (
-                                <div className="px-2 pb-1 flex items-center gap-1 text-[9px] truncate w-full" style={{ color: '#c0391a' }}>
+                                <div className="px-2 pb-1 flex items-center gap-1 text-[9px] truncate w-full text-primary-hover">
                                   <Sparkles size={8} className="shrink-0" />{mart.aiReason}
                                 </div>
                               )}
@@ -424,11 +426,11 @@ export default function TopMetaHeader() {
                           )}
                           {/* Column detail */}
                           {martInfoExpanded === mart.key && (
-                            <div className="px-2 pb-2 pt-1 border-t border-border-subtle bg-white/70 max-h-[80px] overflow-y-auto hide-scrollbar">
+                            <div className="px-2 pb-2 pt-1 border-t border-border-subtle bg-surface/70 max-h-[80px] overflow-y-auto hide-scrollbar">
                               <div className="space-y-0.5">
                                 {mart.columns.map((col) => (
                                   <div key={col.name} className="text-[10px] flex gap-1.5 min-w-0 overflow-hidden">
-                                    <span className="font-mono font-semibold shrink-0" style={{ color: '#D95C3F' }}>{col.name}</span>
+                                    <span className="font-mono font-semibold shrink-0 text-primary">{col.name}</span>
                                     <span className="text-text-tertiary truncate">{col.desc}</span>
                                   </div>
                                 ))}
@@ -444,11 +446,11 @@ export default function TopMetaHeader() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between px-2 py-1.5 border-t border-stone-100 shrink-0">
+                <div className="flex items-center justify-between px-2 py-1.5 border-t border-border-subtle shrink-0">
                   <button
                     disabled={martPage === 0}
                     onClick={() => setMartPage((p) => p - 1)}
-                    className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-stone-100 disabled:opacity-30 transition-colors"
+                    className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-chip disabled:opacity-30 transition-colors"
                   >
                     <ChevronLeft size={12} />
                   </button>
@@ -459,7 +461,7 @@ export default function TopMetaHeader() {
                   <button
                     disabled={martPage >= totalPages - 1}
                     onClick={() => setMartPage((p) => p + 1)}
-                    className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-stone-100 disabled:opacity-30 transition-colors"
+                    className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-chip disabled:opacity-30 transition-colors"
                   >
                     <ChevronRight size={12} />
                   </button>
@@ -469,20 +471,20 @@ export default function TopMetaHeader() {
           </div>
 
           {/* ── Col 3: 마트 정보 ── */}
-          <div className="flex flex-col min-h-0 px-5 pt-3 pb-5 bg-white">
+          <div className="flex flex-col min-h-0 px-5 pt-3 pb-5 bg-surface">
             {/* Panel with rounded border */}
-            <div className="flex-1 flex flex-col min-h-0 rounded-lg overflow-hidden" style={{ border: '1px solid #ebc2b5' }}>
+            <div className="flex-1 flex flex-col min-h-0 rounded-lg overflow-hidden border border-primary-border">
               {/* Header */}
-              <div className="px-3 py-2 border-b bg-white flex items-center justify-between shrink-0" style={{ borderColor: '#ebc2b5' }}>
+              <div className="px-3 py-2 border-b border-primary-border bg-surface flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-1.5">
-                  <Database size={13} style={{ color: '#D95C3F' }} />
-                  <span className="text-[11px] font-semibold" style={{ color: '#8f3a22' }}>마트 정보</span>
+                  <Database size={13} className="text-primary" />
+                  <span className="text-[11px] font-semibold text-primary-text">마트 정보</span>
                 </div>
                 <span className="text-[10px] text-text-tertiary">클릭하면 컬럼 정보를 확인할 수 있어요</span>
               </div>
 
               {/* Col 3: 클릭해서 본 마트 목록 */}
-              <div className="flex-1 overflow-y-auto hide-scrollbar p-2 bg-white">
+              <div className="flex-1 overflow-y-auto hide-scrollbar p-2 bg-surface">
                 {viewedMarts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full gap-2 text-text-disabled text-[11px] px-2 py-6">
                     <Database size={20} className="opacity-30 mx-auto mb-2" />
@@ -496,17 +498,21 @@ export default function TopMetaHeader() {
                     return (
                       <div
                         key={mart.key}
-                        className="rounded mb-1.5 overflow-hidden min-w-0"
-                        style={{ border: `1px solid ${isOpen ? '#D95C3F' : '#ebc2b5'}` }}
+                        className={cn(
+                          'rounded mb-1.5 overflow-hidden min-w-0 border',
+                          isOpen ? 'border-primary' : 'border-primary-border'
+                        )}
                       >
                         {/* Header: 클릭 → 아코디언 토글 */}
                         <div
-                          className="flex items-center gap-1.5 px-2 py-1.5 min-w-0 cursor-pointer transition-colors"
-                          style={{ backgroundColor: isOpen ? '#fdede8' : '#fff' }}
+                          className={cn(
+                            'flex items-center gap-1.5 px-2 py-1.5 min-w-0 cursor-pointer transition-colors',
+                            isOpen ? 'bg-primary-light' : 'bg-surface'
+                          )}
                           onClick={() => setExpandedMart(isOpen ? null : mart.key)}
                         >
-                          <Database size={11} className="shrink-0" style={{ color: '#D95C3F' }} />
-                          <span className="text-[11px] font-mono font-semibold truncate flex-1 min-w-0" style={{ color: '#8f3a22' }}>
+                          <Database size={11} className="shrink-0 text-primary" />
+                          <span className="text-[11px] font-mono font-semibold truncate flex-1 min-w-0 text-primary-text">
                             {mart.key}
                           </span>
                           <span className="text-[9px] font-mono text-text-tertiary shrink-0">
@@ -527,16 +533,16 @@ export default function TopMetaHeader() {
 
                         {/* Collapsed: description */}
                         {!isOpen && mart.description && mart.description !== mart.key && (
-                          <div className="px-2 pb-1.5 text-[10px] text-text-tertiary truncate bg-white">
+                          <div className="px-2 pb-1.5 text-[10px] text-text-tertiary truncate bg-surface">
                             {mart.description}
                           </div>
                         )}
 
                         {/* Expanded: column table */}
                         {isOpen && (
-                          <div className="border-t overflow-y-auto hide-scrollbar" style={{ borderColor: '#ebc2b5', maxHeight: 220 }}>
+                          <div className="border-t border-primary-border overflow-y-auto hide-scrollbar" style={{ maxHeight: 220 }}>
                             {mart.description && mart.description !== mart.key && (
-                              <div className="px-2 py-1.5 text-[10px] text-text-secondary bg-stone-50 border-b" style={{ borderColor: '#ebc2b5' }}>
+                              <div className="px-2 py-1.5 text-[10px] text-text-secondary bg-chip border-b border-primary-border">
                                 {mart.description}
                               </div>
                             )}
@@ -545,7 +551,7 @@ export default function TopMetaHeader() {
                             ) : (
                               <table className="w-full text-[10px]">
                                 <thead>
-                                  <tr className="text-text-tertiary border-b" style={{ borderColor: '#ebc2b5', backgroundColor: '#fdf6f4' }}>
+                                  <tr className="text-text-tertiary border-b border-primary-border bg-primary-pale/40">
                                     <th className="text-left px-2 py-1 font-semibold w-[42%]">컬럼</th>
                                     <th className="text-left px-1 py-1 font-semibold w-[22%]">타입</th>
                                     <th className="text-left px-1 py-1 font-semibold">설명</th>
@@ -553,8 +559,8 @@ export default function TopMetaHeader() {
                                 </thead>
                                 <tbody>
                                   {mart.columns.map((col, i) => (
-                                    <tr key={col.name} className={i % 2 === 0 ? 'bg-white' : 'bg-stone-50'}>
-                                      <td className="px-2 py-1 font-mono font-semibold truncate max-w-0" style={{ color: '#D95C3F' }}>{col.name}</td>
+                                    <tr key={col.name} className={i % 2 === 0 ? 'bg-surface' : 'bg-chip/50'}>
+                                      <td className="px-2 py-1 font-mono font-semibold truncate max-w-0 text-primary">{col.name}</td>
                                       <td className="px-1 py-1 font-mono text-text-tertiary truncate max-w-0">{col.type}</td>
                                       <td className="px-1 py-1 text-text-secondary truncate max-w-0">{col.desc}</td>
                                     </tr>

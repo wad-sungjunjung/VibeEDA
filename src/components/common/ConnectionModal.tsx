@@ -168,19 +168,19 @@ export default function ConnectionModal({ onClose }: Props) {
   // ── Status dot ──────────────────────────────────────────────────────────────
   function StatusDot({ status }: { status: ServiceStatus }) {
     if (status === 'checking') return <Loader size={12} className="animate-spin text-text-tertiary" />
-    if (status === 'ok') return <Circle size={10} className="fill-green-500 text-green-500" />
-    return <Circle size={10} className="fill-red-400 text-red-400" />
+    if (status === 'ok') return <Circle size={10} className="fill-success text-success" />
+    return <Circle size={10} className="fill-danger text-danger" />
   }
 
   function StatusLabel({ status }: { status: ServiceStatus }) {
     if (status === 'checking') return <span className="text-text-tertiary">확인 중...</span>
-    if (status === 'ok') return <span className="text-green-600 font-medium">실행 중</span>
-    return <span className="text-red-500 font-medium">연결 실패</span>
+    if (status === 'ok') return <span className="text-success font-medium">실행 중</span>
+    return <span className="text-danger font-medium">연결 실패</span>
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-[520px] max-w-[95vw] flex flex-col max-h-[90vh]">
+      <div className="bg-surface rounded-xl shadow-2xl w-[520px] max-w-[95vw] flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">
           <div className="flex items-center gap-2">
@@ -193,13 +193,13 @@ export default function ConnectionModal({ onClose }: Props) {
           <div className="flex items-center gap-2">
             {activeTab === 'snowflake' && (
               <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold ${
-                isConnected ? 'bg-green-50 text-green-700' : 'bg-stone-100 text-text-tertiary'
+                isConnected ? 'bg-success/15 text-success' : 'bg-chip text-text-tertiary'
               }`}>
                 {isConnected ? <Wifi size={11} /> : <WifiOff size={11} />}
                 {isConnected ? '연결됨' : '연결 안됨'}
               </div>
             )}
-            <button onClick={onClose} className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-stone-100 rounded transition-colors">
+            <button onClick={onClose} className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-chip rounded transition-colors">
               <X size={16} />
             </button>
           </div>
@@ -269,9 +269,9 @@ export default function ConnectionModal({ onClose }: Props) {
 
               {connectState !== 'idle' && (
                 <div className={`flex items-start gap-2 rounded-md px-3 py-2.5 text-[11px] ${
-                  connectState === 'ok' ? 'bg-green-50 border border-green-200 text-green-700' :
-                  connectState === 'error' ? 'bg-red-50 border border-red-200 text-red-700' :
-                  'bg-blue-50 border border-blue-200 text-blue-700'
+                  connectState === 'ok' ? 'bg-success/15 border border-success/30 text-success' :
+                  connectState === 'error' ? 'bg-danger-bg border border-danger/30 text-danger' :
+                  'bg-primary-light border border-primary-border text-primary-text'
                 }`}>
                   {connectState === 'connecting' && <Loader size={13} className="animate-spin shrink-0 mt-0.5" />}
                   {connectState === 'ok' && <CheckCircle size={13} className="shrink-0 mt-0.5" />}
@@ -282,7 +282,7 @@ export default function ConnectionModal({ onClose }: Props) {
 
               {isConnected && (
                 <div className="border border-border rounded-lg overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 bg-stone-50 border-b border-border">
+                  <div className="flex items-center justify-between px-3 py-2 bg-chip border-b border-border">
                     <div className="flex items-center gap-1.5">
                       <Database size={12} className="text-primary" />
                       <span className="text-[11px] font-semibold text-text-primary">
@@ -322,7 +322,7 @@ export default function ConnectionModal({ onClose }: Props) {
                 </div>
               )}
 
-              <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-700">
+              <div className="rounded-md bg-warning-bg border border-warning/30 px-3 py-2 text-[11px] text-warning-text">
                 "연결" 클릭 시 브라우저에서 Snowflake SSO 로그인 창이 열립니다. 로그인이 완료되면 자동으로 연결됩니다.
               </div>
             </>
@@ -334,7 +334,7 @@ export default function ConnectionModal({ onClose }: Props) {
 
               {/* 서비스 상태 */}
               <div className="border border-border rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-stone-50 border-b border-border">
+                <div className="px-3 py-2 bg-chip border-b border-border">
                   <span className="text-[11px] font-semibold text-text-primary">서비스 상태</span>
                 </div>
                 <div className="divide-y divide-border-subtle">
@@ -375,7 +375,7 @@ export default function ConnectionModal({ onClose }: Props) {
 
               {/* 데이터 저장 위치 */}
               <div className="border border-border rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-stone-50 border-b border-border">
+                <div className="px-3 py-2 bg-chip border-b border-border">
                   <span className="text-[11px] font-semibold text-text-primary">데이터 저장 위치</span>
                 </div>
                 <div className="divide-y divide-border-subtle">
@@ -384,7 +384,7 @@ export default function ConnectionModal({ onClose }: Props) {
                       <FolderOpen size={13} className="text-text-tertiary shrink-0" />
                       <span className="text-[12px] font-medium text-text-primary">노트북 파일</span>
                       {notebookCount !== null && (
-                        <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-100 text-text-secondary">
+                        <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-chip text-text-secondary">
                           {notebookCount}개
                         </span>
                       )}
@@ -406,7 +406,7 @@ export default function ConnectionModal({ onClose }: Props) {
                       </button>
                     </div>
                     {dirMsg && (
-                      <div className={`flex items-center gap-1 mt-1.5 text-[10px] ${dirMsg.ok ? 'text-green-600' : 'text-red-500'}`}>
+                      <div className={`flex items-center gap-1 mt-1.5 text-[10px] ${dirMsg.ok ? 'text-success' : 'text-danger'}`}>
                         {dirMsg.ok ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
                         {dirMsg.text}
                       </div>
@@ -432,7 +432,7 @@ export default function ConnectionModal({ onClose }: Props) {
 
               {/* 빠른 링크 */}
               <div className="border border-border rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-stone-50 border-b border-border">
+                <div className="px-3 py-2 bg-chip border-b border-border">
                   <span className="text-[11px] font-semibold text-text-primary">빠른 링크</span>
                 </div>
                 <div className="divide-y divide-border-subtle">
@@ -446,7 +446,7 @@ export default function ConnectionModal({ onClose }: Props) {
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-between px-3 py-2 text-[11px] text-primary hover:bg-stone-50 transition-colors"
+                      className="flex items-center justify-between px-3 py-2 text-[11px] text-primary hover:bg-chip transition-colors"
                     >
                       <span>{label}</span>
                       <span className="text-[10px] text-text-tertiary font-mono truncate max-w-[200px] ml-2">{url}</span>
@@ -464,13 +464,13 @@ export default function ConnectionModal({ onClose }: Props) {
             <>
               {isConnected ? (
                 <button onClick={handleDisconnect}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-[12px] font-medium border border-red-200 rounded-md text-red-600 hover:bg-red-50 transition-colors">
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-[12px] font-medium border border-danger/30 rounded-md text-danger hover:bg-danger-bg transition-colors">
                   <WifiOff size={12} />
                   연결 해제
                 </button>
               ) : <div />}
               <div className="flex items-center gap-2">
-                <button onClick={onClose} className="px-4 py-1.5 text-[12px] text-text-secondary hover:text-text-primary hover:bg-stone-100 rounded-md transition-colors">닫기</button>
+                <button onClick={onClose} className="px-4 py-1.5 text-[12px] text-text-secondary hover:text-text-primary hover:bg-chip rounded-md transition-colors">닫기</button>
                 <button onClick={handleConnect} disabled={connectState === 'connecting'}
                   className="flex items-center gap-1.5 px-4 py-1.5 text-[12px] font-medium bg-primary text-white rounded-md hover:bg-primary-dark transition-colors disabled:opacity-50">
                   {connectState === 'connecting'
@@ -481,7 +481,7 @@ export default function ConnectionModal({ onClose }: Props) {
             </>
           ) : (
             <div className="flex-1 flex justify-end">
-              <button onClick={onClose} className="px-4 py-1.5 text-[12px] text-text-secondary hover:text-text-primary hover:bg-stone-100 rounded-md transition-colors">닫기</button>
+              <button onClick={onClose} className="px-4 py-1.5 text-[12px] text-text-secondary hover:text-text-primary hover:bg-chip rounded-md transition-colors">닫기</button>
             </div>
           )}
         </div>

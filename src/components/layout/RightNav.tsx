@@ -210,12 +210,10 @@ export default function RightNav() {
             <div className="relative flex-1 min-w-0">
               <Search size={10} className="absolute left-1.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
               <input
-                className="w-full pl-5 pr-5 py-0.5 text-[10px] bg-white border border-border rounded focus:outline-none"
+                className="w-full pl-5 pr-5 py-0.5 text-[10px] bg-surface border border-border rounded focus:outline-none focus:border-primary"
                 placeholder="검색..."
                 value={dataSearch}
                 onChange={(e) => setDataSearch(e.target.value)}
-                onFocus={(e) => { e.target.style.borderColor = '#D95C3F' }}
-                onBlur={(e) => { e.target.style.borderColor = '' }}
               />
               {dataSearch && (
                 <button onClick={() => setDataSearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary">
@@ -242,25 +240,30 @@ export default function RightNav() {
                       key={id}
                       title={`클릭하여 이름 복사: ${name}`}
                       onClick={() => copyItem(name, id)}
-                      className="group w-full flex items-center gap-1.5 px-2 py-1.5 rounded text-left border transition-all hover:border-primary/30 hover:bg-primary-light/30"
-                      style={{ borderColor: isCopied ? '#D95C3F' : '#e7e5e0', backgroundColor: isCopied ? '#fdede8' : '#fff' }}
+                      className={cn(
+                        'group w-full flex items-center gap-1.5 px-2 py-1.5 rounded text-left border transition-all hover:border-primary/30 hover:bg-primary-light/30',
+                        isCopied ? 'border-primary bg-primary-light' : 'border-border bg-surface'
+                      )}
                     >
                       {/* Type badge */}
                       {item.kind === 'mart' ? (
-                        <Database size={10} className="shrink-0" style={{ color: '#D95C3F' }} />
+                        <Database size={10} className="shrink-0 text-primary" />
                       ) : item.type === 'sql' ? (
-                        <span className="text-[8px] font-bold px-1 py-0.5 rounded shrink-0 bg-[#e8e4d8] text-[#5c4a1e]">SQL</span>
+                        <span className="text-[8px] font-bold px-1 py-0.5 rounded shrink-0 bg-sql-bg text-sql-text">SQL</span>
                       ) : (
-                        <span className="text-[8px] font-bold px-1 py-0.5 rounded shrink-0 bg-[#e6ede0] text-[#3d5226]">PY</span>
+                        <span className="text-[8px] font-bold px-1 py-0.5 rounded shrink-0 bg-python-bg text-python-text">PY</span>
                       )}
                       {/* Name */}
-                      <span className="flex-1 min-w-0 text-[10px] font-mono font-semibold truncate" style={{ color: isCopied ? '#D95C3F' : '#44403c' }}>
+                      <span className={cn(
+                        'flex-1 min-w-0 text-[10px] font-mono font-semibold truncate',
+                        isCopied ? 'text-primary' : 'text-text-primary'
+                      )}>
                         {name}
                       </span>
                       {/* Copy indicator */}
                       <span className="shrink-0 ml-auto">
                         {isCopied
-                          ? <Check size={10} style={{ color: '#D95C3F' }} />
+                          ? <Check size={10} className="text-primary" />
                           : <Copy size={9} className="text-text-disabled opacity-0 group-hover:opacity-100 transition-opacity" />
                         }
                       </span>
@@ -335,22 +338,24 @@ export default function RightNav() {
                       <span className="text-[10px] text-text-disabled font-mono shrink-0">[{idx + 1}]</span>
                       <span className={cn(
                         'text-[9px] font-bold px-1 py-0.5 rounded uppercase tracking-wide shrink-0',
-                        cell.type === 'sql' ? 'bg-[#e8e4d8] text-[#5c4a1e]' :
-                        cell.type === 'python' ? 'bg-[#e6ede0] text-[#3d5226]' :
-                        'bg-[#eae4df] text-[#4a3c2e]'
+                        cell.type === 'sql' ? 'bg-sql-bg text-sql-text' :
+                        cell.type === 'python' ? 'bg-python-bg text-python-text' :
+                        'bg-markdown-bg text-markdown-text'
                       )}>
                         {cell.type === 'markdown' ? 'MD' : cell.type === 'python' ? 'PY' : cell.type.toUpperCase()}
                       </span>
                       <span className="text-[12px] font-mono font-semibold text-text-primary truncate flex-1">{cell.name}</span>
                       <div className="flex items-center gap-1 shrink-0">
-                        {cell.agentGenerated && <Telescope size={10} className="text-[#D95C3F]" />}
+                        {cell.agentGenerated && <Telescope size={10} className="text-primary" />}
                         {cell.executed && <div className="w-1.5 h-1.5 rounded-full bg-success" />}
                         {cell.chatHistory.length > 0 && (
                           <button
                             title="대화 이력 토글"
                             onClick={(e) => { e.stopPropagation(); toggleCellHistory(cell.id) }}
-                            className="flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium transition-colors hover:bg-primary-light"
-                            style={{ color: cell.historyOpen ? '#D95C3F' : '#a8a29e' }}
+                            className={cn(
+                              'flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium transition-colors hover:bg-primary-light',
+                              cell.historyOpen ? 'text-primary' : 'text-text-disabled'
+                            )}
                           >
                             <MessageSquare size={9} />
                             {cell.chatHistory.length}
@@ -373,11 +378,10 @@ export default function RightNav() {
                             return (
                               <div
                                 key={entry.id}
-                                className="group relative rounded-md border cursor-pointer transition-all"
-                                style={{
-                                  backgroundColor: isCurrent ? '#fdede8' : '#ffffff',
-                                  borderColor: isCurrent ? '#ebc2b5' : '#e7e5e0',
-                                }}
+                                className={cn(
+                                  'group relative rounded-md border cursor-pointer transition-all',
+                                  isCurrent ? 'bg-primary-light border-primary-border' : 'bg-surface border-border'
+                                )}
                                 onClick={() => setExpandedEntry(expandedEntry === `${cell.id}-${entry.id}` ? null : `${cell.id}-${entry.id}`)}
                               >
                                 <div className="flex items-center gap-1.5 px-2 py-1">
@@ -385,7 +389,7 @@ export default function RightNav() {
                                   <div className={cn('text-[10px] text-text-primary font-medium flex-1', expandedEntry === `${cell.id}-${entry.id}` ? 'whitespace-normal break-words' : 'truncate')}>{entry.user}</div>
                                   <div className="flex items-center gap-1 shrink-0">
                                     <button
-                                      className="p-1 rounded text-text-disabled opacity-0 group-hover:opacity-100 transition-opacity hover:text-text-secondary hover:bg-stone-100"
+                                      className="p-1 rounded text-text-disabled opacity-0 group-hover:opacity-100 transition-opacity hover:text-text-secondary hover:bg-chip"
                                       title="이 메시지를 채팅 입력창에 불러오기"
                                       onClick={(e) => {
                                         e.stopPropagation()
@@ -400,7 +404,7 @@ export default function RightNav() {
                                       <Pencil size={10} />
                                     </button>
                                     {isCurrent ? (
-                                      <span className="text-[8px] font-semibold px-1 py-0.5 rounded border" style={{ color: '#D95C3F', borderColor: '#ebc2b5', backgroundColor: '#ffffff' }}>현재</span>
+                                      <span className="text-[8px] font-semibold px-1 py-0.5 rounded border text-primary border-primary-border bg-surface">현재</span>
                                     ) : (
                                       <button
                                         className="p-1 rounded text-text-disabled opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary hover:bg-primary-light/40"
@@ -443,7 +447,7 @@ export default function RightNav() {
           style={{ height: `${agentPct}%` }}
         >
           <div className="pr-3 pt-3 pb-2 shrink-0 flex items-center gap-1.5">
-            <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: agentMode ? '#D95C3F' : '#e7e5e0' }}>
+            <div className={cn('w-4 h-4 rounded-full flex items-center justify-center', agentMode ? 'bg-primary' : 'bg-border')}>
               <Telescope size={10} className="text-white" strokeWidth={2} />
             </div>
             <span className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wide leading-tight">에이전트 이력</span>
@@ -457,7 +461,7 @@ export default function RightNav() {
               className={cn(
                 'ml-auto p-0.5 rounded transition-colors',
                 agentChatHistory.length > 0
-                  ? 'text-text-tertiary hover:text-primary hover:bg-stone-100'
+                  ? 'text-text-tertiary hover:text-primary hover:bg-chip'
                   : 'text-text-disabled cursor-not-allowed'
               )}
             >
@@ -509,14 +513,14 @@ export default function RightNav() {
 
                   return rows.map((row) => {
                     const collapsed = !!collapsedSessionIds[row.id]
-                    const borderColor = row.isCurrent ? '#ebc2b5' : '#e7e5e0'
-                    const headerBg = row.isCurrent ? '#fdede8' : '#f5f3ef'
                     const titleColor = row.isCurrent ? 'text-primary' : 'text-text-secondary'
                     return (
                       <div
                         key={row.id}
-                        className="group/session rounded-md border overflow-hidden"
-                        style={{ borderColor }}
+                        className={cn(
+                          'group/session rounded-md border overflow-hidden',
+                          row.isCurrent ? 'border-primary-border' : 'border-border'
+                        )}
                         onContextMenu={row.isCurrent ? undefined : (e) => {
                           e.preventDefault()
                           e.stopPropagation()
@@ -524,14 +528,16 @@ export default function RightNav() {
                         }}
                       >
                         <div
-                          className="w-full flex items-center gap-1.5 px-2 py-1.5"
-                          style={{ backgroundColor: headerBg }}
+                          className={cn(
+                            'w-full flex items-center gap-1.5 px-2 py-1.5',
+                            row.isCurrent ? 'bg-primary-light' : 'bg-bg-sidebar'
+                          )}
                         >
                           <button
                             title={collapsed ? '펼치기' : '접기'}
                             onClick={() => toggleSessionCollapsed(row.id)}
                             className={cn(
-                              'shrink-0 p-0.5 -ml-0.5 rounded hover:bg-stone-200',
+                              'shrink-0 p-0.5 -ml-0.5 rounded hover:bg-chip-hover',
                               row.isCurrent ? 'text-primary' : 'text-text-disabled',
                             )}
                           >
@@ -561,7 +567,7 @@ export default function RightNav() {
                                   deleteAgentSession(row.id)
                                 }
                               }}
-                              className="shrink-0 p-0.5 rounded text-text-disabled hover:bg-red-50 hover:text-danger opacity-0 group-hover/session:opacity-100 transition-opacity"
+                              className="shrink-0 p-0.5 rounded text-text-disabled hover:bg-danger-bg hover:text-danger opacity-0 group-hover/session:opacity-100 transition-opacity"
                             >
                               <Trash2 size={10} strokeWidth={2.5} />
                             </button>
@@ -584,7 +590,7 @@ export default function RightNav() {
 
       {contextMenu && (
         <div
-          className="fixed z-50 min-w-[180px] bg-white border border-border rounded-md shadow-lg py-1"
+          className="fixed z-50 min-w-[180px] bg-surface border border-border rounded-md shadow-lg py-1"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -602,7 +608,7 @@ export default function RightNav() {
               </button>
               <div className="h-px my-1 bg-border-subtle" />
               <button
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[11px] text-danger hover:bg-red-50 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[11px] text-danger hover:bg-danger-bg transition-colors"
                 onClick={() => {
                   if (confirm('이 에이전트 이력을 삭제할까요?')) {
                     deleteAgentSession(contextMenu.id)
@@ -617,7 +623,7 @@ export default function RightNav() {
           )}
           {contextMenu.kind === 'cell' && (
             <button
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[11px] text-danger hover:bg-red-50 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[11px] text-danger hover:bg-danger-bg transition-colors"
               onClick={() => {
                 if (confirm('이 셀을 삭제할까요?')) {
                   deleteCell(contextMenu.id)
@@ -640,8 +646,8 @@ import type { AgentMessage } from '@/types'
 function AgentMsgCard({ msg }: { msg: AgentMessage }) {
   if (msg.kind === 'step') {
     return (
-      <div className="px-1.5 py-1 rounded text-[9px] flex items-center gap-1 border" style={{ backgroundColor: '#fafaf8', borderColor: '#ede9dd', color: '#5a5a52' }}>
-        <span className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: msg.stepType === 'error' ? '#a12d19' : '#8a8a80' }} />
+      <div className="px-1.5 py-1 rounded text-[9px] flex items-center gap-1 border bg-bg-output border-border-subtle text-text-secondary">
+        <span className={cn('w-1 h-1 rounded-full shrink-0', msg.stepType === 'error' ? 'bg-danger' : 'bg-text-tertiary')} />
         <span className="truncate flex-1">{msg.stepLabel ?? '작업'}</span>
         <span className="text-[8px] text-text-disabled shrink-0">{msg.timestamp}</span>
       </div>
@@ -649,16 +655,22 @@ function AgentMsgCard({ msg }: { msg: AgentMessage }) {
   }
   return (
     <div
-      className="rounded p-1.5 border"
+      className={cn(
+        'rounded p-1.5 border',
+        msg.role === 'user' ? 'border-border' : 'border-border-subtle'
+      )}
       style={{
-        backgroundColor: msg.role === 'user' ? '#ffffff' : '#faf8f2',
-        borderColor: msg.role === 'user' ? '#e7e5e0' : '#ede9dd',
+        backgroundColor: msg.role === 'user'
+          ? 'rgb(var(--color-surface))'
+          : 'rgb(var(--color-bg-sidebar))',
       }}
     >
       <div className="flex items-center gap-1 mb-0.5">
         <div
-          className="w-3 h-3 rounded-full flex items-center justify-center shrink-0"
-          style={{ background: msg.role === 'user' ? 'linear-gradient(135deg, #ebc2b5, #D95C3F)' : '#D95C3F' }}
+          className={cn(
+            'w-3 h-3 rounded-full flex items-center justify-center shrink-0',
+            msg.role === 'user' ? 'bg-gradient-to-br from-primary-border to-primary' : 'bg-primary'
+          )}
         >
           {msg.role === 'user'
             ? <User size={6} className="text-white" strokeWidth={2.5} />
@@ -718,13 +730,13 @@ function AgentTurnList({ messages, scope }: { messages: AgentMessage[]; scope: s
                 type="button"
                 onClick={() => hasReplies && toggle(key)}
                 className={cn(
-                  'w-full rounded p-1.5 border text-left transition-colors',
-                  hasReplies ? 'cursor-pointer hover:bg-stone-50' : 'cursor-default'
+                  'w-full rounded p-1.5 border text-left transition-colors border-border',
+                  hasReplies ? 'cursor-pointer' : 'cursor-default'
                 )}
-                style={{ backgroundColor: '#ffffff', borderColor: '#e7e5e0' }}
+                style={{ backgroundColor: 'rgb(var(--color-surface))' }}
               >
                 <div className="flex items-center gap-1 mb-0.5">
-                  <div className="w-3 h-3 rounded-full flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #ebc2b5, #D95C3F)' }}>
+                  <div className="w-3 h-3 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-primary-border to-primary">
                     <User size={6} className="text-white" strokeWidth={2.5} />
                   </div>
                   <span className="text-[9px] font-semibold text-text-secondary">나</span>

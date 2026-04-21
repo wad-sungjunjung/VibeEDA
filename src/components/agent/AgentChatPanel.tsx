@@ -6,12 +6,13 @@ import { useConnectionStore } from '@/store/connectionStore'
 import { cn } from '@/lib/utils'
 import Markdown from '@/components/common/Markdown'
 
-const STEP_ICONS: Record<string, { icon: typeof Wrench; bg: string; fg: string }> = {
-  tool: { icon: Wrench, bg: '#eef2f7', fg: '#2c5282' },
-  cell_created: { icon: FileCode2, bg: '#e8f0e1', fg: '#3d5226' },
-  cell_executed: { icon: PlayCircle, bg: '#e7f3e4', fg: '#1f6b2e' },
-  cell_memo: { icon: StickyNote, bg: '#f7efd8', fg: '#7a5a0f' },
-  error: { icon: AlertTriangle, bg: '#fde3e0', fg: '#a12d19' },
+// 스텝 타입별 아이콘/색. 색은 tailwind 시맨틱 클래스로 — 다크모드 자동 대응.
+const STEP_ICONS: Record<string, { icon: typeof Wrench; className: string }> = {
+  tool: { icon: Wrench, className: 'bg-chip text-text-secondary' },
+  cell_created: { icon: FileCode2, className: 'bg-python-bg text-python-text' },
+  cell_executed: { icon: PlayCircle, className: 'bg-success/15 text-success' },
+  cell_memo: { icon: StickyNote, className: 'bg-warning-bg text-warning-text' },
+  error: { icon: AlertTriangle, className: 'bg-danger-bg text-danger' },
 }
 
 export default function AgentChatPanel() {
@@ -127,21 +128,22 @@ export default function AgentChatPanel() {
     ? `${(ctxWindow / 1_000_000).toFixed(ctxWindow % 1_000_000 === 0 ? 0 : 1)}M`
     : `${Math.round(ctxWindow / 1000)}k`
   const ctxPct = Math.min(100, (approxTokens / ctxWindow) * 100)
-  const ctxColor = ctxPct >= 90 ? '#c94a2e' : ctxPct >= 70 ? '#d97706' : '#2c5282'
+  const ctxClass = ctxPct >= 90 ? 'text-primary-hover' : ctxPct >= 70 ? 'text-warning' : 'text-text-secondary'
+  const ctxFillClass = ctxPct >= 90 ? 'bg-primary-hover' : ctxPct >= 70 ? 'bg-warning' : 'bg-text-secondary'
 
   const TYPE_COLORS: Record<string, string> = {
-    sql: 'bg-[#e8e4d8] text-[#5c4a1e]',
-    python: 'bg-[#e6ede0] text-[#3d5226]',
-    markdown: 'bg-[#eae4df] text-[#4a3c2e]',
+    sql: 'bg-sql-bg text-sql-text',
+    python: 'bg-python-bg text-python-text',
+    markdown: 'bg-markdown-bg text-markdown-text',
   }
 
   return (
     <div
-      className="fixed bottom-6 rounded-2xl shadow-2xl bg-white border border-border flex flex-col z-30"
-      style={{ left: 240, right: 268, maxHeight: 'calc(100vh - 96px)' }}
+      className="fixed bottom-6 rounded-2xl shadow-2xl border border-border flex flex-col z-30"
+      style={{ left: 240, right: 268, maxHeight: 'calc(100vh - 96px)', backgroundColor: 'rgb(var(--color-surface))' }}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border-subtle" style={{ backgroundColor: '#faf8f2' }}>
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border-subtle bg-bg-output">
         <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shrink-0">
           <Telescope size={14} className="text-white" strokeWidth={2} />
         </div>
@@ -150,19 +152,18 @@ export default function AgentChatPanel() {
           <div className="text-[10px] text-text-tertiary">노트북 전체와 대화하며 분석을 이어가세요</div>
         </div>
         <div
-          className="shrink-0 flex flex-col items-end gap-1 px-2 py-1 rounded-md border"
-          style={{ backgroundColor: '#ffffff', borderColor: '#ede9dd' }}
+          className="shrink-0 flex flex-col items-end gap-1 px-2 py-1 rounded-md border bg-surface border-border-subtle"
           title={`이번 턴에 전송되는 토큰 추정치(대화 이력 + 셀 코드/메모 기반) / 선택 모델의 최대 컨텍스트 윈도우\n${approxTokens.toLocaleString()} / ${ctxWindow.toLocaleString()} tokens (${ctxPct.toFixed(1)}%)`}
         >
-          <div className="flex items-center gap-1.5 text-[10px] font-mono leading-none" style={{ color: ctxColor }}>
+          <div className={cn('flex items-center gap-1.5 text-[10px] font-mono leading-none', ctxClass)}>
             <span className="font-semibold">{tokenLabel}</span>
             <span className="text-text-disabled">/ {ctxWindowLabel}</span>
             <span className="text-text-tertiary">({ctxPct < 1 ? ctxPct.toFixed(2) : ctxPct.toFixed(1)}%)</span>
           </div>
-          <div className="w-28 h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#f0ece0' }}>
+          <div className="w-28 h-1 rounded-full overflow-hidden bg-bg-sidebar">
             <div
-              className="h-full rounded-full transition-all"
-              style={{ width: `${ctxPct}%`, backgroundColor: ctxColor }}
+              className={cn('h-full rounded-full transition-all', ctxFillClass)}
+              style={{ width: `${ctxPct}%` }}
             />
           </div>
         </div>
@@ -173,7 +174,7 @@ export default function AgentChatPanel() {
           className={cn(
             'p-1 rounded transition-colors',
             agentChatHistory.length > 0
-              ? 'text-text-tertiary hover:text-primary hover:bg-stone-100'
+              ? 'text-text-tertiary hover:text-primary hover:bg-chip'
               : 'text-text-disabled cursor-not-allowed'
           )}
         >
@@ -182,7 +183,7 @@ export default function AgentChatPanel() {
         <button
           title="닫기"
           onClick={toggleAgentMode}
-          className="p-1 text-text-tertiary hover:text-text-secondary rounded hover:bg-stone-100 transition-colors"
+          className="p-1 text-text-tertiary hover:text-text-secondary rounded hover:bg-chip transition-colors"
         >
           <X size={16} />
         </button>
@@ -198,7 +199,7 @@ export default function AgentChatPanel() {
               return (
                 <div key={item.groupId} className="flex gap-2.5 flex-row">
                   <div className="w-7 shrink-0 flex items-start justify-center pt-1">
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: '#eef2f7', color: '#2c5282' }}>
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center bg-chip text-text-secondary">
                       <Wrench size={11} strokeWidth={2.5} />
                     </div>
                   </div>
@@ -206,8 +207,7 @@ export default function AgentChatPanel() {
                     <button
                       type="button"
                       onClick={() => toggleGroup(item.groupId)}
-                      className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-left text-[11.5px] font-medium border cursor-pointer hover:bg-stone-100 transition-colors"
-                      style={{ backgroundColor: '#fafaf8', borderColor: '#ede9dd', color: '#2c5282' }}
+                      className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-left text-[11.5px] font-medium border cursor-pointer hover:bg-chip transition-colors bg-bg-output border-border-subtle text-text-secondary"
                     >
                       {collapsed
                         ? <ChevronRight size={10} className="text-text-disabled shrink-0" />
@@ -225,10 +225,9 @@ export default function AgentChatPanel() {
                           return (
                             <div
                               key={step.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-text-secondary"
-                              style={{ backgroundColor: '#f5f3ef', border: '1px solid #ede9dd' }}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-text-secondary bg-bg-sidebar border border-border-subtle"
                             >
-                              <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: sIcon.bg, color: sIcon.fg }}>
+                              <div className={cn('w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0', sIcon.className)}>
                                 <SIconComp size={8} strokeWidth={2.5} />
                               </div>
                               <span className="truncate flex-1">{step.stepLabel ?? '작업'}</span>
@@ -249,8 +248,10 @@ export default function AgentChatPanel() {
             return (
             <div key={msg.id} className={cn('flex gap-2.5', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
               <div
-                className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                style={{ background: msg.role === 'user' ? 'linear-gradient(135deg, #ebc2b5, #D95C3F)' : '#D95C3F' }}
+                className={cn(
+                  'w-7 h-7 rounded-full flex items-center justify-center shrink-0',
+                  msg.role === 'user' ? 'bg-gradient-to-br from-primary-border to-primary' : 'bg-primary'
+                )}
               >
                 {msg.role === 'user'
                   ? <User size={14} className="text-white" strokeWidth={2} />
@@ -262,22 +263,28 @@ export default function AgentChatPanel() {
                   <span className="text-[9px] text-text-disabled">{msg.timestamp}</span>
                 </div>
                 <div
-                  className="px-3 py-2 rounded-xl text-[13px] text-text-primary text-left leading-relaxed break-words"
-                  style={{ backgroundColor: msg.role === 'user' ? '#fdede8' : '#faf8f2', border: '1px solid', borderColor: msg.role === 'user' ? '#f5d5c8' : '#ede9dd' }}
+                  className={cn(
+                    'px-3 py-2 rounded-xl text-[13px] text-text-primary text-left leading-relaxed break-words border',
+                    msg.role === 'user' ? 'border-primary-border/70' : 'border-border-subtle'
+                  )}
+                  style={{
+                    backgroundColor: msg.role === 'user'
+                      ? 'rgb(var(--color-primary-light))'
+                      : 'rgb(var(--color-bg-sidebar))',
+                  }}
                 >
                   {msg.role === 'assistant' && agentLoading && isLast ? (
                     <div className="flex flex-col gap-1.5">
-                      <span className="flex items-center gap-2 whitespace-nowrap" style={{ color: '#c94a2e' }}>
+                      <span className="flex items-center gap-2 whitespace-nowrap text-primary-hover">
                         <Loader2 size={12} className="animate-spin" />
                         <span className="text-[12px] font-semibold">{agentStatus ?? '생각 중'}</span>
-                        <span className="font-mono text-[11px]" style={{ color: '#c94a2e99' }}>
+                        <span className="font-mono text-[11px] text-primary-hover/60">
                           {(agentElapsed / 10).toFixed(1)}s
                         </span>
                         <button
                           title="에이전트 중지"
                           onClick={() => cancelAgent()}
-                          className="ml-1 flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors"
-                          style={{ backgroundColor: '#fdede8', color: '#c94a2e', border: '1px solid #f5c5b5' }}
+                          className="ml-1 flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors bg-primary-light text-primary-hover border border-primary-border"
                         >
                           <StopCircle size={11} />중지
                         </button>
@@ -285,8 +292,7 @@ export default function AgentChatPanel() {
                       {msg.content && <Markdown content={msg.content} />}
                       {agentElapsed >= 300 && !msg.content && !agentChatHistory.slice(0, idx).some((m) => m.role === 'assistant' && !!m.content) && (
                         <div
-                          className="flex items-start gap-1.5 text-[11px] leading-relaxed px-2 py-1.5 rounded-md"
-                          style={{ backgroundColor: '#fff7ed', border: '1px dashed #f5c5b5', color: '#7a3a22' }}
+                          className="flex items-start gap-1.5 text-[11px] leading-relaxed px-2 py-1.5 rounded-md bg-warning-bg/50 border border-dashed border-primary-border text-primary-text"
                         >
                           <AlertTriangle size={11} className="shrink-0 mt-0.5" />
                           <span>
@@ -319,15 +325,14 @@ export default function AgentChatPanel() {
       )}
 
       {/* Reference cells */}
-      <div className="px-4 pt-3 pb-1 border-t border-border-subtle" style={{ borderTopColor: agentChatHistory.length > 0 ? '#ede9dd' : 'transparent' }}>
+      <div className={cn('px-4 pt-3 pb-1 border-t', agentChatHistory.length > 0 ? 'border-border-subtle' : 'border-transparent')}>
         <div className="flex items-center gap-1.5 flex-wrap relative">
           <span className="text-[10px] text-text-disabled font-medium shrink-0">참조 셀</span>
 
           {refCellObjects.map((cell) => (
             <span
               key={cell.id}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border"
-              style={{ backgroundColor: '#fdede8', borderColor: '#ebc2b5', color: '#8f3a22' }}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border bg-primary-light border-primary-border text-primary-text"
             >
               <FileCode size={9} />
               {cell.name}
@@ -358,7 +363,7 @@ export default function AgentChatPanel() {
             {pickerOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setPickerOpen(false)} />
-                <div className="absolute left-0 bottom-7 z-50 bg-white border border-border rounded-lg shadow-lg min-w-[200px]">
+                <div className="absolute left-0 bottom-7 z-50 bg-surface border border-border rounded-lg shadow-lg min-w-[200px]">
                   {/* Search */}
                   <div className="flex items-center gap-1.5 px-2.5 py-2 border-b border-border-subtle">
                     <Search size={11} className="text-text-disabled shrink-0" />
@@ -383,7 +388,7 @@ export default function AgentChatPanel() {
                       .map((cell, idx) => (
                         <button
                           key={cell.id}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-stone-50 text-left"
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-chip text-left"
                           onClick={() => { toggleAgentRefCell(cell.id); setPickerOpen(false); setPickerQuery('') }}
                         >
                           <span className="text-[9px] text-text-disabled font-mono shrink-0">[{idx + 1}]</span>
@@ -411,8 +416,7 @@ export default function AgentChatPanel() {
       {/* Input — 바이브 챗 박스와 동일 포맷: 모델 select 좌하단, 전송 우하단 */}
       <div className="px-4 py-3">
         <div
-          className="relative rounded-2xl"
-          style={{ backgroundColor: '#ffffff', border: '1px solid #ede9dd', boxShadow: '0 1px 2px rgba(45,42,38,0.03)' }}
+          className="relative rounded-2xl bg-surface border border-border-subtle shadow-sm"
         >
           <textarea
             className="w-full bg-transparent text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none resize-none leading-relaxed overflow-hidden rounded-2xl"
@@ -449,9 +453,9 @@ export default function AgentChatPanel() {
             disabled={!agentChatInput.trim()}
             onClick={() => submitAgentMessage(agentChatInput)}
             className={cn(
-              'absolute right-3 bottom-2 w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:cursor-not-allowed',
+              'absolute right-3 bottom-2 w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:cursor-not-allowed text-white z-10',
+              agentChatInput.trim() ? 'bg-primary' : 'bg-border-subtle'
             )}
-            style={{ backgroundColor: agentChatInput.trim() ? '#D95C3F' : '#ede9dd', color: '#ffffff', zIndex: 10 }}
           >
             <ArrowUp size={16} strokeWidth={2.5} />
           </button>

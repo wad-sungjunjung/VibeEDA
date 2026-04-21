@@ -2,6 +2,127 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────────────────────────────────────────────────────────────────
+   테마 팔레트 (Phase 1 — 토큰 인프라)
+   - 값은 RGB triplet. Tailwind 토큰은 rgb(var(--x) / <alpha-value>) 로 소비.
+   - .dark 클래스가 <html> 에 걸리면 전체 전환.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* backgrounds */
+  --color-bg-page: 250 249 245;
+  --color-bg-sidebar: 245 244 237;
+  --color-bg-pane: 253 252 248;
+  --color-bg-output: 250 248 242;
+  --color-bg-code: 45 42 38;
+
+  /* primary — 버튼/CTA 는 기존 코랄 유지, tint 계열만 오렌지로 이동 */
+  --color-primary: 217 92 63;
+  --color-primary-hover: 194 78 52;
+  --color-primary-light: 255 232 214;
+  --color-primary-pale: 253 219 192;
+  --color-primary-border: 237 173 122;
+  --color-primary-text: 140 50 0;
+
+  /* text */
+  --color-text-primary: 45 42 38;
+  --color-text-secondary: 87 83 78;
+  --color-text-tertiary: 120 113 108;
+  --color-text-disabled: 168 162 158;
+
+  /* borders */
+  --color-border: 231 229 224;
+  --color-border-subtle: 237 233 221;
+  --color-border-hover: 214 211 199;
+
+  /* cell types */
+  --color-sql-bg: 232 228 216;
+  --color-sql-text: 92 74 30;
+  --color-python-bg: 230 237 224;
+  --color-python-text: 61 82 38;
+  --color-markdown-bg: 234 228 223;
+  --color-markdown-text: 74 60 46;
+
+  /* status */
+  --color-success: 101 163 13;
+  --color-success-indicator: 132 204 22;
+  --color-danger: 220 38 38;
+  --color-danger-bg: 254 242 242;
+  --color-warning: 217 119 6;
+  --color-warning-bg: 254 243 199;
+  --color-warning-text: 146 64 14;
+
+  /* elevated surface (카드/모달/인풋 배경 — 라이트는 순백, 다크는 살짝 올라온 톤) */
+  --color-surface: 255 255 255;
+  --color-surface-hover: 250 249 245;
+  /* 중립 chip/호버 배경 (stone-100 대체) */
+  --color-chip: 245 244 241;
+  --color-chip-hover: 237 233 221;
+
+  /* surface (body / scrollbar) */
+  --surface-body-bg: 250 249 245;
+  --surface-body-fg: 45 42 38;
+  --surface-scrollbar-thumb: 214 208 196;
+  --surface-scrollbar-thumb-hover: 184 176 164;
+}
+
+.dark {
+  /* backgrounds — 중성 차콜 (살짝 쿨 뉴트럴, Linear/Raycast 느낌) */
+  --color-bg-page: 17 18 22;
+  --color-bg-sidebar: 22 23 28;
+  --color-bg-pane: 20 21 26;
+  --color-bg-output: 19 20 24;
+  --color-bg-code: 12 13 16;
+
+  /* primary — 버튼은 기존 다크 코랄 유지, tint 만 오렌지 쪽 */
+  --color-primary: 232 108 80;
+  --color-primary-hover: 242 128 100;
+  --color-primary-light: 52 28 10;
+  --color-primary-pale: 40 22 8;
+  --color-primary-border: 110 58 22;
+  --color-primary-text: 255 162 108;
+
+  /* text — 뉴트럴 웜-화이트 (살짝 따뜻하게 가독성 ↑) */
+  --color-text-primary: 230 230 234;
+  --color-text-secondary: 170 170 178;
+  --color-text-tertiary: 128 128 138;
+  --color-text-disabled: 88 88 98;
+
+  /* borders */
+  --color-border: 44 45 52;
+  --color-border-subtle: 32 33 40;
+  --color-border-hover: 58 60 68;
+
+  /* cell types — 배경 뉴트럴화에 맞춰 채도 낮춤·명도 조정 */
+  --color-sql-bg: 52 48 30;
+  --color-sql-text: 212 195 130;
+  --color-python-bg: 34 48 30;
+  --color-python-text: 174 205 144;
+  --color-markdown-bg: 46 43 40;
+  --color-markdown-text: 205 192 175;
+
+  /* status */
+  --color-success: 132 204 22;
+  --color-success-indicator: 163 230 53;
+  --color-danger: 248 113 113;
+  --color-danger-bg: 58 26 26;
+  --color-warning: 250 204 21;
+  --color-warning-bg: 58 45 15;
+  --color-warning-text: 253 224 71;
+
+  /* elevated surface — 카드/모달 배경 */
+  --color-surface: 28 29 34;
+  --color-surface-hover: 36 37 44;
+  /* 중립 chip */
+  --color-chip: 32 33 40;
+  --color-chip-hover: 42 43 50;
+
+  /* surface (body / scrollbar) */
+  --surface-body-bg: 17 18 22;
+  --surface-body-fg: 230 230 234;
+  --surface-scrollbar-thumb: 58 60 68;
+  --surface-scrollbar-thumb-hover: 88 90 100;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -16,8 +137,8 @@
   }
 
   body {
-    background-color: #faf9f5;
-    color: #2d2a26;
+    background-color: rgb(var(--surface-body-bg));
+    color: rgb(var(--surface-body-fg));
     font-family: 'Pretendard', -apple-system, 'Malgun Gothic', sans-serif;
     font-size: 14px;
     line-height: 1.5;
@@ -32,7 +153,7 @@
   100% { background-position: 0% 50%; }
 }
 
-/* ── 앱 기본 스크롤바 — 라이트 크림 톤 ── */
+/* ── 앱 기본 스크롤바 — 테마 변수로 구동 ── */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -41,18 +162,18 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: #d6d0c4;
+  background-color: rgb(var(--surface-scrollbar-thumb));
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: #b8b0a4;
+  background-color: rgb(var(--surface-scrollbar-thumb-hover));
 }
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d6d0c4 transparent;
+  scrollbar-color: rgb(var(--surface-scrollbar-thumb)) transparent;
 }
 
 @layer utilities {

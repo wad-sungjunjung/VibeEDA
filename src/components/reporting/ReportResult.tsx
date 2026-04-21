@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import Markdown from '@/components/common/Markdown'
 import { API_BASE_URL } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 const STAGE_ORDER = [
   { key: 'collecting', label: '셀 데이터 수집' },
@@ -113,7 +114,7 @@ export default function ReportResult() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl h-full max-h-[90vh] flex flex-col">
+      <div className="bg-surface rounded-xl shadow-2xl w-full max-w-3xl h-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-2 px-5 py-4 border-b border-border-subtle">
           <FileText size={16} className="text-primary" />
@@ -124,8 +125,7 @@ export default function ReportResult() {
               </div>
               {reportIsDraft && !generatingReport && (
                 <span
-                  className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                  style={{ backgroundColor: '#fff1d6', color: '#7a4a00' }}
+                  className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-warning-bg text-warning-text"
                   title="저장하지 않은 임시 리포트입니다. 저장하지 않고 닫으면 삭제됩니다."
                 >
                   임시
@@ -137,7 +137,7 @@ export default function ReportResult() {
             )}
           </div>
           {(generatingReport || reportStartedAt) && (
-            <span className="flex items-center gap-1 text-[11px] font-mono shrink-0" style={{ color: generatingReport ? '#c94a2e' : '#6b7280' }}>
+            <span className={cn('flex items-center gap-1 text-[11px] font-mono shrink-0', generatingReport ? 'text-primary-hover' : 'text-text-tertiary')}>
               {generatingReport && <Loader2 size={12} className="animate-spin" />}
               {elapsedSec}s
             </span>
@@ -163,12 +163,12 @@ export default function ReportResult() {
             onClick={() => { void saveCurrentReport() }}
             disabled={!reportContent || !reportIsDraft || reportSaving || generatingReport}
             title={reportIsDraft ? '~/vibe-notebooks/reports/ 에 영구 저장' : '이미 저장된 리포트입니다'}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors disabled:opacity-50"
-            style={
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors disabled:opacity-50',
               !reportContent || !reportIsDraft || reportSaving || generatingReport
-                ? { backgroundColor: 'var(--tw-bg-sidebar, #f3f1ec)', color: '#9aa0a6' }
-                : { backgroundColor: '#D95C3F', color: '#fff' }
-            }
+                ? 'bg-bg-sidebar text-text-disabled'
+                : 'bg-primary text-white hover:bg-primary-hover'
+            )}
           >
             {reportSaving
               ? <Loader2 size={13} className="animate-spin" />
@@ -186,7 +186,7 @@ export default function ReportResult() {
 
         {/* Stage tracker */}
         {(generatingReport || reportStages.length > 0) && (
-          <div className="px-5 py-3 border-b border-border-subtle bg-[#faf8f2]">
+          <div className="px-5 py-3 border-b border-border-subtle bg-bg-output">
             <div className="flex items-center gap-3">
               {STAGE_ORDER.map((s, i) => {
                 const status = stageStatus(s.key)
@@ -199,7 +199,7 @@ export default function ReportResult() {
                 return (
                   <div key={s.key} className="flex items-center gap-2 min-w-0">
                     {status === 'done' && <CheckCircle2 size={14} className="text-success shrink-0" />}
-                    {status === 'active' && <Loader2 size={14} className="animate-spin shrink-0" style={{ color: '#c94a2e' }} />}
+                    {status === 'active' && <Loader2 size={14} className="animate-spin shrink-0 text-primary-hover" />}
                     {status === 'pending' && <Circle size={14} className="text-text-disabled shrink-0" />}
                     <span
                       className={
@@ -227,7 +227,7 @@ export default function ReportResult() {
           (reportProcessingNotes.missing_charts.length > 0
             || reportProcessingNotes.unreferenced_charts.length > 0
             || reportProcessingNotes.suspicious_number_count > 0) && (
-            <div className="px-5 py-2 text-[11px] border-b border-border-subtle" style={{ backgroundColor: '#fff7e6', color: '#7a4a00' }}>
+            <div className="px-5 py-2 text-[11px] border-b border-border-subtle bg-warning-bg text-warning-text">
               <div className="flex items-start gap-2">
                 <AlertTriangle size={12} className="mt-0.5 shrink-0" />
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -250,7 +250,7 @@ export default function ReportResult() {
 
         {/* Error */}
         {reportError && (
-          <div className="px-5 py-3 text-[12px] flex items-start gap-2" style={{ backgroundColor: '#fff1f0', color: '#8a1c1c' }}>
+          <div className="px-5 py-3 text-[12px] flex items-start gap-2 bg-danger-bg text-danger">
             <AlertTriangle size={13} className="mt-0.5 shrink-0" />
             <span>{reportError}</span>
           </div>
@@ -258,7 +258,7 @@ export default function ReportResult() {
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6 bg-bg-output">
-          <div className="bg-white p-6 rounded-lg border border-border">
+          <div className="bg-surface p-6 rounded-lg border border-border">
             {reportContent ? (
               <Markdown content={displayContent} />
             ) : generatingReport ? (

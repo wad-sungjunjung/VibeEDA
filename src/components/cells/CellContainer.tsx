@@ -13,9 +13,9 @@ interface Props {
 
 const TYPE_CYCLE_ORDER = ['sql', 'python', 'markdown'] as const
 const TYPE_STYLES: Record<string, string> = {
-  sql: 'bg-[#e8e4d8] text-[#5c4a1e]',
-  python: 'bg-[#e6ede0] text-[#3d5226]',
-  markdown: 'bg-[#eae4df] text-[#4a3c2e]',
+  sql: 'bg-sql-bg text-sql-text',
+  python: 'bg-python-bg text-python-text',
+  markdown: 'bg-markdown-bg text-markdown-text',
 }
 
 export default function CellContainer({ cell }: Props) {
@@ -171,18 +171,17 @@ export default function CellContainer({ cell }: Props) {
         <button
           key={t}
           onClick={(e) => { e.stopPropagation(); onTab(t) }}
-          className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold border-b-2 -mb-px transition-colors"
-          style={{
-            borderColor: activeTab === t ? '#D95C3F' : 'transparent',
-            color: activeTab === t ? '#D95C3F' : '#a8a29e',
-          }}
+          className={cn(
+            'flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold border-b-2 -mb-px transition-colors',
+            activeTab === t ? 'border-primary text-primary' : 'border-transparent text-text-disabled'
+          )}
         >
           {t === 'input' && <Code size={11} />}
           {t === 'output' && <BarChart3 size={11} />}
           {t === 'memo' && <FileText size={11} />}
           {t === 'input' ? '입력' : t === 'output' ? '출력' : '메모'}
           {t === 'output' && cell.executed && cell.type !== 'markdown' && (
-            <span className="w-1.5 h-1.5 rounded-full ml-0.5" style={{ backgroundColor: '#65a30d' }} />
+            <span className="w-1.5 h-1.5 rounded-full ml-0.5 bg-success" />
           )}
         </button>
       ))}
@@ -194,8 +193,11 @@ export default function CellContainer({ cell }: Props) {
       const isMarkdown = cell.type === 'markdown'
       return (
         <div
-          className={cn('relative rounded-md overflow-hidden', stretch && 'h-full flex flex-col [&_.cm-editor]:!h-full [&>*]:flex-1 [&>*]:min-h-0')}
-          style={isMarkdown ? { backgroundColor: '#ffffff', border: '1px solid #ede9dd' } : undefined}
+          className={cn(
+            'relative rounded-md overflow-hidden',
+            isMarkdown && 'bg-surface border border-border-subtle',
+            stretch && 'h-full flex flex-col [&_.cm-editor]:!h-full [&>*]:flex-1 [&>*]:min-h-0'
+          )}
         >
           <CodeEditor
             type={cell.type}
@@ -211,30 +213,32 @@ export default function CellContainer({ cell }: Props) {
     if (tab === 'output') {
       return (
         <div
-          className={cn('relative rounded-md overflow-hidden', stretch && 'h-full')}
+          className={cn(
+            'relative rounded-md overflow-hidden',
+            stretch && 'h-full',
+            !isExecuting && 'border border-border-subtle',
+            !isExecuting && ((cell.type === 'markdown' || cell.output?.type === 'table') ? 'bg-surface' : 'bg-bg-output'),
+          )}
           style={isExecuting ? {
             border: '1.5px solid transparent',
-            backgroundImage: 'linear-gradient(#faf8f2,#faf8f2), linear-gradient(90deg,#f59e0b,#fbbf24,#fde68a,#fbbf24,#f59e0b)',
+            backgroundImage: 'linear-gradient(rgb(var(--color-bg-output)),rgb(var(--color-bg-output))), linear-gradient(90deg,#f59e0b,#fbbf24,#fde68a,#fbbf24,#f59e0b)',
             backgroundOrigin: 'border-box',
             backgroundClip: 'padding-box, border-box',
             backgroundSize: '300% 300%',
             animation: 'vibe-border-flow 2s linear infinite',
             boxShadow: '0 0 8px rgba(245,158,11,0.12)',
-          } : {
-            backgroundColor: (cell.type === 'markdown' || cell.output?.type === 'table') ? '#ffffff' : '#faf8f2',
-            border: '1px solid #ede9dd',
-          }}
+          } : undefined}
         >
           <CellOutput cell={cell} />
           {isExecuting && (
             <>
-              <div className="absolute inset-0 bg-[#faf8f2] z-[30] rounded-md" />
+              <div className="absolute inset-0 bg-bg-output z-[30] rounded-md" />
               <div className="absolute inset-0 z-[40] flex flex-col items-center justify-center gap-1 pointer-events-none">
-                <div className="flex items-center gap-1.5" style={{ color: '#b45309' }}>
+                <div className="flex items-center gap-1.5 text-warning-text">
                   <Loader2 size={13} className="animate-spin" />
                   <span className="text-[12px] font-semibold">실행 중</span>
                 </div>
-                <span className="font-mono text-[11px]" style={{ color: '#b4530999' }}>
+                <span className="font-mono text-[11px] text-warning-text/60">
                   {(execElapsed / 10).toFixed(1)}s
                 </span>
               </div>
@@ -246,14 +250,12 @@ export default function CellContainer({ cell }: Props) {
     return (
       <textarea
         className={cn(
-          'w-full text-[12px] px-4 py-3 rounded-md outline-none leading-relaxed text-text-primary placeholder-text-tertiary hide-scrollbar',
+          'w-full text-[12px] px-4 py-3 rounded-md outline-none leading-relaxed text-text-primary placeholder-text-tertiary hide-scrollbar bg-surface border border-border-subtle',
           !fixedHeight && 'resize-y'
         )}
         style={{
           height: fixedHeight,
           minHeight: fixedHeight ? undefined : 200,
-          backgroundColor: '#ffffff',
-          border: '1px solid #ede9dd',
           fontFamily: 'inherit',
         }}
         spellCheck={false}
@@ -270,7 +272,9 @@ export default function CellContainer({ cell }: Props) {
       id={cell.id}
       className={cn(
         'border-b border-border-subtle transition-colors',
-        isActive ? 'bg-primary-light/60' : 'hover:bg-[rgba(253,237,232,0.15)]',
+        isActive
+          ? 'bg-primary-light/60 dark:bg-primary-light/30'
+          : 'hover:bg-primary-light/15 dark:hover:bg-primary-light/10',
       )}
       onClick={() => setActiveCellId(cell.id)}
     >
@@ -289,7 +293,7 @@ export default function CellContainer({ cell }: Props) {
             {badgeLabel}
           </button>
           <input
-            className="text-sm font-mono font-semibold bg-transparent border-none focus:outline-none focus:bg-white px-1 rounded text-text-primary"
+            className="text-sm font-mono font-semibold bg-transparent border-none focus:outline-none focus:bg-surface px-1 rounded text-text-primary"
             size={Math.max((cell.name?.length || 1) + 1, 4)}
             value={cell.name}
             onChange={(e) => updateCellName(cell.id, sanitizeCellNameInput(e.target.value))}
@@ -300,7 +304,7 @@ export default function CellContainer({ cell }: Props) {
           />
           {/* Execution status */}
           {isExecuting && (
-            <span className="text-[10px] font-mono flex items-center gap-0.5 shrink-0" style={{ color: '#d97706' }}>
+            <span className="text-[10px] font-mono flex items-center gap-0.5 shrink-0 text-warning">
               <Loader2 size={10} className="animate-spin" />
               {elapsedSecs}s
             </span>
@@ -309,7 +313,7 @@ export default function CellContainer({ cell }: Props) {
             <span className="text-[10px] font-mono text-text-disabled shrink-0">{cell.executedAt}</span>
           )}
           {cell.agentGenerated && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0" style={{ backgroundColor: '#fdede8', color: '#8f3a22' }}>
+            <span className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0 bg-primary-light text-primary-text">
               <Telescope size={10} />에이전트
             </span>
           )}
@@ -323,9 +327,7 @@ export default function CellContainer({ cell }: Props) {
                 title={isExecuting ? '실행 중...' : 'Ctrl+Enter로도 실행'}
                 disabled={isExecuting}
                 onClick={(e) => { e.stopPropagation(); executeCell(cell.id) }}
-                className="p-1.5 rounded text-text-secondary transition-colors disabled:cursor-not-allowed"
-                onMouseEnter={(e) => { if (!isExecuting) { e.currentTarget.style.color = '#D95C3F'; e.currentTarget.style.backgroundColor = '#fdede8' } }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = ''; e.currentTarget.style.backgroundColor = 'transparent' }}
+                className="p-1.5 rounded text-text-secondary transition-colors disabled:cursor-not-allowed enabled:hover:text-primary enabled:hover:bg-primary-light"
               >
                 {isExecuting ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
               </button>
@@ -340,37 +342,34 @@ export default function CellContainer({ cell }: Props) {
           </div>
 
           {/* Layout mode toggle */}
-          <div className="flex items-center rounded overflow-hidden ml-1" style={{ border: '1px solid #ede9dd' }}>
+          <div className="flex items-center rounded overflow-hidden ml-1 border border-border-subtle">
             <button
               title="기본"
               onClick={(e) => { e.stopPropagation(); if (cell.splitMode) toggleCellSplitMode(cell.id) }}
-              className="flex items-center justify-center w-6 h-6 transition-colors"
-              style={{
-                backgroundColor: !cell.splitMode ? '#D95C3F' : 'transparent',
-                color: !cell.splitMode ? '#ffffff' : '#a8a29e',
-              }}
+              className={cn(
+                'flex items-center justify-center w-6 h-6 transition-colors',
+                !cell.splitMode ? 'bg-primary text-white' : 'bg-transparent text-text-disabled'
+              )}
             >
               <Square size={12} />
             </button>
             <button
               title="좌우 분할"
               onClick={(e) => { e.stopPropagation(); setCellSplitDir(cell.id, 'h') }}
-              className="flex items-center justify-center w-6 h-6 transition-colors"
-              style={{
-                backgroundColor: cell.splitMode && cell.splitDir === 'h' ? '#D95C3F' : 'transparent',
-                color: cell.splitMode && cell.splitDir === 'h' ? '#ffffff' : '#a8a29e',
-              }}
+              className={cn(
+                'flex items-center justify-center w-6 h-6 transition-colors',
+                cell.splitMode && cell.splitDir === 'h' ? 'bg-primary text-white' : 'bg-transparent text-text-disabled'
+              )}
             >
               <Columns2 size={12} />
             </button>
             <button
               title="위아래 분할"
               onClick={(e) => { e.stopPropagation(); setCellSplitDir(cell.id, 'v') }}
-              className="flex items-center justify-center w-6 h-6 transition-colors"
-              style={{
-                backgroundColor: cell.splitMode && cell.splitDir === 'v' ? '#D95C3F' : 'transparent',
-                color: cell.splitMode && cell.splitDir === 'v' ? '#ffffff' : '#a8a29e',
-              }}
+              className={cn(
+                'flex items-center justify-center w-6 h-6 transition-colors',
+                cell.splitMode && cell.splitDir === 'v' ? 'bg-primary text-white' : 'bg-transparent text-text-disabled'
+              )}
             >
               <Rows2 size={12} />
             </button>
@@ -406,7 +405,7 @@ export default function CellContainer({ cell }: Props) {
                   onMouseDown={handleVDividerMouseDown}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="h-px w-full rounded-full transition-colors group-hover/div:bg-primary" style={{ backgroundColor: '#ede9dd' }} />
+                  <div className="h-px w-full rounded-full transition-colors bg-border-subtle group-hover/div:bg-primary" />
                 </div>
                 <div style={{ height: bottomPx, overflow: 'hidden' }}>
                   {renderTabBar(cell.rightTab, (t) => setSplitTab(cell.id, 'right', t))}
@@ -441,7 +440,7 @@ export default function CellContainer({ cell }: Props) {
                     onMouseDown={handleDividerMouseDown}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="w-px h-full rounded-full transition-colors group-hover/div:bg-primary" style={{ backgroundColor: '#ede9dd' }} />
+                    <div className="w-px h-full rounded-full transition-colors bg-border-subtle group-hover/div:bg-primary" />
                   </div>
                   <div className="min-w-0 flex flex-col" style={{ height: panelHeight, overflow: 'hidden' }}>
                     {renderTabBar(cell.rightTab, (t) => setSplitTab(cell.id, 'right', t))}
@@ -479,7 +478,7 @@ export default function CellContainer({ cell }: Props) {
 
       {/* Insight */}
       {cell.insight && (
-        <div className="mt-2 mx-4 px-3 py-2 rounded-md text-xs flex items-start gap-2" style={{ backgroundColor: '#fdede8', color: '#8f3a22' }}>
+        <div className="mt-2 mx-4 px-3 py-2 rounded-md text-xs flex items-start gap-2 bg-primary-light text-primary-text">
           <Telescope size={14} className="shrink-0 mt-0.5" />
           <span>{cell.insight}</span>
         </div>
@@ -488,40 +487,38 @@ export default function CellContainer({ cell }: Props) {
       {/* Vibe chat (active cell only) */}
       {isActive && (
         <div
-          className="relative mt-3 mx-4 mb-4 rounded-2xl"
+          className={cn(
+            'relative mt-3 mx-4 mb-4 rounded-2xl',
+            !isVibing && 'bg-surface border border-border-subtle shadow-sm'
+          )}
           style={isVibing ? {
             border: '1.5px solid transparent',
-            backgroundImage: 'linear-gradient(#fff,#fff), linear-gradient(90deg,#D95C3F,#f0883e,#fbbf24,#f0883e,#D95C3F)',
+            backgroundImage: 'linear-gradient(rgb(var(--color-surface)),rgb(var(--color-surface))), linear-gradient(90deg,#D95C3F,#f0883e,#fbbf24,#f0883e,#D95C3F)',
             backgroundOrigin: 'border-box',
             backgroundClip: 'padding-box, border-box',
             backgroundSize: '300% 300%',
             animation: 'vibe-border-flow 2s linear infinite',
             boxShadow: '0 0 8px rgba(217,92,63,0.12)',
-          } : {
-            backgroundColor: '#ffffff',
-            border: '1px solid #ede9dd',
-            boxShadow: '0 1px 2px rgba(45,42,38,0.03)',
-          }}
+          } : undefined}
           onClick={(e) => e.stopPropagation()}
         >
           {/* 뒤 텍스트 가리기 + 상태 표시 */}
           {isVibing && (
             <>
-              <div className="absolute inset-0 rounded-2xl bg-white z-[30]" />
+              <div className="absolute inset-0 rounded-2xl bg-surface z-[30]" />
               <div className="absolute inset-0 z-[40] flex flex-col items-center justify-center gap-1 pointer-events-none">
-                <div className="flex items-center gap-1.5" style={{ color: '#c94a2e' }}>
+                <div className="flex items-center gap-1.5 text-primary-hover">
                   <Loader2 size={13} className="animate-spin" />
                   <span className="text-[12px] font-semibold">코드 생성 중</span>
                 </div>
-                <span className="font-mono text-[11px]" style={{ color: '#c94a2e99' }}>
+                <span className="font-mono text-[11px] text-primary-hover/60">
                   {(vibeElapsed / 10).toFixed(1)}s
                 </span>
               </div>
               <button
                 title="생성 중지"
                 onClick={(e) => { e.stopPropagation(); cancelVibe(cell.id) }}
-                className="absolute top-1/2 right-3 -translate-y-1/2 z-[50] flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
-                style={{ backgroundColor: '#fdede8', color: '#c94a2e', border: '1px solid #f5c5b5' }}
+                className="absolute top-1/2 right-3 -translate-y-1/2 z-[50] flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors bg-primary-light text-primary-hover border border-primary-border"
               >
                 <StopCircle size={12} />중지
               </button>
@@ -563,8 +560,10 @@ export default function CellContainer({ cell }: Props) {
               title="바이브 전송"
               disabled={isVibing || !cell.chatInput.trim()}
               onClick={() => submitVibe(cell.id, cell.chatInput)}
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:cursor-not-allowed"
-              style={{ backgroundColor: cell.chatInput.trim() && !isVibing ? '#D95C3F' : '#ede9dd', color: '#ffffff' }}
+              className={cn(
+                'w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:cursor-not-allowed text-white',
+                cell.chatInput.trim() && !isVibing ? 'bg-primary' : 'bg-border-subtle'
+              )}
             >
               <ArrowUp size={16} strokeWidth={2.5} />
             </button>
@@ -599,8 +598,8 @@ function PanelResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent)
       title="드래그해 셀 높이 조절"
     >
       <div
-        className="rounded-full transition-colors group-hover/resize:bg-primary"
-        style={{ width: 40, height: 3, backgroundColor: '#ede9dd' }}
+        className="rounded-full transition-colors bg-border-subtle group-hover/resize:bg-primary"
+        style={{ width: 40, height: 3 }}
       />
     </div>
   )

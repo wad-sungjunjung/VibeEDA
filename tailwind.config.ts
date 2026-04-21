@@ -1,55 +1,70 @@
 import type { Config } from 'tailwindcss'
 
+// 색 토큰을 CSS 변수(rgb triplet) 기반으로 정의해 light/dark 테마를 런타임에 전환한다.
+// 실제 팔레트 값은 src/styles/globals.css 의 :root / .dark 선택자에 정의돼 있다.
+const c = (name: string) => `rgb(var(--color-${name}) / <alpha-value>)`
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
         // Backgrounds
-        'bg-page': '#faf9f5',
-        'bg-sidebar': '#f5f4ed',
-        'bg-pane': '#fdfcf8',
-        'bg-output': '#faf8f2',
-        'bg-code': '#2d2a26',
+        'bg-page': c('bg-page'),
+        'bg-sidebar': c('bg-sidebar'),
+        'bg-pane': c('bg-pane'),
+        'bg-output': c('bg-output'),
+        'bg-code': c('bg-code'),
+        // 카드/모달/인풋 등 elevated surface
+        surface: {
+          DEFAULT: c('surface'),
+          hover: c('surface-hover'),
+        },
+        // 중립 chip/hover (stone-100 대체)
+        chip: {
+          DEFAULT: c('chip'),
+          hover: c('chip-hover'),
+        },
 
         // Primary (Coral)
         primary: {
-          DEFAULT: '#D95C3F',
-          hover: '#C24E34',
-          light: '#fdede8',
-          pale: '#f8e5dd',
-          border: '#ebc2b5',
-          text: '#8f3a22',
+          DEFAULT: c('primary'),
+          hover: c('primary-hover'),
+          light: c('primary-light'),
+          pale: c('primary-pale'),
+          border: c('primary-border'),
+          text: c('primary-text'),
         },
 
         // Text
         text: {
-          primary: '#2d2a26',
-          secondary: '#57534e',
-          tertiary: '#78716c',
-          disabled: '#a8a29e',
+          primary: c('text-primary'),
+          secondary: c('text-secondary'),
+          tertiary: c('text-tertiary'),
+          disabled: c('text-disabled'),
         },
 
         // Borders
         border: {
-          DEFAULT: '#e7e5e0',
-          subtle: '#ede9dd',
-          hover: '#d6d3c7',
+          DEFAULT: c('border'),
+          subtle: c('border-subtle'),
+          hover: c('border-hover'),
         },
 
         // Cell types
-        sql: { bg: '#e8e4d8', text: '#5c4a1e' },
-        python: { bg: '#e6ede0', text: '#3d5226' },
-        markdown: { bg: '#eae4df', text: '#4a3c2e' },
+        sql: { bg: c('sql-bg'), text: c('sql-text') },
+        python: { bg: c('python-bg'), text: c('python-text') },
+        markdown: { bg: c('markdown-bg'), text: c('markdown-text') },
 
         // Status
-        success: '#65a30d',
-        'success-indicator': '#84cc16',
-        danger: '#dc2626',
-        'danger-bg': '#fef2f2',
-        warning: '#d97706',
-        'warning-bg': '#fef3c7',
-        'warning-text': '#92400e',
+        success: c('success'),
+        'success-indicator': c('success-indicator'),
+        danger: c('danger'),
+        'danger-bg': c('danger-bg'),
+        warning: c('warning'),
+        'warning-bg': c('warning-bg'),
+        'warning-text': c('warning-text'),
       },
       fontFamily: {
         sans: ['Pretendard', '-apple-system', 'Malgun Gothic', 'sans-serif'],

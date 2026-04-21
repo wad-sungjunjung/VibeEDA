@@ -16,7 +16,7 @@ function ApiKeyWarning({ model, geminiKey, anthropicKey }: { model: string; gemi
   if (!missing) return null
   const name = provider === 'gemini' ? 'Google Gemini' : 'Anthropic Claude'
   return (
-    <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-amber-600">
+    <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-warning">
       <AlertCircle size={10} className="shrink-0" />
       {name} API 키가 필요합니다
     </div>
@@ -45,14 +45,14 @@ export default function ModelSettingsModal({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-[480px] max-w-[95vw] flex flex-col">
+      <div className="bg-surface rounded-xl shadow-2xl w-[480px] max-w-[95vw] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
           <div>
             <div className="text-[14px] font-semibold text-text-primary">모델 설정</div>
             <div className="text-[11px] text-text-tertiary mt-0.5">API 키와 모델을 설정합니다</div>
           </div>
-          <button onClick={onClose} className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-stone-100 rounded transition-colors">
+          <button onClick={onClose} className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-chip rounded transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -67,8 +67,8 @@ export default function ModelSettingsModal({ onClose }: Props) {
             {/* Gemini */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-4 h-4 rounded bg-blue-50 flex items-center justify-center shrink-0">
-                  <Key size={9} className="text-blue-500" />
+                <div className="w-4 h-4 rounded bg-chip flex items-center justify-center shrink-0">
+                  <Key size={9} className="text-text-secondary" />
                 </div>
                 <span className="text-[11px] font-semibold text-text-primary">Google Gemini</span>
               </div>
@@ -152,14 +152,14 @@ export default function ModelSettingsModal({ onClose }: Props) {
             </div>
           </section>
 
-          <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-700">
+          <div className="rounded-md bg-warning-bg border border-warning/30 px-3 py-2 text-[11px] text-warning-text">
             API 키는 브라우저 로컬 스토리지에 저장됩니다. 미설정 시 백엔드 .env의 GEMINI_API_KEY / ANTHROPIC_API_KEY를 사용합니다.
           </div>
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border-subtle">
-          <button onClick={onClose} className="px-4 py-1.5 text-[12px] text-text-secondary hover:text-text-primary hover:bg-stone-100 rounded-md transition-colors">취소</button>
+          <button onClick={onClose} className="px-4 py-1.5 text-[12px] text-text-secondary hover:text-text-primary hover:bg-chip rounded-md transition-colors">취소</button>
           <button onClick={handleSave} className="px-4 py-1.5 text-[12px] font-medium bg-primary text-white rounded-md hover:bg-primary-dark transition-colors">저장</button>
         </div>
       </div>

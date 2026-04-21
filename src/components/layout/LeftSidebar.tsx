@@ -24,10 +24,13 @@ import {
   HardDrive,
   RefreshCw,
   Check,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import type { FileNode } from '@/lib/api'
 import { useAppStore } from '@/store/useAppStore'
 import { useConnectionStore } from '@/store/connectionStore'
+import { useModelStore } from '@/store/modelStore'
 import { cn } from '@/lib/utils'
 import ModelSettingsModal from '@/components/common/ModelSettingsModal'
 import ConnectionModal from '@/components/common/ConnectionModal'
@@ -62,6 +65,8 @@ export default function LeftSidebar() {
 
   const sfUser = useConnectionStore((s) => s.sfUser)
   const displayName = sfUser ? sfUser.split('@')[0] : '하우'
+  const theme = useModelStore((s) => s.theme)
+  const toggleTheme = useModelStore((s) => s.toggleTheme)
 
   const [addingFolder, setAddingFolder] = useState(false)
   const [folderInput, setFolderInput] = useState('')
@@ -120,10 +125,7 @@ export default function LeftSidebar() {
       <div className="px-3 py-2 border-b border-border-subtle">
         <button
           onClick={newAnalysis}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-[12px] font-semibold text-white transition-colors"
-          style={{ backgroundColor: '#D95C3F' }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#C24E34' }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#D95C3F' }}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-[12px] font-semibold text-white transition-colors bg-primary hover:bg-primary-hover"
         >
           <Plus size={14} />
           새 분석 만들기
@@ -226,7 +228,14 @@ export default function LeftSidebar() {
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary-pale to-primary flex items-center justify-center shrink-0">
           <User size={14} className="text-white" />
         </div>
-        <span className="text-[12px] font-medium text-text-secondary truncate" title={sfUser || displayName}>{displayName}</span>
+        <span className="flex-1 text-[12px] font-medium text-text-secondary truncate" title={sfUser || displayName}>{displayName}</span>
+        <button
+          onClick={toggleTheme}
+          title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+          className="shrink-0 p-1.5 rounded text-text-tertiary hover:text-primary hover:bg-primary-light transition-colors"
+        >
+          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
       </div>
 
       {showModelSettings && (
@@ -293,7 +302,7 @@ function HistoryItemRow({
     <div
       className={cn(
         'group relative flex items-center gap-1 px-2 py-1.5 rounded cursor-pointer',
-        item.isCurrent ? 'bg-white border border-primary-border' : 'hover:bg-white'
+        item.isCurrent ? 'bg-surface border border-primary-border' : 'hover:bg-surface'
       )}
       onClick={() => { if (!item.isCurrent) onLoad() }}
     >
@@ -327,14 +336,14 @@ function HistoryItemRow({
       {/* Context menu — rendered via portal to escape overflow:hidden parents */}
       {menuOpen && createPortal(
         <div
-          className="fixed z-[9999] bg-white border border-border rounded-md shadow-lg py-1 min-w-[140px]"
+          className="fixed z-[9999] bg-surface border border-border rounded-md shadow-lg py-1 min-w-[140px]"
           style={{ left: menuPos.x, top: menuPos.y }}
           onMouseLeave={onMenuClose}
         >
           {menuView === 'main' ? (
             <>
               <button
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-stone-100"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-chip"
                 onClick={() => onMenuView('move')}
               >
                 <Folder size={12} />
@@ -342,7 +351,7 @@ function HistoryItemRow({
                 <ChevronRight size={10} className="ml-auto" />
               </button>
               <button
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-stone-100"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-chip"
                 onClick={onDuplicate}
               >
                 <Copy size={12} />
@@ -360,7 +369,7 @@ function HistoryItemRow({
           ) : (
             <>
               <button
-                className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-stone-100"
+                className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-chip"
                 onClick={() => onMenuView('main')}
               >
                 <ChevronRight size={10} className="rotate-180" />
@@ -368,7 +377,7 @@ function HistoryItemRow({
               </button>
               <div className="border-t border-bg-sidebar my-0.5" />
               <button
-                className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] text-text-secondary hover:bg-stone-100"
+                className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] text-text-secondary hover:bg-chip"
                 onClick={async () => {
                   if (folderName === null) { onMenuClose(); return }
                   try {
@@ -391,7 +400,7 @@ function HistoryItemRow({
               {rootFolders.map((f) => (
                 <button
                   key={f.path}
-                  className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] text-text-secondary hover:bg-stone-100"
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] text-text-secondary hover:bg-chip"
                   onClick={async () => {
                     if (folderName === f.name) { onMenuClose(); return }
                     try {
@@ -529,7 +538,7 @@ function UnifiedFolderSection({
         </div>
       </div>
       {adding && (
-        <div className="mx-3 mb-2 flex items-center gap-1 bg-white border border-border rounded px-2 py-1 shrink-0">
+        <div className="mx-3 mb-2 flex items-center gap-1 bg-surface border border-border rounded px-2 py-1 shrink-0">
           <Folder size={12} className="text-text-tertiary shrink-0" />
           <input
             autoFocus
@@ -617,7 +626,7 @@ function FileTreeNode({
     return (
       <div>
         <div
-          className="group flex items-center gap-1 py-0.5 rounded hover:bg-white cursor-pointer"
+          className="group flex items-center gap-1 py-0.5 rounded hover:bg-surface cursor-pointer"
           style={{ paddingLeft: indent }}
           onClick={() => setOpen((v) => !v)}
           title={node.path}
@@ -696,7 +705,7 @@ function FileTreeNode({
     <div
       className={cn(
         'group flex items-center gap-1 py-0.5 rounded cursor-pointer',
-        isActive ? 'bg-white border border-primary-border' : 'hover:bg-white',
+        isActive ? 'bg-surface border border-primary-border' : 'hover:bg-surface',
       )}
       style={{ paddingLeft: indent + 14 }}
       onClick={handleClick}
@@ -714,7 +723,7 @@ function FileTreeNode({
         onClick={(e) => { e.stopPropagation(); void copyPath() }}
         className="opacity-0 group-hover:opacity-100 p-0.5 text-text-tertiary hover:text-primary transition-opacity shrink-0"
       >
-        {copied ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+        {copied ? <Check size={11} className="text-success" /> : <Copy size={11} />}
       </button>
     </div>
   )

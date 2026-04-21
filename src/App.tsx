@@ -12,6 +12,7 @@ import SnowflakeConnectionGuard from '@/components/common/SnowflakeConnectionGua
 import ReportModal from '@/components/reporting/ReportModal'
 import ReportResult from '@/components/reporting/ReportResult'
 import { useAppStore } from '@/store/useAppStore'
+import { useModelStore } from '@/store/modelStore'
 
 export default function App() {
   const agentMode = useAppStore((s) => s.agentMode)
@@ -21,6 +22,14 @@ export default function App() {
   const notebookId = useAppStore((s) => s.notebookId)
   const initApp = useAppStore((s) => s.initApp)
   const newAnalysis = useAppStore((s) => s.newAnalysis)
+  const theme = useModelStore((s) => s.theme)
+
+  // persist 복원이 onRehydrateStorage 에서 이미 <html>.dark 를 적용하지만,
+  // 세션 중 토글에도 반응하도록 마운트/변경 시점에 재동기화한다.
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    document.documentElement.dataset.theme = theme
+  }, [theme])
 
   useEffect(() => {
     initApp()
@@ -103,7 +112,7 @@ export default function App() {
               </span>
             </button>
             {createError && (
-              <p className="text-xs text-red-500 max-w-xs text-center">{createError}</p>
+              <p className="text-xs text-danger max-w-xs text-center">{createError}</p>
             )}
           </div>
         ) : (

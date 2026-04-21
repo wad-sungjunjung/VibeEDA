@@ -58,7 +58,7 @@ export default function AgentFAB() {
     <div className="fixed bottom-6 right-6 z-40">
       {(doneBubble || liveStatus || liveAssistantText) && !agentMode && (
         <div
-          className="absolute bottom-16 right-0 bg-white border border-border rounded-2xl shadow-lg px-4 py-3 animate-fade-in"
+          className="absolute bottom-16 right-0 bg-surface border border-border rounded-2xl shadow-lg px-4 py-3 animate-fade-in"
           style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)', width: 340, maxHeight: '60vh', overflowY: 'auto' }}
         >
           {doneBubble ? (
@@ -67,8 +67,8 @@ export default function AgentFAB() {
             <div className="flex flex-col gap-2">
               {liveStatus && (
                 <div className="flex items-center gap-1.5">
-                  <Loader2 size={13} className="animate-spin shrink-0" style={{ color: '#D95C3F' }} />
-                  <p className="text-[13px] font-semibold leading-relaxed whitespace-pre-wrap break-keep" style={{ color: '#c94a2e' }}>{liveStatus}</p>
+                  <Loader2 size={13} className="animate-spin shrink-0 text-primary" />
+                  <p className="text-[13px] font-semibold leading-relaxed whitespace-pre-wrap break-keep text-primary-hover">{liveStatus}</p>
                 </div>
               )}
               {liveAssistantText && (
@@ -77,7 +77,7 @@ export default function AgentFAB() {
             </div>
           )}
           <div
-            className="absolute -bottom-[7px] right-5 w-3 h-3 bg-white border-r border-b border-border"
+            className="absolute -bottom-[7px] right-5 w-3 h-3 bg-surface border-r border-b border-border"
             style={{ transform: 'rotate(45deg)' }}
           />
         </div>
@@ -93,14 +93,14 @@ export default function AgentFAB() {
             : isGenerating
               ? 'bg-primary text-white shadow-[0_4px_20px_rgba(217,92,63,0.4)]'
               : showCheck
-                ? 'bg-emerald-600 text-white shadow-[0_4px_20px_rgba(16,160,90,0.35)]'
-                : 'bg-white text-text-secondary border border-border hover:shadow-2xl hover:border-primary hover:text-primary hover:scale-110'
+                ? 'bg-success text-white shadow-[0_4px_20px_rgba(16,160,90,0.35)]'
+                : 'bg-surface text-text-secondary border border-border hover:shadow-2xl hover:border-primary hover:text-primary hover:scale-110'
         )}
       >
         <Telescope size={22} strokeWidth={2} />
 
         {isGenerating && !agentMode && (
-          <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-yellow-400 border-2 border-white animate-ping" />
+          <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-warning border-2 border-surface animate-ping" />
         )}
       </button>
     </div>

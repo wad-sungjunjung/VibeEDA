@@ -9,6 +9,7 @@ import { indentWithTab } from '@codemirror/commands'
 import { Prec, RangeSetBuilder } from '@codemirror/state'
 import { snowflakeTheme } from '@/lib/snowflakeTheme'
 import type { CellType } from '@/types'
+import { useModelStore } from '@/store/modelStore'
 
 const fnCallTheme = EditorView.theme({
   '.cm-fn-call, .cm-fn-call span': { color: '#56d364 !important' },
@@ -61,6 +62,7 @@ interface Props {
 export default function CodeEditor({ type, value, onChange, onRun, fixedHeight, readOnly }: Props) {
   const onRunRef = useRef(onRun)
   useEffect(() => { onRunRef.current = onRun }, [onRun])
+  const theme = useModelStore((s) => s.theme)
 
   const runKeymap = useMemo(() => Prec.highest(keymap.of([
     { key: 'Ctrl-Enter', run: () => { onRunRef.current?.(); return true } },
@@ -84,7 +86,7 @@ export default function CodeEditor({ type, value, onChange, onRun, fixedHeight, 
       <CodeMirror
         value={value}
         height={fixedHeight ? `${fixedHeight}px` : undefined}
-        theme={type !== 'markdown' ? 'none' : 'light'}
+        theme={type !== 'markdown' ? 'none' : (theme === 'dark' ? 'dark' : 'light')}
         extensions={extensions}
         onChange={onChange}
         readOnly={readOnly}

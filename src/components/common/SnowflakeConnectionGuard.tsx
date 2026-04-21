@@ -75,13 +75,13 @@ export default function SnowflakeConnectionGuard() {
     <div className="fixed top-4 right-4 z-[60] animate-fade-in">
       <div
         role="alert"
-        className="flex items-start gap-2.5 bg-white border border-red-200 rounded-xl shadow-lg px-4 py-3 w-[300px]"
+        className="flex items-start gap-2.5 bg-surface border border-danger/30 rounded-xl shadow-lg px-4 py-3 w-[300px]"
         style={{ boxShadow: '0 6px 24px rgba(0,0,0,0.10)' }}
       >
         <div className="shrink-0 mt-0.5">
           {isRetrying
-            ? <Loader2 size={16} className="animate-spin text-amber-500" />
-            : <WifiOff size={16} className="text-red-500" />}
+            ? <Loader2 size={16} className="animate-spin text-warning" />
+            : <WifiOff size={16} className="text-danger" />}
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[12px] font-semibold text-text-primary">

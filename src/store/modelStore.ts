@@ -23,33 +23,62 @@ export const VIBE_MODELS   = ALL_MODELS
 export const AGENT_MODELS  = ALL_MODELS
 export const REPORT_MODELS = ALL_MODELS
 
+export type ThemeMode = 'light' | 'dark'
+
 interface ModelStore {
   geminiApiKey: string
   anthropicApiKey: string
   vibeModel: string
   agentModel: string
   reportModel: string
+  theme: ThemeMode
   setGeminiApiKey: (key: string) => void
   setAnthropicApiKey: (key: string) => void
   setVibeModel: (model: string) => void
   setAgentModel: (model: string) => void
   setReportModel: (model: string) => void
+  setTheme: (theme: ThemeMode) => void
+  toggleTheme: () => void
+}
+
+// <html> 클래스에 테마를 반영. Tailwind darkMode:'class' 와 globals.css .dark 팔레트가 이걸로 구동됨.
+function applyThemeClass(theme: ThemeMode) {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  root.classList.toggle('dark', theme === 'dark')
+  root.dataset.theme = theme
 }
 
 export const useModelStore = create<ModelStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       geminiApiKey: '',
       anthropicApiKey: '',
       vibeModel: 'gemini-2.5-flash',
       agentModel: 'claude-opus-4-7',
       reportModel: 'claude-opus-4-7',
+      theme: 'light',
       setGeminiApiKey: (key) => set({ geminiApiKey: key }),
       setAnthropicApiKey: (key) => set({ anthropicApiKey: key }),
       setVibeModel: (model) => set({ vibeModel: model }),
       setAgentModel: (model) => set({ agentModel: model }),
       setReportModel: (model) => set({ reportModel: model }),
+      setTheme: (theme) => {
+        applyThemeClass(theme)
+        set({ theme })
+      },
+      toggleTheme: () => {
+        const next: ThemeMode = get().theme === 'dark' ? 'light' : 'dark'
+        applyThemeClass(next)
+        set({ theme: next })
+      },
     }),
-    { name: 'vibe-eda-model-settings' }
+    {
+      name: 'vibe-eda-model-settings',
+      // persist 복원 시점에 <html>.dark 동기화 — App 마운트 전 깜빡임 방지
+      onRehydrateStorage: () => (state) => {
+        if (state?.theme) applyThemeClass(state.theme)
+      },
+    }
   )
 )

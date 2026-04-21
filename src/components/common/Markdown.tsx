@@ -28,7 +28,7 @@ export default function Markdown({ content, className }: Props) {
             return isBlock ? (
               <code className={cn(cls, 'text-[12px] font-mono text-stone-100')} {...props}>{children}</code>
             ) : (
-              <code className="px-1 py-0.5 rounded bg-stone-100 text-[12px] font-mono break-all" {...props}>{children}</code>
+              <code className="px-1 py-0.5 rounded bg-chip text-[12px] font-mono break-all" {...props}>{children}</code>
             )
           },
           pre: ({ node: _n, ...props }) => (
@@ -58,7 +58,7 @@ export default function Markdown({ content, className }: Props) {
             </div>
           ),
           th: ({ node: _n, ...props }) => (
-            <th className="border border-border-subtle px-2 py-1 bg-stone-50 font-semibold text-left" {...props} />
+            <th className="border border-border-subtle px-2 py-1 bg-chip font-semibold text-left" {...props} />
           ),
           td: ({ node: _n, ...props }) => (
             <td className="border border-border-subtle px-2 py-1" {...props} />

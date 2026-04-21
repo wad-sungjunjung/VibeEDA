@@ -5,6 +5,7 @@ import type { Cell } from '@/types'
 import { formatNumber } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import Markdown from '@/components/common/Markdown'
+import { useModelStore } from '@/store/modelStore'
 
 interface Props {
   cell: Cell
@@ -36,8 +37,8 @@ function CopyButton({ onCopy, label = '복사', className }: {
       className={cn(
         'flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-medium transition-colors shadow-sm',
         copied
-          ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-          : 'bg-white/95 border-border text-text-secondary hover:border-primary hover:text-primary',
+          ? 'bg-success/15 border-success/40 text-success'
+          : 'bg-surface/95 border-border text-text-secondary hover:border-primary hover:text-primary',
         className
       )}
     >
@@ -75,6 +76,8 @@ async function copyPlotAsImage(gd: HTMLElement | null) {
 
 export default function CellOutput({ cell }: Props) {
   const plotDivRef = useRef<HTMLDivElement | null>(null)
+  const theme = useModelStore((s) => s.theme)
+  const isDark = theme === 'dark'
 
   if (cell.type === 'markdown') {
     return <MarkdownOutput content={cell.code} />
@@ -82,7 +85,7 @@ export default function CellOutput({ cell }: Props) {
 
   if (!cell.executed || !cell.output) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[360px] text-[12px] text-text-disabled rounded-md border border-border bg-[#ede9dd]">
+      <div className="flex items-center justify-center h-full min-h-[360px] text-[12px] text-text-disabled rounded-md border border-border bg-border-subtle">
         실행 전 — 버튼을 누르거나 채팅으로 요청하세요
       </div>
     )
@@ -103,7 +106,7 @@ export default function CellOutput({ cell }: Props) {
         </div>
         <div className="overflow-x-auto overflow-y-auto hide-scrollbar flex-1 min-h-0">
           <table className="w-full text-[12px]">
-            <thead className="sticky top-0 bg-stone-100">
+            <thead className="sticky top-0 bg-chip">
               <tr>
                 {cols.map((col, i) => (
                   <th
@@ -120,7 +123,7 @@ export default function CellOutput({ cell }: Props) {
             </thead>
             <tbody>
               {rows.map((row, ri) => (
-                <tr key={ri} className="hover:bg-stone-50/60 border-b border-border-subtle last:border-0">
+                <tr key={ri} className="hover:bg-chip/60 border-b border-border-subtle last:border-0">
                   {row.map((cell, ci) => (
                     <td
                       key={ci}
@@ -138,7 +141,7 @@ export default function CellOutput({ cell }: Props) {
             </tbody>
           </table>
         </div>
-        <div className="sticky bottom-0 bg-stone-100 border-t border-border-subtle px-4 py-1.5 text-[11px] text-text-disabled">
+        <div className="sticky bottom-0 bg-chip border-t border-border-subtle px-4 py-1.5 text-[11px] text-text-disabled">
           {output.rowCount} rows × {cols.length} columns
         </div>
       </div>
@@ -163,12 +166,12 @@ export default function CellOutput({ cell }: Props) {
             layout={{
               ...baseLayout,
               // plotly TS 타입이 문자열 템플릿명을 직접 받지 않아 명시적 cast
-              template: 'plotly_white' as unknown as Plotly.Template,
+              template: (isDark ? 'plotly_dark' : 'plotly_white') as unknown as Plotly.Template,
               autosize: true,
               margin: { l: 16, r: 16, t: 40, b: 16, pad: 4 },
-              paper_bgcolor: '#ffffff',
-              plot_bgcolor: '#ffffff',
-              font: { family: 'Pretendard, -apple-system, sans-serif', size: 12, color: '#3d3530' },
+              paper_bgcolor: isDark ? '#1b1916' : '#ffffff',
+              plot_bgcolor: isDark ? '#1b1916' : '#ffffff',
+              font: { family: 'Pretendard, -apple-system, sans-serif', size: 12, color: isDark ? '#e9e6df' : '#3d3530' },
               xaxis: { ...(baseLayout.xaxis ?? {}), automargin: true },
               yaxis: { ...(baseLayout.yaxis ?? {}), automargin: true },
             }}
@@ -184,12 +187,12 @@ export default function CellOutput({ cell }: Props) {
   if (output.type === 'stdout') {
     if (!output.content?.trim()) {
       return (
-        <div className="px-4 py-3 text-[12px] text-text-disabled italic bg-white h-full">출력 없음</div>
+        <div className="px-4 py-3 text-[12px] text-text-disabled italic bg-surface h-full">출력 없음</div>
       )
     }
     const text = output.content
     return (
-      <div className="relative group/output h-full overflow-auto bg-white">
+      <div className="relative group/output h-full overflow-auto bg-surface">
         <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
           <CopyButton label="텍스트 복사" onCopy={() => navigator.clipboard.writeText(text)} />
         </div>

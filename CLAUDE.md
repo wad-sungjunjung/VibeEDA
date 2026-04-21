@@ -120,13 +120,34 @@ backend/
 
 ## 디자인 시스템
 
-`tailwind.config.ts`에 디자인 토큰 정의됨:
+### 색 토큰 (CSS 변수 기반 · 라이트/다크 테마)
+`tailwind.config.ts`가 모든 색 토큰을 `rgb(var(--color-*) / <alpha-value>)` 로 정의하고,
+실제 팔레트 값은 `src/styles/globals.css` 의 `:root` (라이트) 와 `.dark` (다크) 에서 관리한다.
+Tailwind `darkMode: 'class'`, `<html>.dark` 클래스 토글로 전환.
 
-- **Primary (Coral)**: `primary` — `#D95C3F`
-- **배경**: `bg-page`, `bg-sidebar`, `bg-pane`, `bg-output`, `bg-code`
+- **Primary (Coral)**: `primary` · `primary-hover` · `primary-light` · `primary-pale` · `primary-border` · `primary-text`
+  - 버튼/CTA 는 코랄 `#D95C3F` 계열, tint 배경(`primary-light`/`pale`)은 피치 오렌지 계열 `#FFE8D6`
+- **배경**: `bg-page`, `bg-sidebar`, `bg-pane`, `bg-output`, `bg-code` → Tailwind 클래스는 `bg-bg-page` 처럼 접두사 중복 주의
+- **Elevated surface**: `surface` (카드/모달/인풋 배경) · `surface-hover`
+- **Chip / 중립 hover**: `chip` · `chip-hover` (기존 stone-100 대체)
 - **텍스트**: `text-primary`, `text-secondary`, `text-tertiary`, `text-disabled`
-- **셀 타입**: SQL `bg-[#e8e4d8] text-[#5c4a1e]`, Python `bg-[#e6ede0] text-[#3d5226]`, Markdown `bg-[#eae4df] text-[#4a3c2e]`
+- **테두리**: `border`, `border-subtle`, `border-hover`
+- **셀 타입**: `bg-sql-bg text-sql-text`, `bg-python-bg text-python-text`, `bg-markdown-bg text-markdown-text` (라이트/다크 자동 전환)
+- **상태**: `success`, `danger`, `warning` + `-bg` / `-text` 변종
 - **레이아웃**: `w-sidebar-left (224px)`, `w-sidebar-right (256px)`, `h-header/h-cell-bar (56px)`
+
+### 다크모드
+- `modelStore.theme`(`'light' | 'dark'`) 에 영속 저장, `<html>.dark` 클래스로 전환
+- 토글 버튼: `LeftSidebar` 하단 프로필 행의 Sun/Moon 아이콘
+- **외부 위젯 분기** (Tailwind 클래스로 커버 안 되는 영역):
+  - Plotly (`CellOutput.tsx`): `plotly_white` ↔ `plotly_dark` 템플릿, `paper_bgcolor`/`plot_bgcolor`/`font.color` 를 `theme` 에 따라 교체
+  - Monaco 마크다운 에디터 (`CodeEditor.tsx`): `'light'` ↔ `'dark'` 테마 전환. SQL/Python 에디터는 `snowflakeTheme` 로 항상 다크 고정
+- 저장된 차트 PNG (`.ipynb` 출력 또는 리포트 이미지)는 흰 배경 고정 — 재실행 시 Plotly 메타로부터 현재 테마에 맞게 자동 재렌더링됨
+
+### 색상 사용 규칙
+- **하드코딩 금지**: `bg-[#xxx]` arbitrary value 나 인라인 `style={{ color: '#xxx' }}` 사용하지 말 것. 기존 토큰으로 매핑하거나 새 시맨틱 토큰 추가
+- Tailwind JIT 가 새 토큰을 즉시 픽업하지 못할 때는 `style={{ backgroundColor: 'rgb(var(--color-x))' }}` 로 우회 가능
+- `tailwind.config.ts` 에 토큰을 추가/변경하면 Vite 재시작 권장
 
 폰트: Pretendard (CDN) → `-apple-system` → `Malgun Gothic`
 

@@ -22,6 +22,11 @@
 
 ## 2. 색상 팔레트
 
+> **구현 메모**: 모든 색 토큰은 `src/styles/globals.css` 의 CSS 변수로 정의되며,
+> `tailwind.config.ts` 가 `rgb(var(--color-*) / <alpha-value>)` 패턴으로 참조한다.
+> **라이트 값은 `:root`, 다크 값은 `.dark` 블록**에서 관리 → `<html>.dark` 클래스 토글로 전환.
+> 아래 표는 **라이트 팔레트 기준**. 다크 팔레트와 대응 토큰은 §12 참조.
+
 ### 2.1 배경 (Backgrounds)
 | 이름 | HEX | 용도 |
 |---|---|---|
@@ -72,7 +77,17 @@
 | Python | `#e6ede0` | `#3d5226` (올리브) |
 | Markdown | `#eae4df` | `#4a3c2e` (브라운) |
 
-### 2.6 차트 색상 (Chart Palette)
+### 2.6 Elevated Surface · Chip (Phase 2 신규 시맨틱 토큰)
+| 이름 | 라이트 | 다크 | 용도 |
+|---|---|---|---|
+| `surface` | `#ffffff` | `#1C1D22` | 카드·모달·인풋 배경 (라이트는 순백, 다크는 약간 올라온 뉴트럴) |
+| `surface-hover` | `#faf9f5` | `#24252C` | 카드 호버 |
+| `chip` | `#f5f4f1` | `#202128` | 중립 호버 배경 (기존 `stone-100` 대체) |
+| `chip-hover` | `#ede9dd` | `#2A2B32` | chip 위 추가 강조 |
+
+Tailwind 클래스는 `bg-surface`, `bg-chip`, `bg-surface-hover`, `bg-chip-hover` 로 사용.
+
+### 2.7 차트 색상 (Chart Palette)
 순서대로 사용 (1→5위):
 1. `#D95C3F` (코랄)
 2. `#E08A4F` (라이트 오렌지)
@@ -394,11 +409,33 @@ margin: my-0.5
 
 ## 12. 다크모드
 
-**MVP 범위 외.** v1.5에서 고려.
-만약 구현 시:
-- `#2d2a26` (코드 배경)을 메인 배경으로 활용 가능
-- 코랄 `#D95C3F`는 다크모드에서도 동작함
-- `stone-` 팔레트를 반전하여 사용
+**지원됨** (베타). `<html>.dark` 클래스 + CSS 변수로 런타임 전환.
+
+### 활성화
+- 좌측 사이드바 최하단 프로필 행의 **Sun/Moon 아이콘** 클릭 → 즉시 전환
+- `modelStore.theme` 에 영속 저장 (`'light' | 'dark'`)
+- 첫 마운트 시 `onRehydrateStorage` 훅이 `<html>.dark` 를 동기화 — 초기 화면 깜빡임 방지
+
+### 팔레트 설계 원칙
+- 배경: 쿨 뉴트럴 차콜 계열 (`#111216` ~ `#1C1D22`, Linear/Raycast 느낌). 라이트의 웜 크림을 그대로 반전하지 않음
+- 텍스트: 뉴트럴 화이트 (`#E6E6EA`) — 너무 따뜻하면 배경과 충돌
+- Primary (코랄): **버튼/CTA 는 라이트와 동일** (`#D95C3F` → 다크에선 살짝 밝힌 `#E86C50`). tint 계열 (`primary-light`/`pale`) 은 어두운 번트 오렌지로 변환
+- 셀 타입 배경: 채도 낮춘 다크 올리브(SQL)/포레스트(Python)/웜그레이(MD)
+- Status(success/danger/warning): 채도 유지, 배경만 어둡게 (`danger-bg`, `warning-bg` 등)
+
+### 외부 위젯 분기
+- **Plotly** (`CellOutput.tsx`): 테마에 따라 `plotly_white` ↔ `plotly_dark` 템플릿 + `paper_bgcolor` / `plot_bgcolor` / `font.color` 를 `useModelStore((s) => s.theme)` 로 동적 주입
+- **Monaco** (`CodeEditor.tsx`): 마크다운 모드에서만 `'light' ↔ 'dark'` 전환. SQL/Python 은 `snowflakeTheme` 로 항상 다크
+- 저장된 차트 PNG 는 흰 배경 고정 — 재실행 시 Plotly 메타로부터 현재 테마로 자동 재렌더
+
+### 새 컴포넌트 다크 대응 체크리스트
+1. 하드코딩 금지: `bg-[#xxx]` 또는 인라인 `style={{ color: '#xxx' }}` 사용 금지
+2. 기본 배경: `bg-bg-page` / `bg-bg-pane` / `bg-surface` 중 의미에 맞는 것 선택
+3. 모달·카드·인풋: `bg-surface`
+4. 호버/토스트 neutral bg: `bg-chip`
+5. 텍스트: `text-text-primary` / `-secondary` / `-tertiary` / `-disabled`
+6. 외부 라이브러리가 테마를 받지 않으면 `useModelStore((s) => s.theme)` 로 옵션 분기
+7. 특이 케이스(애니메이션 그라데이션 등): `rgb(var(--color-x))` 를 inline style 로 참조
 
 ---
 

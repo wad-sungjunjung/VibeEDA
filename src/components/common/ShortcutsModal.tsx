@@ -53,8 +53,8 @@ const SECTIONS = [
 function Kbd({ label }: { label: string }) {
   return (
     <span
-      className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold"
-      style={{ backgroundColor: '#f5f4ed', border: '1px solid #d4cfc6', color: '#5c4a1e', minWidth: 22 }}
+      className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-bg-sidebar border border-border-hover text-sql-text"
+      style={{ minWidth: 22 }}
     >
       {label}
     </span>
@@ -65,16 +65,16 @@ export default function ShortcutsModal({ onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-2xl w-[500px] max-w-[95vw] flex flex-col max-h-[85vh]"
+        className="bg-surface rounded-xl shadow-2xl w-[500px] max-w-[95vw] flex flex-col max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
           <div className="flex items-center gap-2">
-            <Keyboard size={16} style={{ color: '#D95C3F' }} />
+            <Keyboard size={16} className="text-primary" />
             <span className="font-semibold text-text-primary">단축키</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-stone-100 text-text-tertiary transition-colors">
+          <button onClick={onClose} className="p-1 rounded hover:bg-chip text-text-tertiary transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -88,7 +88,7 @@ export default function ShortcutsModal({ onClose }: Props) {
               </div>
               <div className="space-y-1.5">
                 {section.shortcuts.map((s, i) => (
-                  <div key={i} className="flex items-center justify-between py-1 px-2 rounded hover:bg-stone-50">
+                  <div key={i} className="flex items-center justify-between py-1 px-2 rounded hover:bg-chip">
                     <span className="text-[12px] text-text-secondary">{s.desc}</span>
                     <div className="flex items-center gap-1 shrink-0 ml-4">
                       {s.keys.map((k, ki) => (
@@ -109,8 +109,7 @@ export default function ShortcutsModal({ onClose }: Props) {
         <div className="px-5 py-3 border-t border-border-subtle">
           <button
             onClick={onClose}
-            className="w-full py-2 rounded-lg text-[13px] font-semibold transition-colors"
-            style={{ backgroundColor: '#f5f4ed', color: '#5c4a1e' }}
+            className="w-full py-2 rounded-lg text-[13px] font-semibold transition-colors bg-bg-sidebar text-sql-text hover:bg-chip"
           >
             닫기
           </button>
