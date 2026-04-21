@@ -416,7 +416,7 @@ _COMMON_PRINCIPLES = (
 
 def _build_outline_system_prompt() -> str:
     return (
-        "당신은 사내 광고 플랫폼의 시니어 데이터 분석가입니다. "
+        "당신은 캐치테이블의 시니어 데이터 분석가입니다. "
         "경영진용 리포트를 작성하기 전에, 주어진 셀 증거를 분석해 **리포트 개요(outline)** 를 JSON 으로 설계하라.\n\n"
         + _COMMON_PRINCIPLES
         + "\n## Outline 출력 규칙\n"
@@ -493,7 +493,7 @@ def _build_outline_user_prompt(
 
 def _build_writing_system_prompt() -> str:
     return (
-        "당신은 사내 광고 플랫폼의 시니어 데이터 분석가입니다. "
+        "당신은 캐치테이블의 시니어 데이터 분석가입니다. "
         "제공된 **Outline 과 증거** 를 바탕으로 경영진이 바로 읽을 수 있는 Markdown 리포트를 작성하라.\n\n"
         + _COMMON_PRINCIPLES
         + "\n## 작성 규칙\n"

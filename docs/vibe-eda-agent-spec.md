@@ -1,6 +1,6 @@
 # Vibe EDA — Agent Mode 기능 명세
 
-> 사내 광고 플랫폼 분석가가 자연어로 노트북 EDA를 지시하면, 에이전트가 SQL/Python/Markdown 셀을 직접 만들고 실행·해석하는 AI 파이프라인.
+> 캐치테이블 데이터 분석가가 자연어로 노트북 EDA를 지시하면, 에이전트가 SQL/Python/Markdown 셀을 직접 만들고 실행·해석하는 AI 파이프라인.
 
 ---
 

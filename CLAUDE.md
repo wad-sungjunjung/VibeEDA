@@ -2,7 +2,7 @@
 
 ## 프로젝트 개요
 
-**Vibe EDA**: 사내 광고 플랫폼 데이터 분석가를 위한 AI 네이티브 EDA 도구.  
+**Vibe EDA**: 캐치테이블 데이터 분석가를 위한 AI 네이티브 EDA 도구.  
 Jupyter Notebook의 상위 버전 — 자연어 채팅으로 SQL/Python 코드를 생성·수정하고 리포트를 자동 생성한다.  
 **로컬 전용 앱** (Cloud 배포 없음). 노트북은 `.ipynb` 파일로 저장, LLM은 Claude/Gemini 이중 지원 + Claude Code MCP 연동.
 
