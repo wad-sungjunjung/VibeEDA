@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from ..config import settings
 from ..services import notebook_store
+from ..services import category_cache
 from ..services.kernel import get_dataframe_summaries
 from ..services.gemini_service import stream_vibe_chat as stream_vibe_gemini
 from ..services.claude_vibe_service import stream_vibe_chat_claude as stream_vibe_claude
@@ -68,7 +69,9 @@ async def vibe_endpoint(
             current_code=req.current_code,
             message=req.message,
             selected_marts=req.selected_marts,
-            mart_metadata=[m.model_dump() for m in req.mart_metadata],
+            mart_metadata=category_cache.enrich_mart_metadata(
+                [m.model_dump() for m in req.mart_metadata]
+            ),
             analysis_theme=req.analysis_theme,
             df_summaries=df_summaries,
             cell_above_name=cell_above_name,

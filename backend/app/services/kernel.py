@@ -129,15 +129,30 @@ def _render_figure_png_base64(fig) -> str | None:
         return None
 
 
-def _to_cell_output(ns: dict, cell_name: str, stdout: str) -> dict:
+def _to_cell_output(
+    ns: dict,
+    cell_name: str,
+    stdout: str,
+    touched_keys: set[str] | None = None,
+) -> dict:
     var = ns.get(cell_name)
 
     try:
         import json
         import plotly.graph_objs as go
-        candidate = var if isinstance(var, go.Figure) else next(
-            (v for v in ns.values() if isinstance(v, go.Figure)), None
-        )
+        # 차트 후보 선택 — 이전 셀에서 만들어진 Figure가 namespace 에 남아
+        # 엉뚱한 셀에 '캐싱된 것처럼' 재출력되는 것을 막기 위해,
+        # (a) cell_name 변수가 직접 Figure 인 경우, 또는
+        # (b) 이번 실행에서 새로 바인딩/변경된 변수 중 마지막 Figure 만 허용한다.
+        candidate = None
+        if isinstance(var, go.Figure):
+            candidate = var
+        elif touched_keys:
+            for k in reversed(list(touched_keys)):
+                v = ns.get(k)
+                if isinstance(v, go.Figure):
+                    candidate = v
+                    break
         if candidate is not None:
             result = {
                 "type": "chart",
@@ -172,6 +187,60 @@ def _to_cell_output(ns: dict, cell_name: str, stdout: str) -> dict:
     return {"type": "stdout", "content": ""}
 
 
+import re as _re
+import shlex as _shlex
+
+# Jupyter 호환: `!pip install ...`, `%pip install ...`, `!<shell>` 을
+# in-process 파이썬 코드로 변환해 실행한다.
+_MAGIC_LINE_RE = _re.compile(r"^(?P<indent>\s*)(?P<sigil>[!%])(?P<rest>.+)$")
+
+
+def _translate_shell_magics(code: str) -> str:
+    out_lines: list[str] = []
+    needs_subprocess = False
+    for line in code.splitlines():
+        m = _MAGIC_LINE_RE.match(line)
+        if not m:
+            out_lines.append(line)
+            continue
+        indent = m.group("indent")
+        rest = m.group("rest").strip()
+        # pip install (혹은 %pip install / !pip install)
+        lower = rest.lower()
+        try:
+            tokens = _shlex.split(rest)
+        except ValueError:
+            tokens = rest.split()
+        if lower.startswith("pip "):
+            # 예: "pip install xgboost" → subprocess 로 현재 인터프리터에 설치하고
+            # 출력은 셀 stdout 으로 흘려 진행/완료를 볼 수 있게 한다.
+            args = tokens[1:]  # drop 'pip'
+            py_args = ["sys.executable", "'-m'", "'pip'"] + [repr(a) for a in args]
+            out_lines.append(
+                f"{indent}_r = __import__('subprocess').run("
+                f"[{', '.join(py_args)}], capture_output=True, text=True)"
+            )
+            out_lines.append(f"{indent}print(_r.stdout, end='')")
+            out_lines.append(f"{indent}print(_r.stderr, end='')")
+            out_lines.append(
+                f"{indent}"
+                "_ = (_r.returncode == 0) or "
+                "(_ for _ in ()).throw(RuntimeError(f'pip install failed (exit {_r.returncode})'))"
+            )
+            needs_subprocess = True
+            continue
+        # 기타 `!shell cmd` — subprocess.run 으로 변환, stdout 만 print
+        cmd_list = ", ".join(repr(t) for t in tokens)
+        out_lines.append(
+            f"{indent}print(__import__('subprocess').run([{cmd_list}], "
+            f"capture_output=True, text=True).stdout, end='')"
+        )
+        needs_subprocess = True
+    if needs_subprocess:
+        out_lines.insert(0, "import sys")
+    return "\n".join(out_lines)
+
+
 def run_python(notebook_id: str, cell_name: str, code: str) -> dict:
     ns = get_namespace(notebook_id)
     output_lines: list[str] = []
@@ -182,13 +251,19 @@ def run_python(notebook_id: str, cell_name: str, code: str) -> dict:
         output_lines.append(sep.join(str(a) for a in args) + end)
 
     exec_ns = {**ns, "print": _print, "__builtins__": __builtins__}
+    pre_snapshot = {k: id(v) for k, v in ns.items()}
+    translated = _translate_shell_magics(code)
     try:
-        exec(code, exec_ns)  # noqa: S102
+        exec(translated, exec_ns)  # noqa: S102
+        touched_keys: set[str] = set()
         for k, v in exec_ns.items():
-            if k not in ("print", "__builtins__"):
-                ns[k] = v
+            if k in ("print", "__builtins__"):
+                continue
+            if k not in pre_snapshot or pre_snapshot[k] != id(v):
+                touched_keys.add(k)
+            ns[k] = v
         stdout = "".join(output_lines)
-        return _to_cell_output(ns, cell_name, stdout)
+        return _to_cell_output(ns, cell_name, stdout, touched_keys)
     except Exception:
         return {"type": "error", "message": traceback.format_exc()}
 

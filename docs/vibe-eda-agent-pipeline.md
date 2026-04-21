@@ -272,10 +272,49 @@ def _render_figure_png_base64(fig) -> str | None:
 
 ---
 
-## 11. 향후 개선 아이디어
+## 11. 분석가 마인드셋 스킬 모듈 (`agent_skills.py`)
 
-- **플래닝 셀**: 첫 Markdown 셀에 분석 계획 + 가설을 기록하고 매 턴 참조해 drift 방지
-- **셀별 수정 재시도 상한**: 같은 셀에 `update_cell_code` 를 3회 이상 실패하면 `ask_user` 강제
-- **ask_user 전용 UI**: 단순 텍스트 대신 버튼형 옵션 카드 (options 필드 활용)
+Claude/Gemini 파이프라인이 공용으로 사용하는 스킬 프레임워크. 9개 스킬이 시스템 프롬프트 fragment + 선택적 신규 tool + pre-guard + post-hook + end-guard 를 조합해 제공된다.
+
+### 스킬 목록
+
+| # | 스킬 | 제공 메커니즘 | 핵심 효과 |
+|---|---|---|---|
+| 1 | **planning** | 신규 tool `create_plan` + pre-guard | 가설 3개 이상 Markdown 플랜 없으면 SQL/Python 셀 생성 거부 (trivial 요청은 휴리스틱 스킵) |
+| 2 | **plan_revision** | 신규 tool `update_plan` + 메모 post-hook | 메모에 '예상 밖/새 가설' 키워드 감지 시 플랜 갱신 리마인더 |
+| 3 | **hypothesis_exhaustion** | end-guard | 루프 종료 직전 미검증 가설 수 체크 → 리마인더 1회 주입 후 재개 |
+| 4 | **data_request** | 신규 tool `request_marts` | 구조화된 마트 추가 요청 (ask_user 의 typed variant) |
+| 5 | **output_critic** | 프롬프트 강제 | 메모를 `관찰 / 이상 신호 / 비교 기준 / 다음 행동` 구조로 |
+| 6 | **sanity_check** | SQL 실행 post-hook | GROUP BY/JOIN 감지 시 rowcount·중복·NULL 검증 셀 권고 |
+| 7 | **error_recovery** | execute post-hook | 에러를 `column_not_found/division_by_zero/timeout/type_mismatch/…` 로 분류 + 2회 반복 시 `ask_user` 유도 |
+| 8 | **baseline_comparison** | 메모 post-hook | 메모에 상대 비교 표현이 없으면 보강 요구 |
+| 9 | **segmentation_exploration** | end-guard | 모든 가설 검증 완료 & 충분히 진행됐으면 미탐색 축 제안 |
+
+### 런타임 상태
+
+`NotebookState.skill_ctx` (dict) 에 요청 단위 상태 저장:
+- `plan_cell_id` — 플랜 Markdown 셀 id (`<!-- vibe:analysis_plan -->` 마커로 탐지)
+- `error_count_by_cell` — 셀별 에러 반복 수
+- `sanity_hinted_cells` — sanity-check 힌트 중복 방지 set
+- `memo_count` — 3회마다 drift 정기 체크
+- `end_guard_fired` — end-guard 중복 방지
+- `initial_user_message` — trivial 요청 휴리스틱용
+
+### 프로바이더 공용화
+
+- 시스템 프롬프트 fragment (`SKILLS_SYSTEM_PROMPT`) 는 `_build_system_prompt` 에서 둘 다 append
+- Tool 정의는 Claude JSONSchema (`SKILL_TOOLS_CLAUDE`) + Gemini FunctionDeclaration (`SKILL_TOOLS_GEMINI`) 각각 선언
+- pre-guard / post-hook / end-guard 함수는 순수 Python 으로 어느 파이프라인에서도 호출 가능
+- `ASK_USER_LIKE_TOOLS = {"ask_user", "request_marts"}` — 두 파이프라인 공용으로 세션 종료 플래그 공유
+
+---
+
+## 12. 향후 개선 아이디어
+
+- **플랜 진행률 UI**: 플랜 셀의 `- [x]/[ ]` 를 프론트에서 진행 바로 시각화
+- **셀별 수정 재시도 상한**: 같은 셀에 `update_cell_code` 를 3회 이상 실패하면 `ask_user` 강제 (error_recovery skill 에서 부분 구현됨)
+- **`request_marts` 전용 UI**: 제안 키워드 기반 마트 추천 카드
 - **행동 요약**: `complete` 이벤트에 한 줄 결과 요약 포함 (지금은 셀 ID 만)
 - **비용 추적**: 각 턴의 Claude/Gemini usage 집계 → 프론트 사이드바 표시
+- **통계적 엄밀성 스킬 (Tier 3)**: 비교·차이 주장 시 표본 크기 경고
+- **차트 선택 스킬 (Tier 3)**: 데이터 shape 로 차트 타입 추천

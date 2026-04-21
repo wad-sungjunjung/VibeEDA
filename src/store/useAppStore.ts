@@ -53,13 +53,28 @@ import { useModelStore } from '@/store/modelStore'
 const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const _vibeControllers = new Map<string, AbortController>()
 let _agentController: AbortController | null = null
+const _pendingSaves = new Map<string, () => void>()
 function debounced(key: string, fn: () => void, delay = 800) {
   const t = _debounceTimers.get(key)
   if (t) clearTimeout(t)
+  _pendingSaves.set(key, fn)
   _debounceTimers.set(key, setTimeout(() => {
     _debounceTimers.delete(key)
+    _pendingSaves.delete(key)
     fn()
   }, delay))
+}
+function flushDebouncedForCell(cellId: string) {
+  // 해당 셀 관련 debounce (code-<id>, memo-<id>) 를 즉시 실행 + timer 해제
+  for (const key of Array.from(_pendingSaves.keys())) {
+    if (key.endsWith(`-${cellId}`)) {
+      const t = _debounceTimers.get(key)
+      if (t) { clearTimeout(t); _debounceTimers.delete(key) }
+      const fn = _pendingSaves.get(key)
+      _pendingSaves.delete(key)
+      try { fn?.() } catch (e) { console.warn('flush failed', key, e) }
+    }
+  }
 }
 
 // ─── DB row → Cell converter ─────────────────────────────────────────────────
@@ -188,7 +203,7 @@ interface AppStore {
   toggleCellSplitMode: (id: string) => void
   setCellSplitDir: (id: string, dir: 'h' | 'v') => void
   updateCellMemo: (id: string, memo: string) => void
-  cycleCellTypeById: (id: string) => void
+  cycleCellTypeById: (id: string) => Promise<void>
   executeCell: (id: string) => Promise<void>
   executeAllCells: () => Promise<void>
   updateCellChatInput: (id: string, input: string) => void
@@ -209,6 +224,18 @@ interface AppStore {
   agentSessions: AgentSession[]
   agentSessionTitle: string | null
   currentSessionCreatedAtMs: number | null
+  /**
+   * 현재 진행 중인 에이전트 대화의 안정적인 ID.
+   * - 첫 턴 전에는 null
+   * - 첫 턴 시작 시 새 ID 발급
+   * - 세션 아카이브(newAgentSession) 시 이 ID 그대로 `agentSessions[]` 에 보관 (새 ID 생성 X)
+   * - 다른 세션 resume 시 해당 세션 ID가 그대로 currentSessionId 가 됨
+   * 덕분에 접힘 상태 같은 UI 상태를 이 ID 기준으로 일관되게 유지 가능.
+   */
+  currentSessionId: string | null
+  /** 접힘 상태: 세션 ID → collapsed 여부 */
+  collapsedSessionIds: Record<string, boolean>
+  toggleSessionCollapsed: (id: string) => void
   agentLoading: boolean
   agentStartedAtMs: number | null
   agentStatus: string | null
@@ -249,12 +276,24 @@ interface AppStore {
   reports: import('@/lib/api').ReportSummary[]
   reportStages: { stage: import('@/lib/api').ReportStage; label: string; at: number }[]
   reportStartedAt: number | null
+  reportProcessingNotes: import('@/lib/api').ReportProcessingNotes | null
+  reportOutline: import('@/lib/api').ReportOutline | null
+  reportIsDraft: boolean
+  reportSaving: boolean
+  saveCurrentReport: () => Promise<void>
+  closeCurrentReport: () => Promise<void>
   setShowReportModal: (v: boolean) => void
   generateReport: (args: { cellIds: string[]; goal?: string }) => Promise<void>
   setShowReport: (v: boolean) => void
   fetchReports: () => Promise<void>
   openReport: (id: string) => Promise<void>
   removeReport: (id: string) => Promise<void>
+
+  // ── Files tree (root notebooks-dir) ───────────────────────────────────────
+  filesTree: import('@/lib/api').FileNode[]
+  filesRoot: string
+  filesLoading: boolean
+  fetchFilesTree: () => Promise<void>
 
   // ── Toast ──────────────────────────────────────────────────────────────────
   rollbackToast: ToastData | null
@@ -297,6 +336,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
       // 리포트 목록도 초기 로드 (실패해도 앱 동작에 영향 없음)
       void get().fetchReports()
+      void get().fetchFilesTree()
 
       if (notebooks.length > 0) {
         // Load most recent notebook. 백엔드는 분석이 하나도 없으면
@@ -655,22 +695,35 @@ export const useAppStore = create<AppStore>((set, get) => ({
     if (notebookId) debounced(`memo-${id}`, () => updateCell(notebookId!, id, { memo }).catch(() => {}))
   },
 
-  cycleCellTypeById: (id) => {
+  cycleCellTypeById: async (id) => {
+    const current = get().cells.find((c) => c.id === id)
+    if (!current) return
+    const newType = cycleCellType(current.type)
     set((s) => ({
       cells: s.cells.map((c) =>
         c.id === id
-          ? { ...c, type: cycleCellType(c.type), executed: cycleCellType(c.type) === 'markdown' }
+          ? { ...c, type: newType, executed: newType === 'markdown' }
           : c
       ),
     }))
-    const newType = cycleCellType(get().cells.find((c) => c.id === id)?.type ?? 'sql')
     const { notebookId } = get()
-    if (notebookId) updateCell(notebookId, id, { type: newType }).catch(() => {})
+    if (notebookId) {
+      try {
+        await updateCell(notebookId, id, { type: newType })
+      } catch (e) {
+        console.warn('cycle type failed', e)
+      }
+    }
   },
 
   executeCell: async (id) => {
     const { executingCells } = get()
     if (executingCells.has(id)) return
+
+    // 디바운스 저장이 대기 중인 코드/메모를 즉시 flush — stale 상태로 실행되는 것 방지
+    flushDebouncedForCell(id)
+    // debounce flush 가 API 호출을 바로 보내므로 약간 대기해 네트워크 정착
+    await new Promise((r) => setTimeout(r, 30))
 
     set((s) => ({ executingCells: new Set([...s.executingCells, id]) }))
 
@@ -900,6 +953,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   agentSessions: [],
   agentSessionTitle: null,
   currentSessionCreatedAtMs: null,
+  currentSessionId: null,
+  collapsedSessionIds: {},
+  toggleSessionCollapsed: (id) =>
+    set((s) => ({ collapsedSessionIds: { ...s.collapsedSessionIds, [id]: !s.collapsedSessionIds[id] } })),
   agentLoading: false,
   agentStartedAtMs: null,
   agentStatus: null,
@@ -923,14 +980,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })),
 
   newAgentSession: () => {
-    const { agentChatHistory, agentSessions, agentSessionTitle, notebookId, currentSessionCreatedAtMs } = get()
+    const { agentChatHistory, agentSessions, agentSessionTitle, notebookId, currentSessionCreatedAtMs, currentSessionId } = get()
     if (!agentChatHistory.length) return
     const firstUser = agentChatHistory.find((m) => m.role === 'user')
     const fallback = (firstUser?.content ?? '새 대화').trim().replace(/\s+/g, ' ')
     const fallbackTitle = fallback.length > 40 ? fallback.slice(0, 40) + '…' : fallback
     const title = agentSessionTitle?.trim() || fallbackTitle
+    // 안정적 ID 유지: 현재 세션 ID를 그대로 사용해 아카이브 (새 ID 생성 X).
+    // 덕분에 접힘 상태 같은 UI 메타가 이 ID 기준으로 계속 유효.
+    const stableId = currentSessionId ?? generateId('as')
     const session: AgentSession = {
-      id: generateId('as'),
+      id: stableId,
       title,
       startedAt: agentChatHistory[0]?.timestamp ?? nowTimestamp(),
       createdAtMs: currentSessionCreatedAtMs ?? Date.now(),
@@ -941,26 +1001,38 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const insertAt = updated.findIndex((s) => (s.createdAtMs ?? 0) > (session.createdAtMs ?? 0))
     if (insertAt < 0) updated.push(session)
     else updated.splice(insertAt, 0, session)
-    set({ agentChatHistory: [], agentSessions: updated, agentSessionTitle: null, currentSessionCreatedAtMs: null, agentRefCells: [] })
+    set({
+      agentChatHistory: [],
+      agentSessions: updated,
+      agentSessionTitle: null,
+      currentSessionCreatedAtMs: null,
+      currentSessionId: null,
+      agentRefCells: [],
+    })
     if (notebookId) saveAgentSessions(notebookId, updated)
   },
 
   resumeAgentSession: (id) => {
-    const { agentChatHistory, agentSessions, agentSessionTitle, agentLoading, notebookId, currentSessionCreatedAtMs } = get()
+    const {
+      agentChatHistory, agentSessions, agentSessionTitle, agentLoading,
+      notebookId, currentSessionCreatedAtMs, currentSessionId,
+    } = get()
     if (agentLoading) return
     const targetIdx = agentSessions.findIndex((s) => s.id === id)
     if (targetIdx < 0) return
     const target = agentSessions[targetIdx]
 
     // 현재 대화가 있으면 원래 생성 순서 위치에 아카이브 (가장 아래로 밀리지 않게).
+    // 아카이브 시 현재 세션의 안정적 ID 를 그대로 사용 — 접힘 상태 일관성 유지.
     let sessions: AgentSession[] = [...agentSessions]
     if (agentChatHistory.length > 0) {
       const firstUser = agentChatHistory.find((m) => m.role === 'user')
       const fallback = (firstUser?.content ?? '새 대화').trim().replace(/\s+/g, ' ')
       const fallbackTitle = fallback.length > 40 ? fallback.slice(0, 40) + '…' : fallback
       const title = agentSessionTitle?.trim() || fallbackTitle
+      const archivedId = currentSessionId ?? generateId('as')
       const archived: AgentSession = {
-        id: generateId('as'),
+        id: archivedId,
         title,
         startedAt: agentChatHistory[0]?.timestamp ?? nowTimestamp(),
         createdAtMs: currentSessionCreatedAtMs ?? Date.now(),
@@ -979,6 +1051,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       agentSessions: sessions,
       agentSessionTitle: target.title,
       currentSessionCreatedAtMs: target.createdAtMs ?? Date.now(),
+      currentSessionId: id, // resume 된 세션 ID 를 그대로 current 로 사용
       agentRefCells: [],
       agentMode: true,
     })
@@ -1068,6 +1141,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       agentChatHistory: [...s.agentChatHistory, userMsg],
       agentChatInput: '',
       currentSessionCreatedAtMs: isFirstUserMsg ? Date.now() : (s.currentSessionCreatedAtMs ?? Date.now()),
+      currentSessionId: s.currentSessionId ?? generateId('as'),
       agentLoading: true,
       agentStartedAtMs: Date.now(),
       agentStatus: '생각 중',
@@ -1252,17 +1326,29 @@ export const useAppStore = create<AppStore>((set, get) => ({
             pushStep('cell_memo', '인사이트 메모 기록', event.memo)
           } else if (event.type === 'complete') {
             const lastId = currentAssistantMsgId
-            set((s) => ({
-              agentStatus: null,
-              agentChatHistory: s.agentChatHistory
-                .filter((m) => !(m.role === 'assistant' && m.kind !== 'step' && !m.content && m.id !== lastId))
-                // 최종 답변이 도착했으므로 중간 step들은 접어둠
-                .map((m) =>
-                  m.kind === 'step' ? { ...m, collapsed: true }
-                  : m.id === lastId ? { ...m, createdCellIds }
-                  : m
+            set((s) => {
+              // 스트림 종료 시점: 빈 assistant 메시지는 모두 제거(미리 만들어 둔 placeholder 포함).
+              // createdCellIds는 내용이 있는 마지막 어시스턴트 말풍선에 붙인다.
+              const cleaned = s.agentChatHistory.filter(
+                (m) => !(m.role === 'assistant' && m.kind !== 'step' && !m.content)
+              )
+              let attached = false
+              const withCells = [...cleaned]
+              for (let i = withCells.length - 1; i >= 0 && !attached; i--) {
+                const m = withCells[i]
+                if (m.role === 'assistant' && m.kind !== 'step' && m.content) {
+                  withCells[i] = { ...m, createdCellIds }
+                  attached = true
+                }
+              }
+              return {
+                agentStatus: null,
+                agentChatHistory: withCells.map((m) =>
+                  m.kind === 'step' ? { ...m, collapsed: true } : m
                 ),
-            }))
+              }
+            })
+            void lastId
           } else if (event.type === 'error') {
             const msgId = currentAssistantMsgId
             console.error('Agent error:', event.message)
@@ -1416,6 +1502,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
         agentChatHistory: [],
         agentSessions: [],
         agentSessionTitle: null,
+        currentSessionId: null,
+        currentSessionCreatedAtMs: null,
+        collapsedSessionIds: {},
         analysisTheme: '',
         analysisDescription: '',
         selectedMarts: [],
@@ -1449,6 +1538,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   reports: [],
   reportStages: [],
   reportStartedAt: null,
+  reportProcessingNotes: null,
+  reportOutline: null,
+  reportIsDraft: false,
+  reportSaving: false,
   setShowReportModal: (v) => set({ showReportModal: v }),
 
   generateReport: async ({ cellIds, goal }) => {
@@ -1464,6 +1557,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
       currentReportId: null,
       reportStages: [],
       reportStartedAt: Date.now(),
+      reportProcessingNotes: null,
+      reportOutline: null,
+      reportIsDraft: false,
     })
     try {
       const api = await import('@/lib/api')
@@ -1476,18 +1572,29 @@ export const useAppStore = create<AppStore>((set, get) => ({
             set((s) => ({
               reportStages: [...s.reportStages, { stage: event.stage, label: event.label, at: Date.now() }],
             }))
+          } else if (event.type === 'meta') {
+            set({
+              reportProcessingNotes: event.processing_notes,
+              reportOutline: event.outline,
+            })
           } else if (event.type === 'complete') {
             set((s) => ({
               generatingReport: false,
               currentReportId: event.id,
               reportTitle: event.title,
+              reportIsDraft: event.is_draft ?? true,
               reportStages: [...s.reportStages, { stage: 'finalizing', label: '완료', at: Date.now() }],
             }))
-            // 저장된 최종(후처리 완료) 본문으로 교체 — 차트 이미지 data URI 삽입 + 취소선 제거 반영
+            // 저장된 최종(후처리 완료) 본문으로 교체 — 차트 이미지 경로 치환 + 취소선 제거 반영
             void api.getReport(event.id).then((r) => {
-              set({ reportContent: r.markdown })
+              set({
+                reportContent: r.markdown,
+                reportProcessingNotes: r.processing_notes ?? null,
+                reportOutline: r.outline ?? null,
+                reportIsDraft: r.is_draft ?? true,
+              })
             }).catch((err) => console.warn('getReport after complete failed', err))
-            void get().fetchReports()
+            // draft 는 사이드바에 노출되지 않음 — 승격 시에만 목록 새로고침
           } else if (event.type === 'error') {
             set({ generatingReport: false, reportError: event.message })
           }
@@ -1503,6 +1610,46 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   setShowReport: (v) => set({ showReport: v }),
 
+  saveCurrentReport: async () => {
+    const { currentReportId, reportIsDraft, generatingReport } = get()
+    if (!currentReportId || !reportIsDraft || generatingReport) return
+    set({ reportSaving: true })
+    try {
+      const api = await import('@/lib/api')
+      await api.saveReportDraft(currentReportId)
+      set({ reportIsDraft: false, reportSaving: false })
+      void get().fetchReports()
+    } catch (e) {
+      console.warn('saveReportDraft failed', e)
+      set({
+        reportSaving: false,
+        reportError: e instanceof Error ? e.message : String(e),
+      })
+    }
+  },
+
+  closeCurrentReport: async () => {
+    const { currentReportId, reportIsDraft, generatingReport } = get()
+    // 스트리밍 중 닫기: 일단 모달만 닫음 (생성은 계속). 완료 후 draft 가 남겠지만 그건 허용.
+    set({ showReport: false })
+    if (generatingReport) return
+    if (currentReportId && reportIsDraft) {
+      try {
+        const api = await import('@/lib/api')
+        await api.discardReportDraft(currentReportId)
+      } catch (e) {
+        console.warn('discardReportDraft failed', e)
+      }
+      set({
+        currentReportId: null,
+        reportContent: '',
+        reportIsDraft: false,
+        reportProcessingNotes: null,
+        reportOutline: null,
+      })
+    }
+  },
+
   fetchReports: async () => {
     try {
       const api = await import('@/lib/api')
@@ -1510,6 +1657,40 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({ reports: list })
     } catch (e) {
       console.warn('fetchReports failed', e)
+    }
+  },
+
+  filesTree: [],
+  filesRoot: '',
+  filesLoading: false,
+  fetchFilesTree: async () => {
+    set({ filesLoading: true })
+    try {
+      const api = await import('@/lib/api')
+      const res = await api.getFilesTree()
+      set({ filesTree: res.tree, filesRoot: res.root })
+      // 하위 폴더로 옮겨진 ipynb 도 반영되도록 histories 도 함께 갱신
+      try {
+        const nbs = await api.getNotebooks()
+        const existingMap = new Map(get().histories.map((h) => [h.id, h]))
+        const merged = nbs.map((nb, i) => {
+          const prev = existingMap.get(nb.id)
+          return {
+            id: nb.id,
+            title: nb.title,
+            date: prev?.date ?? formatNotebookDate(nb.updated_at),
+            folderId: nb.folder_id,
+            isCurrent: prev?.isCurrent ?? (i === 0 && !get().notebookId),
+          }
+        })
+        set({ histories: merged })
+      } catch (e) {
+        console.warn('refresh histories after tree fetch failed', e)
+      }
+    } catch (e) {
+      console.warn('fetchFilesTree failed', e)
+    } finally {
+      set({ filesLoading: false })
     }
   },
 
@@ -1524,6 +1705,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
         reportTitle: r.title,
         currentReportId: r.id,
         reportError: null,
+        reportProcessingNotes: r.processing_notes ?? null,
+        reportOutline: r.outline ?? null,
+        reportIsDraft: r.is_draft ?? false,
       })
     } catch (e) {
       set({ reportError: e instanceof Error ? e.message : String(e) })
@@ -1572,6 +1756,9 @@ function _applyNotebookDetail(detail: NotebookDetail, _isFirst: boolean) {
     agentChatHistory,
     agentSessions,
     agentSessionTitle: null,
+    currentSessionId: null,
+    currentSessionCreatedAtMs: null,
+    collapsedSessionIds: {},
     histories: s.histories.map((h) => ({ ...h, isCurrent: h.id === detail.id })),
   }))
 }

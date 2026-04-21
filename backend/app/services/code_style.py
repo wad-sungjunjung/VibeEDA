@@ -5,143 +5,145 @@ Vibe Chat (gemini_service / claude_vibe_service) 과 Agent Mode (claude_agent / 
 """
 
 SQL_STYLE_GUIDE = """
-## 필수 쿼리 스타일 (반드시 적용, 예외 없음)
+## SQL 작성 원칙 (일반 규칙)
 
-### 1. SQL 키워드는 모두 소문자로 작성한다
-select, from, where, left join, inner join, case, when, then, else, end, group by, order by, with, as 등
-대문자 키워드는 절대 사용하지 않는다.
+### 0. 🎯 사용자 질문 범위만 다룬다 (가장 중요)
+- 사용자가 요청하지 않은 **차원(시간 단위 · 세그먼트 · 컬럼) 을 추가하지 말 것**
+  - 예: "월별" → 월 단위 집계만. 일/요일/시간대 브레이크다운 금지
+  - 예: "전체" → 세그먼트 분리 금지
+- **최종 SELECT 에서 안 쓸 컬럼을 CTE 에서 미리 끌어오지 말 것** — 쿼리 비용만 커짐
+- **의미 없는 JOIN 금지**: 필터 목적의 join 이면 실제 WHERE 조건도 함께 넣기. 필터 없는 join 은 제거
+- 파생 컬럼(요일·상태 레이블 등) 은 **사용자가 명시적으로 요청한 경우**에만 생성. 마트에 이미 동일 의미 컬럼이 있으면 재계산하지 말고 그 컬럼을 그대로 사용
 
-### 2. 항상 CTE(with 절) 구조로 작성한다
-- 변환 로직은 CTE 안에 넣고, 마지막 select는 `select * from final_cte` 형태로 단순하게 끝낸다
-- CTE 이름은 비즈니스 의미를 담아 snake_case로 작성한다 (예: fact_entry, agg_daily, dim_shop)
-- 단순 SELECT라도 with ... as (...) select * from ... 형태로 감싼다
+### 0-A. 🔒 모르는 카테고리 값은 추측 금지
+WHERE / CASE WHEN 의 문자열 리터럴은 **시스템 프롬프트 "카테고리 컬럼 허용 값" 목록에 있는 값만** 사용.
+- 목록에 없거나 사용자 의도와 어떤 코드값이 매칭되는지 불확실하면:
+  - **Agent 모드**: `get_category_values` tool 로 먼저 확인 → 그래도 불확실하면 `ask_user`
+  - **Vibe Chat 모드**: 추측하지 말고 **해당 필터를 제거**하거나, 주석으로 `-- ⚠️ 값 확인 필요` 를 남기고 결과에 원본 컬럼을 포함해 사용자가 눈으로 확인할 수 있게 함
 
-### 3. 컬럼을 의미 그룹별로 구분하고 빈 줄을 넣는다
-id 그룹 → 날짜/시간 그룹 → 상태/분류 그룹 → 매장/채널 그룹 → 고객 그룹 순으로 배치하고
-그룹 사이에 빈 줄을 넣어 가독성을 높인다.
+### 1. SQL 키워드는 소문자
+select, from, where, join, case, when, group by, order by, with, as 등 모두 소문자.
 
-### 4. 날짜/시간 컬럼은 _date(DATE)와 _dt(DATETIME) 쌍으로 분리한다
-    date(cw.reg_date_time) as reg_date,
-    cw.reg_date_time as reg_dt,
+### 2. CTE(with 절) 기반 구조
+- 변환 로직은 CTE 안에 배치하고, 마지막은 `select * from final_cte` 형태로 단순하게 마무리
+- CTE 이름은 비즈니스 의미가 드러나는 snake_case (예: `fact_xxx`, `agg_xxx`, `dim_xxx`)
+- 단순 SELECT 라도 `with ... as (...) select * from ...` 구조를 유지
 
-### 5. 요일 컬럼은 dayofweek() → 한국어 요일명으로 변환한다
-    case
-        when dayofweek(reg_date) = 0 then '일'
-        when dayofweek(reg_date) = 1 then '월'
-        when dayofweek(reg_date) = 2 then '화'
-        when dayofweek(reg_date) = 3 then '수'
-        when dayofweek(reg_date) = 4 then '목'
-        when dayofweek(reg_date) = 5 then '금'
-        when dayofweek(reg_date) = 6 then '토'
-    end as reg_weekday,
+### 3. 컬럼 그룹별로 빈 줄로 구분
+의미 그룹(식별자 → 날짜/시간 → 분류/상태 → 수치/지표) 사이에 빈 줄을 넣어 가독성 확보.
 
-### 6. 상태 코드값은 CASE WHEN으로 한국어 레이블로 변환한다
-영어 코드를 그대로 노출하지 않고 의미있는 한국어 레이블로 변환한다.
-    case
-        when status = 'SITTING' then '착석'
-        when status = 'CANCEL' then '취소'
-        else '기타'
-    end as entry_status,
+### 4. 집계 컬럼 별칭은 의도가 드러나는 이름
+- 한국어 큰따옴표 별칭을 선호: `count(distinct user_id) as "방문자수"`
+- 영어 별칭을 쓸 거면 의미가 분명해야 함 (`n`, `cnt` 같은 축약 금지)
 
-### 7. GROUP BY는 기본 `group by` 절로 작성한다
-- **`grouping sets`는 사용자가 소계/총계를 명시적으로 요청했을 때만** 사용한다
-  (예: "시도별 + 전체 합계 보여줘", "지역별 소계 포함") — 단순 집계에는 쓰지 않는다
-- `grouping sets` 사용 시 소계 레이블 패턴: `case when grouping(col) = 1 then '0. 전체' else col end`
-- 정렬은 `order by <컬럼명>` 으로 작성한다. `order by all` / `order by 1,2` 는 쓰지 않는다 —
-  어떤 컬럼 기준으로 정렬되는지 명시적으로 드러낸다.
+### 5. GROUP BY / ORDER BY
+- 기본은 `group by <컬럼명>` — 컬럼 번호(`group by 1,2`) 지양
+- `grouping sets` 는 사용자가 소계/총계를 명시적으로 요청했을 때만
+- `order by` 도 컬럼명으로. `order by all` 금지
 
-### 8. 집계 컬럼 별칭은 한국어 큰따옴표 문자열로 작성한다
-    count(distinct shop_id) as "매장수"    -- O
-    count(distinct shop_id) as shop_count  -- X
+### 6. NULL / 타입
+- NULL 방어는 `coalesce(col, default)` 로
+- 0 분모 방어: `nullif(denominator, 0)`
+- 타입 변환은 명시적 `cast(col as ...)`
 
-### 9. JOIN에는 인라인 주석으로 목적을 설명한다
-    inner join wad_dw_prod.mart.dim_shop_base as ds  -- 테스트 매장 제외
-        on cw.shop_id = ds.shop_key
-
-### 10. 테이블 별칭은 짧고 의미 있는 영문 약어를 사용한다
-테이블 이름에서 의미 있는 부분만 추출 (예: cw_fast_entry → cw, ct_reservation → cr, dim_user → du)
-
-### 11. 컬럼명·테이블명은 모두 소문자 snake_case로 작성한다
-NULL 방어는 coalesce로 처리한다. 들여쓰기: 4칸 스페이스.
-
----
-## 예시
-
-입력 요청: "일별 채널 유형별 입장 건수"
-
-올바른 예 (반드시 이 형태로 작성):
-    with fact_entry as (
-
-        select
-            cw.fast_entry_id as entry_id,
-
-            date(cw.reg_date_time) as reg_date,
-            cw.reg_date_time as reg_dt,
-            case
-                when dayofweek(date(cw.reg_date_time)) = 0 then '일'
-                when dayofweek(date(cw.reg_date_time)) = 1 then '월'
-                when dayofweek(date(cw.reg_date_time)) = 2 then '화'
-                when dayofweek(date(cw.reg_date_time)) = 3 then '수'
-                when dayofweek(date(cw.reg_date_time)) = 4 then '목'
-                when dayofweek(date(cw.reg_date_time)) = 5 then '금'
-                when dayofweek(date(cw.reg_date_time)) = 6 then '토'
-            end as reg_weekday,
-
-            case
-                when cw.entry_type = 'RESERVATION' then '우선_국내'
-                when cw.entry_type = 'NOW' then '지금_국내'
-                when cw.entry_type is null then '지금_국내'
-                else '기타'
-            end as channel_type,
-
-        from wad_dw.ods.cw_fast_entry as cw
-        inner join wad_dw_prod.mart.dim_shop_base as ds  -- 테스트 매장 제외
-            on cw.shop_id = ds.shop_key
-
-    ), agg as (
-
-        select
-            reg_date,
-            channel_type,
-            count(entry_id) as "입장건수"
-        from fact_entry
-        group by reg_date, channel_type
-
-    )
-    select *
-    from agg
-    order by reg_date, channel_type
+### 7. 네이밍 · 들여쓰기
+- 컬럼·테이블·별칭 모두 소문자 snake_case
+- 테이블 별칭은 짧고 의미 있는 영문 (예: `fact_reservation as fr`)
+- 들여쓰기는 4칸 스페이스, `,` 는 줄 끝에
 """
 
 PYTHON_RULES = """
-## Python 셀 규칙
-- DB 마트에 직접 접근하지 않는다 — 이미 실행된 SQL 셀 결과 DataFrame만 사용한다
-- 시각화 코드는 반드시 마지막 줄을 `fig_<주제>_<차트타입>` 형태의 변수 **참조로만** 끝낸다
-  (예: fig_region_bar, fig_daily_trend_line, fig_funnel_conversion)
-  단순한 `fig` 이름은 절대 사용하지 않는다 — 주제와 차트 유형을 명시하라
-- **`.show()` / `fig.show()` / `pio.show(...)` / `display(...)` 는 절대 호출하지 않는다**
-  (새 브라우저 탭이 열리는 문제 발생) — 마지막 줄은 `fig_xxx` 변수 식별자만 둔다
-- plotly: `import plotly.express as px` 사용 (plotly_express 금지)
-- DataFrame 변수명은 SQL 셀 이름과 동일하다 (예: query_1, code_2)
-- 기본 제공 라이브러리 (requirements.txt): pandas, numpy, plotly, scikit-learn, scipy, statsmodels
-  - 전처리/정제: pandas
-  - 시각화: plotly
-  - 통계/검정: scipy.stats, statsmodels
-  - 머신러닝(분류·회귀·군집·차원축소 등): scikit-learn
-- 사용자가 **"<패키지>를 설치해줘 / 설치해서 ~"** 또는 목록 밖 패키지가 필요한 요청을 하면
-  **반드시 아래 패턴을 셀 상단에 포함**하여 런타임 설치 후 import한다.
-  (`!pip` / `%pip` / `os.system` 은 금지 — 커널이 Jupyter 매직을 지원하지 않음)
+## Python 셀 작성 원칙
 
-  ```python
-  import importlib, subprocess, sys
-  for _pkg in ("<패키지명>",):               # 여러 개면 여기 추가
-      try:
-          importlib.import_module(_pkg.split('==')[0].split('[')[0])
-      except ImportError:
-          subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", _pkg])
-  import <패키지명> as <alias>              # 실제 import
-  ```
+### 1. 데이터 소스
+- DB 에 직접 접근하지 않는다 — 이미 실행된 SQL 셀 결과 DataFrame 을 사용
+- DataFrame 변수명은 상위 SQL 셀 이름과 동일 (예: SQL 셀 `query_1` → Python 에서 `query_1` 그대로 참조)
 
-  - 이미 설치돼 있으면 건너뛰고, 없을 때만 설치해 재실행이 빨라진다.
-  - 딥러닝/수GB급 라이브러리(tensorflow, torch, transformers 등)는 지양.
+### 2. 시각화 (Plotly)
+- `import plotly.express as px` 사용
+- Figure 변수명은 `fig_<주제>_<차트타입>` 형태 — 주제와 차트 유형이 드러나야 함
+  (예: `fig_region_bar`, `fig_daily_trend_line`, `fig_funnel_conversion`)
+- 단순한 `fig` 이름은 쓰지 말 것 — 여러 차트가 같은 네임스페이스에 있을 때 덮어쓰기 방지
+- **마지막 줄은 반드시 `fig_xxx` 변수 식별자만** (자동 표시용)
+- `.show()` / `pio.show(...)` / `display(...)` 는 호출하지 말 것
+
+### 3. 기본 라이브러리
+기본 제공: pandas, numpy, plotly, scikit-learn, scipy, statsmodels.
+- 전처리/정제: pandas
+- 시각화: plotly
+- 통계/검정: scipy.stats, statsmodels
+- 머신러닝: scikit-learn
+
+### 4. 외부 패키지 런타임 설치
+목록 외 패키지가 필요하면 아래 둘 중 하나를 사용:
+
+**A) `!pip install` (Jupyter 스타일, 지원됨)** — 커널이 자동으로 `subprocess` 호출로 변환한다.
+```python
+!pip install xgboost --quiet
+import xgboost as xgb
+```
+`%pip install ...` 도 동일하게 동작.
+
+**B) 안전한 guard 패턴** — 이미 설치됐으면 스킵하고 싶을 때:
+```python
+import importlib, subprocess, sys
+for _pkg in ("<패키지명>",):
+    try:
+        importlib.import_module(_pkg.split('==')[0].split('[')[0])
+    except ImportError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", _pkg])
+import <패키지명> as <alias>
+```
+
+딥러닝/수GB 라이브러리(tensorflow, torch, transformers 등) 는 지양.
+
+### 5. 사용자 질문 범위 (SQL 과 동일)
+- 요청하지 않은 차원 추가 금지
+- 요청하지 않은 통계/전처리 단계 추가 금지
+"""
+
+
+MARKDOWN_RULES = """
+## Markdown 작성 원칙 (렌더링 안정성)
+
+프론트는 `react-markdown + remark-gfm` 으로 렌더링한다. 아래 규칙은 레이아웃 깨짐 방지를 위해 반드시 준수.
+
+### 1. 특수문자 이스케이프
+Markdown 특수 리터럴 (`_ * ` # > [ ] ( ) | \\ ! ~`) 을 본문에 그대로 쓰면 해석되므로 이스케이프 또는 전각 대체.
+- 파이프 `|` → `\\|` 또는 전각 `｜`
+- 대괄호 `[...]` → `\\[...\\]` 또는 전각 `［...］`
+
+### 2. italic 안에 code/체크박스/링크를 섞지 말 것
+`_..._` 또는 `*...*` 내부에 inline code / task-list 마커를 섞으면 한국어 italic 글자가 오버플로한다.
+- 강조가 필요하면 짧은 `**굵게**` 로 통일
+- italic 은 필수적인 경우에만 단독 사용
+
+### 3. GFM task-list 는 "할 일 목록" 용도로만
+`- [ ]` / `- [x]` 는 체크박스로 렌더된다. 본문에 `[x]` 를 체크 표시 같은 기호로 쓰지 말 것 — `✓` 또는 "완료" 텍스트로 대체.
+
+### 4. inline code 안에 backtick 넣지 않기
+이중 백틱 구간에 다시 `-` 나 `|` 를 넣으면 파서가 혼란. 필요하면 일반 텍스트 + `**굵게**` 로 대체.
+
+### 5. 헤더 계층
+H1(`#`) → H2(`##`) → H3(`###`) 순서. 한 셀에서 H1 은 최대 1회.
+
+### 6. 표는 파이프 정합 + 헤더 구분선 필수
+| 컬럼 | 값 |
+|---|---|
+| a | b |
+
+컬럼 수가 어긋나면 일반 본문으로 렌더된다.
+
+### 7. 숫자 · 날짜 포맷
+- 퍼센트: `62%` 처럼 붙여 쓰기 (공백 넣지 않기)
+- 마이너스: ASCII 하이픈(-) 사용. 유니코드 마이너스(−) 피하기
+- 날짜: `YYYY-MM-DD`
+
+### 8. 긴 대문자 토큰 / URL
+`REVIEW_TOTAL_AVG_SCORE` 같은 토큰은 자동 줄바꿈이 안 되므로 inline code 로 감싸기.
+
+### 9. 메모 / 플랜 본문
+- 불릿 위주, 아이템 앞에 italic/code/체크박스 복합 표기는 금지
+- 강조는 `**굵게**` 한 가지로 통일
+- 2~5줄, 각 줄 80자 이내 권장
 """

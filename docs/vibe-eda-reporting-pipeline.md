@@ -12,7 +12,7 @@
 
 ---
 
-## 1. 전체 흐름
+## 1. 전체 흐름 (품질 우선 2-pass 파이프라인)
 
 ```
 [ReportModal 셀 선택 + 목표 + 모델]
@@ -21,28 +21,37 @@
         ▼
 [1] stage: collecting
     build_evidence(nb_id, cell_ids)
-     └─ .ipynb 로드 → 각 셀의 code/memo/insight/output(text+PNG) 추출
+     └─ .ipynb 로드 → code/memo/insight/output(text+PNG) + depends_on 추적
         ▼
 [2] stage: collected (셀 N · 차트 M)
-[3] stage: writing
-    _stream_claude  또는  _stream_gemini
-     ├─ system prompt (시니어 분석가 + 구조 강제)
-     ├─ user prompt (증거 + 사용 가능한 차트 리스트)
-     └─ 차트 PNG 를 텍스트와 함께 이미지 블록으로 주입
-        ▼ delta 이벤트 반복
-[4] stage: finalizing
-    _allocate_report_id → report_id 고정 (충돌 방지)
-    _inject_chart_images
-     ├─ {{CHART:cell_name}} → ![alt](./{id}_images/xxx.png)
-     ├─ 매칭 실패 플레이스홀더 조용히 제거
-     ├─ 취소선(~~) 쌍 제거
-     ├─ 단일 ~ 를 \~ 로 이스케이프
-     └─ 참조된 이미지만 디스크 기록
-    save_report
-     ├─ reports/{id}.md 에 frontmatter + 본문 저장
-     └─ 원본 노트북 metadata.vibe.reports[] 에 참조 append
+[3] stage: outlining     ← Pass 1
+    _run_outline_pass
+     ├─ LLM 호출 (Claude: _call_claude_text / Gemini: _call_gemini_text, response_mime_type=json)
+     ├─ _parse_outline_json 방어적 파싱
+     ├─ _validate_outline_coverage: 첨부 차트 중 미할당 → 1회 재시도 (누락 목록 힌트 주입)
+     └─ 실패 시 빈 outline 으로 폴백 (writing 은 계속 진행)
         ▼
-[5] complete 이벤트 → 프론트가 GET /v1/reports/{id} 로 후처리 본문 재수신
+[4] stage: outlined (섹션 K개 [· 차트 미할당 n])
+[5] stage: writing        ← Pass 2
+    _stream_claude / _stream_gemini
+     ├─ system prompt (시니어 분석가 + outline 엄수 지시)
+     ├─ user prompt (맥락 + outline JSON + 셀별 증거)
+     └─ 차트 PNG 이미지 블록 첨부
+        ▼ delta 이벤트 반복
+[6] stage: finalizing
+    _allocate_report_id
+    _inject_chart_images  →  (new_markdown, chart_notes)
+     ├─ {{CHART:cell_name}} → ![alt](./{id}_images/xxx.png)
+     ├─ 매칭 실패 → `> ⚠ 차트 미삽입` 경고 블록 + missing_charts 기록
+     ├─ 첨부됐지만 미참조 차트 → "## 부록: 본문 미참조 차트" 자동 추가 + unreferenced_charts 기록
+     ├─ 취소선(~~) 쌍 제거 / 단일 ~ 이스케이프
+     └─ 참조된 이미지만 디스크 기록
+    _collect_evidence_numbers + _validate_report_numbers
+     └─ 본문 수치(단위 포함) 중 evidence 에 ±0.5% 매칭 안 되는 것 = suspicious_numbers
+    save_report (processing_notes + outline 을 frontmatter 에 기록)
+        ▼
+[7] meta 이벤트 → 프론트 경고 배너 갱신 (missing/unreferenced/suspicious)
+[8] complete 이벤트 → GET /v1/reports/{id} 로 최종 본문 재수신
 ```
 
 ---
@@ -75,67 +84,78 @@
 
 | 타입 | 요약 방식 |
 |---|---|
-| table | 컬럼 헤더 + 상위 20행 + "전체 N행 중 상위 20행 표시" 주석 |
-| chart | `chartMeta` (제목, 축, trace 이름·n_points) + PNG 이미지 별도 첨부 |
-| stdout | 앞 2000자 |
+| table | 헤더 + head(15) + tail(5) + **컬럼 프로파일** (수치: min/p25/median/p75/max/mean/null%; 범주: top-5 · unique · null%) |
+| chart | `chartMeta` (제목, 축, trace type/name/n_points/x_range/y_range) + PNG 이미지 별도 첨부 |
+| stdout | 앞 4000자 |
 | error | 앞 2000자 |
 
-### 2.2 증거 수집 원칙
+### 2.2 증거 수집 원칙 (품질 우선)
 
-- **head(20)** 만 추출 — 토큰 비용/품질 trade-off
+- 테이블은 **head+tail+통계 프로파일** 삼중 제공 — LLM 이 분포/이상치/tail 패턴을 놓치지 않게 함
+- 선택 셀 간 **`depends_on`** 자동 추적 — 셀 코드에서 다른 선택 셀 이름 토큰을 찾아 파이프라인 맥락 제공
 - 이미지는 저해상도 600×400 PNG (`kernel.py::_render_figure_png_base64` 가 셀 실행 시 이미 생성해 `.ipynb` 에 저장해 둠)
 - 메모가 비어 있으면 `(비어있음)` 으로 표시 — 에이전트 가드가 메모를 강제하므로 실제로는 거의 없음
 
+### 2.3 수치 집합 수집 (환각 검증용)
+
+`_collect_evidence_numbers(evidence)` 가 반환하는 두 집합:
+
+- `with_units`: 단위 붙은 수치 `{(value, "%"), (value, "원"), ...}` — 본문 매칭의 1차 기준
+- `bigs`: 테이블 cell / chart meta 스칼라 / stdout / 메모에서 추출한 모든 4자리↑ 수치
+- 문자열 경로 손실을 피해 **테이블 row 원본 값과 chart meta 를 직접 walk** 해 숫자를 모은다
+
 ---
 
-## 3. 프롬프트 설계
+## 3. 프롬프트 설계 (2-pass)
 
-### 3.1 시스템 프롬프트 (`_build_system_prompt`)
+구조적 일관성과 차트 커버리지를 코드로 강제하기 위해 **Outline(Pass 1) → Writing(Pass 2)** 로 분리했다.
 
-역할: **"사내 광고 플랫폼 시니어 데이터 분석가, 경영진 열람 가능한 수준"**
+### 3.0 공통 원칙 (`_COMMON_PRINCIPLES`)
 
-핵심 규칙:
+양 pass 가 공유하는 원칙 텍스트:
 1. 숫자·통계는 **반드시 제공된 셀 출력에서만** 인용 (추측 금지)
-2. 메모를 적극 활용하되 본문에 자연스럽게 녹여 서술
-3. 차트 이미지가 첨부된 셀은 실제로 이미지를 보고 의미 있는 패턴 서술
-4. 테이블은 핵심 행만 추려 GFM 테이블로 인라인
-5. `[출처: 셀 …]` 같은 별도 인용 표기 금지 — 근거는 차트·표·수치로 표현
-6. 취소선(`~~text~~`) 절대 사용 금지 — 자체 편집 흔적 금지
-7. 강조는 `**굵게**` / `_기울임_` 만 허용
+2. 메모/인사이트 필드를 적극 활용
+3. 차트 이미지 첨부 셀은 이미지를 보고 패턴을 서술
+4. 테이블 통계(p25/p75/median/top-5) 로 분포·이상치를 구체적으로 지적
+5. `[출처: 셀 …]` 금지 / 취소선 금지 / 강조는 `**` `_` 만
 
-### 3.2 출력 구조 (7단)
+### 3.1 Outline Pass — `_build_outline_system_prompt` + `_build_outline_user_prompt`
 
-```
-# {제목}
-## TL;DR              핵심 발견 3~5개 불릿
-## 배경 및 가설         목표·대상·가설
-## 데이터와 방법        마트·지표·집계 기준
-## 발견                셀별 근거를 차트·표·수치로 엮어 서술
-  - {{CHART:cell_name}}  ← 첨부 차트는 반드시 한 번씩 삽입, 단독 라인
-## 종합 인사이트        비즈니스 시사점·행동 제안 2~4개
-## 한계와 후속 과제      한계 + 추가 검증 제안
-```
+- **유효한 JSON** 만 출력하도록 강제. Claude 는 자유 출력 후 `_parse_outline_json` 로 파싱, Gemini 는 `response_mime_type="application/json"` 옵션으로 강제.
+- 출력 스키마:
+  ```json
+  {
+    "report_title": "…",
+    "tldr": ["…", "…"],
+    "sections": [
+      {
+        "heading": "## 섹션 제목",
+        "thesis": "…",
+        "cite_cells": ["cell_a", "cell_b"],
+        "cite_charts": ["chart_cell_name"],
+        "key_numbers": ["8.4%", "1,234건"]
+      }
+    ],
+    "insights": ["…"],
+    "limitations": ["…"]
+  }
+  ```
+- 사용자 프롬프트는 **목표·맥락·첨부 차트 목록·셀별 증거 요약(의존 셀 포함)** 을 담는다.
 
-문체: 한국어 단정적 서술체(-다/-이다), 경어체 금지.
+#### Coverage 검증 + 1회 재시도
 
-### 3.3 사용자 프롬프트 (`_build_user_prompt`)
+- `_validate_outline_coverage(outline, evidence)` 가 첨부 차트 중 어떤 `sections[*].cite_charts` 에도 없는 이름을 반환.
+- 누락 있으면 `missing_charts_hint` 를 주입해 **1회 재시도**. 여전히 실패하면 마지막 outline 으로 진행 (writing 에서 미참조 차트는 후처리가 부록에 추가함).
 
-사용자 입력 목표 + 분석 맥락(제목·설명·마트) + **"사용 가능한 차트" 섹션을 상단에 명시적으로 배치**해 모델이 플레이스홀더를 놓치지 않도록 유도 + 셀별 증거 블록.
+### 3.2 Writing Pass — `_build_writing_system_prompt` + `_build_writing_user_prompt`
 
-```
-## 사용 가능한 차트 (반드시 발견 섹션에 모두 참조)
-- `{{CHART:fig_region_bar}}`
-- `{{CHART:fig_time_line}}`
+- 시스템 프롬프트가 **"Outline 을 엄수"** 하도록 지시. 각 섹션의 `cite_charts` 전부를 `{{CHART:name}}` 단독 라인으로 삽입.
+- 사용자 프롬프트에 **Outline JSON 을 코드블록으로 그대로** 넣고, 뒤이어 셀별 상세 증거(코드·메모·인사이트·의존·출력) + 첨부 차트 이미지.
+- 출력 구조: `# report_title` → `## TL;DR` → `## 배경/가설` → `## 데이터와 방법` → Outline.sections → `## 종합 인사이트` → `## 한계와 후속 과제`.
 
-## 셀별 증거
-### [1] 셀 `region_sales` (SQL)
-**코드**: ...
-**메모(분석가 노트)**: ...
-**출력 요약**: [테이블] ...
-(차트 이미지 첨부됨 — 플레이스홀더: `{{CHART:region_sales}}`)
-```
+### 3.3 Fallback
 
-마지막에 "리포트 본문만 출력. ```markdown 펜스 금지" 같은 포맷 지시.
+- Outline 파싱 실패(JSON 깨짐) 시 빈 outline 으로 진행 → Writing Pass 는 구조 가이드만으로 작성. 이 경우 `processing_notes.outline_sections = 0` 이 되어 UI 에서 식별 가능.
 
 ---
 
@@ -189,18 +209,76 @@ client.aio.models.generate_content_stream(
 
 ---
 
-## 5. 후처리 (`_inject_chart_images`)
+## 5. 저장 흐름 — Draft → 저장하기 (사용자 명시적 승격)
+
+리포트 생성 직후에는 자동으로 영구 저장되지 않는다. 사용자가 **저장하기** 를 눌러야 `reports/` 에 등록된다.
+
+### 폴더 구조
+
+각 리포트는 **1 리포트 = 1 폴더** 로 통합 저장된다. `.md` 와 차트 PNG 가 같은 폴더에 평면으로 놓인다.
+
+```
+~/vibe-notebooks/reports/
+├── {report_id}/                   ← 영구 저장 리포트 (list 에 노출)
+│   ├── {report_id}.md
+│   ├── fig_region.png
+│   └── fig_time.png
+├── _drafts/
+│   └── {report_id}/               ← 미저장 draft (list 미노출)
+│       ├── {report_id}.md
+│       └── fig_xxx.png
+├── 20260420_...md                 ← (레거시) 평면 .md — 읽기 전용 폴백
+└── 20260420_..._images/            ← (레거시) 이미지 폴더
+    └── fig_xxx.png
+```
+
+### 흐름
+
+```
+[생성 스트림]
+   └─ _inject_chart_images(target_dir=_report_folder(id, draft=True))
+      → reports/_drafts/{id}/{id}.md + reports/_drafts/{id}/*.png
+      markdown 내 이미지 참조: ![alt](./fig_xxx.png)  ← 같은 폴더 상대 경로
+
+사용자 액션:
+  [저장하기] → POST /v1/reports/{id}/save
+    → promote_draft: _drafts/{id}/ 폴더를 reports/{id}/ 로 rename
+    → 노트북 metadata.vibe.reports[] 에 참조 append
+    → list_reports 에 등장 + 사이드바 갱신
+
+  [닫기 X] (미저장 상태) → DELETE /v1/reports/drafts/{id}
+    → _drafts/{id}/ 폴더 삭제 (복구 불가)
+```
+
+**자산 서빙**: `get_asset_path(id, filename)` 은 신규 구조(`reports/{id}/`) → draft(`_drafts/{id}/`) → 레거시(`reports/{id}_images/`) 순으로 탐색.
+
+**URL 리라이트 (프론트)**: markdown 에 있는 `](./fig_xxx.png)` 는 `ReportResult.tsx` 에서 `](${API_BASE}/reports/${id}/assets/fig_xxx.png)` 로 치환해 렌더. 원본 문자열은 다운로드·복사를 위해 보존 — `.md` 와 이미지 폴더를 함께 옮기면 어디서든 상대 경로로 이미지가 보임.
+
+**draft 식별**: 스트림 완료 시 `complete` 이벤트가 `is_draft: true` 를 포함, `get_report` 응답도 `is_draft` 필드를 반환. UI 는 임시 배지·저장 버튼 활성화에 사용.
+
+---
+
+## 6. 후처리 (`_inject_chart_images` + `_validate_report_numbers`)
 
 스트리밍이 끝난 뒤 버퍼에 누적된 Markdown 에 아래를 순서대로 적용:
 
 1. **차트 플레이스홀더 치환**
-   - `{{CHART:name}}` 발견 시 evidence 에서 매칭되는 이미지를 찾아 `![alt](./{report_id}_images/{safe_name}.png)` 로 교체
-   - 느슨 매칭: 대소문자·특수문자 무시한 정규화 이름(`_norm_cell_name`)로 폴백
-   - 매칭 실패 시 **조용히 삭제** (경고 텍스트 남기지 않음)
-2. **잔여 플레이스홀더 라인 제거**: 한 줄 전체가 플레이스홀더면 그 줄까지 삭제 — 빈 줄이 남지 않도록
-3. **취소선 제거**: `~~foo~~` → `foo` (안쪽 텍스트만 보존)
-4. **`~` 이스케이프**: 단일 `~` (앞에 `\` 가 없는 경우) 를 `\~` 로 치환 → 한국어 범위 표현(`2~4만원`)이 GFM 에서 취소선으로 오인되는 것을 완벽히 차단
-5. **연속 빈 줄 축소**: 3개 이상 연속 빈 줄을 2개로
+   - `{{CHART:name}}` → `![alt](./{report_id}_images/{safe_name}.png)`
+   - 느슨 매칭: `_norm_cell_name` 으로 대소문자·특수문자 무시 폴백
+   - **매칭 실패 시** → `> ⚠ 차트 미삽입: \`name\` (증거에 없음)` 경고 블록으로 치환 + `processing_notes.missing_charts` 에 기록 (투명성)
+2. **미참조 첨부 차트 부록화**
+   - evidence 에 첨부됐지만 본문에 참조되지 않은 차트 → 문서 끝에 `## 부록: 본문 미참조 차트` 섹션으로 자동 추가
+   - `processing_notes.unreferenced_charts` 에 목록 기록
+3. **취소선 제거**: `~~foo~~` → `foo`
+4. **`~` 이스케이프**: 단일 `~` → `\~`
+5. **연속 빈 줄 축소**: 3개 이상 → 2개
+
+### 5.1 수치 환각 검증
+
+- `_collect_evidence_numbers(evidence)` → evidence 전체 수치 집합 (with_units + bigs)
+- `_validate_report_numbers(markdown, ...)` — 본문 수치 중 evidence 에 **±0.5% 허용**으로도 매칭 안 되는 것들을 반환
+- 결과는 `processing_notes.suspicious_numbers` (최대 50개 샘플) + `suspicious_number_count` 전체 개수
+- **UI 는 배너로 "검증 불가 수치 N개" 표시** → 사용자가 원본 확인 유도
 
 ### 5.1 이미지 파일 저장 규칙
 
@@ -210,16 +288,21 @@ client.aio.models.generate_content_stream(
 
 ---
 
-## 6. 저장 (`save_report`)
+## 7. 저장 (`save_draft` / `promote_draft`)
 
-### 6.1 report_id 충돌 방지 (`_allocate_report_id`)
+- `save_draft` — 스트림 완료 시 `reports/_drafts/{id}.md` 에 기록 (노트북 append 없음)
+- `promote_draft` — 사용자 저장 액션 시 `_drafts/` → `reports/` 로 이동 + 노트북 `metadata.vibe.reports[]` append
+- `delete_draft` — 모달 닫기 시 호출 (복구 불가)
+
+### 7.1 report_id 충돌 방지 (`_allocate_report_id`)
 
 ```python
 base = f"{now.strftime('%Y%m%d_%H%M%S')}_{slug(title)}"
-# base.md 또는 base_images 폴더가 이미 있으면 _2, _3 ... 로 증가
+# reports/base.md, reports/base_images, _drafts/base.md, _drafts/base_images
+# 넷 중 하나라도 존재하면 _2, _3 ... 로 증가
 ```
 
-### 6.2 파일 포맷
+### 7.2 파일 포맷
 
 ```markdown
 ---
@@ -230,6 +313,8 @@ source_cell_ids: ["cell1", "cell2"]
 goal: "..."
 model: "claude-opus-4-7"
 created_at: "2026-04-20T21:26:13"
+processing_notes: "{\"missing_charts\":[],\"unreferenced_charts\":[\"fig_xyz\"],\"suspicious_numbers\":[...],\"suspicious_number_count\":2,\"outline_sections\":5}"
+outline: "{\"report_title\":\"...\",\"sections\":[...]}"
 ---
 
 # 우선입장 매장 특징 분석
@@ -238,7 +323,7 @@ created_at: "2026-04-20T21:26:13"
 - ...
 ```
 
-frontmatter 는 간단한 "key: value" 형식만 지원(멀티라인 제외). `list_reports` 에서 파싱해 목록 API 응답의 메타로 활용.
+frontmatter 는 "key: value" 라인 형식. `processing_notes` / `outline` 은 JSON 을 compact 문자열로 직렬화해 싣고, `_parse_frontmatter` 가 이 두 키는 `json.loads` 로 역직렬화. `get_report` / `list_reports` 응답에도 그대로 포함된다 — UI 가 이후 경고 배너를 렌더한다.
 
 ### 6.3 원본 노트북에 참조 추가
 
@@ -296,17 +381,23 @@ const displayContent = useMemo(() => {
 
 ## 8. 진행 단계 트래커 (`stage` 이벤트)
 
-백엔드가 보내는 stage 이벤트는 3단계 + 중간 collected 알림:
+백엔드가 보내는 stage 이벤트 (+ meta 이벤트):
 
 | stage | label 예시 |
 |---|---|
 | `collecting` | "셀 데이터 수집" |
 | `collected` | "셀 7개 · 차트 3개 수집 완료" |
+| `outlining` | "리포트 개요 설계" |
+| `outlined` | "섹션 5개 · 차트 커버리지 부분(1개 미할당)" |
 | `writing` | "리포트 작성 중" |
-| `finalizing` | "차트 이미지 삽입·저장" |
+| `finalizing` | "차트 삽입 · 수치 검증 · 저장" |
+
+추가 이벤트:
+- `meta` — `{processing_notes, outline}` 송신 (complete 직전). UI 경고 배너 데이터 소스.
+- `complete` — 저장 완료 메타.
 
 프론트 `ReportResult` 의 트래커 UI:
-- 3칸 체크리스트 (수집 · 작성 · 삽입·저장)
+- 4칸 체크리스트 (수집 · 개요 · 작성 · 삽입·저장)
 - 대기: 빈 원 (`Circle`)
 - 진행 중: 스피너 (`Loader2`, 코랄)
 - 완료: 녹색 체크 (`CheckCircle2`)
@@ -328,6 +419,8 @@ const displayContent = useMemo(() => {
 | `reportStartedAt` | 경과 시간 계산 기준 |
 | `reports` | 사이드바 목록 (`listReports`) |
 | `reportError` | 에러 메시지 (헤더 배너) |
+| `reportProcessingNotes` | meta 이벤트 / `getReport` 응답의 `processing_notes` — 상단 경고 배너 |
+| `reportOutline` | meta 이벤트 / `getReport` 응답의 outline JSON |
 
 **주요 액션**:
 - `generateReport({cellIds, goal})` — SSE 스트림 수신 + complete 시 `getReport(id)` 로 후처리본 재수신

@@ -94,7 +94,7 @@ export default function CellOutput({ cell }: Props) {
     const cols = output.columns
     const rows = output.rows
     return (
-      <div className="relative rounded-md border border-border bg-white overflow-hidden group/output flex flex-col h-full" style={{ minHeight: 180 }}>
+      <div className="relative overflow-hidden group/output flex flex-col h-full">
         <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
           <CopyButton
             label="표 복사"
@@ -150,7 +150,7 @@ export default function CellOutput({ cell }: Props) {
     const { template: _t, ...layoutRest } = (pj.layout ?? {}) as Record<string, unknown>
     const baseLayout = layoutRest as Record<string, any>
     return (
-      <div className="relative rounded-md border border-border bg-white overflow-hidden group/output flex flex-col h-full" style={{ minHeight: 380 }}>
+      <div className="relative overflow-hidden group/output flex flex-col h-full">
         <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
           <CopyButton
             label="이미지 복사"
@@ -173,7 +173,7 @@ export default function CellOutput({ cell }: Props) {
               yaxis: { ...(baseLayout.yaxis ?? {}), automargin: true },
             }}
             config={{ responsive: true, displayModeBar: false }}
-            style={{ width: '100%', height: '100%', minHeight: 380 }}
+            style={{ width: '100%', height: '100%' }}
             useResizeHandler
           />
         </div>
@@ -184,16 +184,16 @@ export default function CellOutput({ cell }: Props) {
   if (output.type === 'stdout') {
     if (!output.content?.trim()) {
       return (
-        <div className="px-4 py-3 text-[12px] text-text-disabled italic">출력 없음</div>
+        <div className="px-4 py-3 text-[12px] text-text-disabled italic bg-white h-full">출력 없음</div>
       )
     }
     const text = output.content
     return (
-      <div className="relative group/output">
+      <div className="relative group/output h-full overflow-auto bg-white">
         <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
           <CopyButton label="텍스트 복사" onCopy={() => navigator.clipboard.writeText(text)} />
         </div>
-        <pre className="px-4 py-3 text-[12px] text-text-primary font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
+        <pre className="px-4 py-3 text-[12px] text-text-primary font-mono whitespace-pre-wrap leading-relaxed">
           {text}
         </pre>
       </div>
@@ -203,11 +203,11 @@ export default function CellOutput({ cell }: Props) {
   if (output.type === 'error') {
     const msg = output.message ?? ''
     return (
-      <div className="relative group/output">
+      <div className="relative group/output h-full overflow-auto">
         <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
           <CopyButton label="오류 복사" onCopy={() => navigator.clipboard.writeText(msg)} />
         </div>
-        <pre className="rounded-md bg-danger-bg border border-danger/20 px-4 py-3 text-[12px] text-danger font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
+        <pre className="bg-danger-bg px-4 py-3 text-[12px] text-danger font-mono whitespace-pre-wrap leading-relaxed h-full">
           {msg}
         </pre>
       </div>
@@ -224,11 +224,11 @@ function MarkdownOutput({ content }: { content: string }) {
     )
   }
   return (
-    <div className="relative group/output rounded-md border border-border bg-white h-full overflow-y-auto">
+    <div className="relative group/output h-full overflow-y-auto overflow-x-hidden">
       <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
         <CopyButton label="마크다운 복사" onCopy={() => navigator.clipboard.writeText(content)} />
       </div>
-      <div className="px-5 py-4">
+      <div className="pl-7 pr-9 py-4 break-words min-w-0">
         <Markdown content={content} />
       </div>
     </div>

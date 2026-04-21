@@ -9,7 +9,7 @@ interface Props {
 
 export default function Markdown({ content, className }: Props) {
   return (
-    <div className={cn('vibe-md text-[13px] text-text-primary leading-relaxed', className)}>
+    <div className={cn('vibe-md text-[13px] text-text-primary leading-relaxed break-words [overflow-wrap:anywhere] max-w-full min-w-0', className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -26,13 +26,16 @@ export default function Markdown({ content, className }: Props) {
           code: ({ node: _n, className: cls, children, ...props }: any) => {
             const isBlock = /language-/.test(cls || '')
             return isBlock ? (
-              <code className={cn(cls, 'text-[12px] font-mono')} {...props}>{children}</code>
+              <code className={cn(cls, 'text-[12px] font-mono text-stone-100')} {...props}>{children}</code>
             ) : (
-              <code className="px-1 py-0.5 rounded bg-stone-100 text-[12px] font-mono" {...props}>{children}</code>
+              <code className="px-1 py-0.5 rounded bg-stone-100 text-[12px] font-mono break-all" {...props}>{children}</code>
             )
           },
           pre: ({ node: _n, ...props }) => (
-            <pre className="my-2 p-2 rounded-md bg-bg-code text-[12px] overflow-x-auto" {...props} />
+            <pre
+              className="my-2 p-2 rounded-md bg-bg-code text-stone-100 text-[12px] overflow-x-auto max-w-full whitespace-pre-wrap break-words"
+              {...props}
+            />
           ),
           blockquote: ({ node: _n, ...props }) => (
             <blockquote className="border-l-2 border-border pl-3 my-2 text-text-secondary" {...props} />

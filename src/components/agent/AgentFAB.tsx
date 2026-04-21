@@ -21,20 +21,16 @@ export default function AgentFAB() {
       if (doneTimerRef.current) clearTimeout(doneTimerRef.current)
       if (checkTimerRef.current) clearTimeout(checkTimerRef.current)
     } else if (prevLoadingRef.current) {
-      // 실행 완료 — 체크 아이콘 + (창 닫혔으면) 최종 답변 요약 말풍선
+      // 실행 완료 — 체크(초록) 상태 유지. 창 닫혀 있으면 최종 답변 말풍선도 유지.
+      // 사용자가 에이전트 모드를 한 번 토글해야 원복된다.
       setShowCheck(true)
-      if (checkTimerRef.current) clearTimeout(checkTimerRef.current)
-      checkTimerRef.current = setTimeout(() => setShowCheck(false), 2500)
 
       if (!agentModeRef.current) {
         const lastAssistant = [...agentChatHistory].reverse().find(
           (m) => m.role === 'assistant' && m.kind !== 'step' && m.content
         )
         if (lastAssistant?.content) {
-          const text = lastAssistant.content.trim()
-          setDoneBubble(text.length > 80 ? text.slice(0, 80) + '…' : text)
-          if (doneTimerRef.current) clearTimeout(doneTimerRef.current)
-          doneTimerRef.current = setTimeout(() => setDoneBubble(null), 4000)
+          setDoneBubble(lastAssistant.content.trim())
         }
       }
     }
@@ -42,27 +38,44 @@ export default function AgentFAB() {
   }, [agentLoading, agentChatHistory])
 
   useEffect(() => {
-    if (agentMode) {
-      setDoneBubble(null)
-      if (doneTimerRef.current) clearTimeout(doneTimerRef.current)
-    }
+    // 에이전트 모드를 토글(열기/닫기 어느 쪽이든)하면 완료 상태 해제 → 색/말풍선 원복
+    setShowCheck(false)
+    setDoneBubble(null)
+    if (doneTimerRef.current) clearTimeout(doneTimerRef.current)
+    if (checkTimerRef.current) clearTimeout(checkTimerRef.current)
   }, [agentMode])
 
   const isGenerating = agentLoading && !agentMode
-  const liveBubble = isGenerating ? (agentStatus ?? '생각 중') : null
-  const bubbleText = doneBubble ?? liveBubble
+  const liveStatus = isGenerating ? (agentStatus ?? '생각 중') : null
+  const liveAssistantMsg = isGenerating
+    ? [...agentChatHistory].reverse().find(
+        (m) => m.role === 'assistant' && m.kind !== 'step' && m.content
+      )
+    : null
+  const liveAssistantText = liveAssistantMsg?.content?.trim() || null
 
   return (
     <div className="fixed bottom-6 right-6 z-40">
-      {bubbleText && !agentMode && (
+      {(doneBubble || liveStatus || liveAssistantText) && !agentMode && (
         <div
-          className="absolute bottom-16 right-0 bg-white border border-border rounded-2xl shadow-lg px-3.5 py-2.5 w-max max-w-[240px] animate-fade-in"
-          style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)' }}
+          className="absolute bottom-16 right-0 bg-white border border-border rounded-2xl shadow-lg px-4 py-3 animate-fade-in"
+          style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)', width: 340, maxHeight: '60vh', overflowY: 'auto' }}
         >
-          <div className="flex items-center gap-1.5">
-            {isGenerating && !doneBubble && <Loader2 size={12} className="animate-spin shrink-0" style={{ color: '#D95C3F' }} />}
-            <p className="text-[12px] text-text-primary leading-relaxed whitespace-pre-wrap break-keep">{bubbleText}</p>
-          </div>
+          {doneBubble ? (
+            <p className="text-[13.5px] text-text-primary leading-relaxed whitespace-pre-wrap break-keep">{doneBubble}</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {liveStatus && (
+                <div className="flex items-center gap-1.5">
+                  <Loader2 size={13} className="animate-spin shrink-0" style={{ color: '#D95C3F' }} />
+                  <p className="text-[13px] font-semibold leading-relaxed whitespace-pre-wrap break-keep" style={{ color: '#c94a2e' }}>{liveStatus}</p>
+                </div>
+              )}
+              {liveAssistantText && (
+                <p className="text-[13.5px] text-text-primary leading-relaxed whitespace-pre-wrap break-keep">{liveAssistantText}</p>
+              )}
+            </div>
+          )}
           <div
             className="absolute -bottom-[7px] right-5 w-3 h-3 bg-white border-r border-b border-border"
             style={{ transform: 'rotate(45deg)' }}

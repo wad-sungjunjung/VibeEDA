@@ -220,11 +220,9 @@ export default function CellContainer({ cell }: Props) {
             backgroundSize: '300% 300%',
             animation: 'vibe-border-flow 2s linear infinite',
             boxShadow: '0 0 8px rgba(245,158,11,0.12)',
-            minHeight: fixedHeight,
           } : {
-            backgroundColor: cell.type === 'markdown' ? '#ffffff' : '#faf8f2',
+            backgroundColor: (cell.type === 'markdown' || cell.output?.type === 'table') ? '#ffffff' : '#faf8f2',
             border: '1px solid #ede9dd',
-            minHeight: fixedHeight,
           }}
         >
           <CellOutput cell={cell} />

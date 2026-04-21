@@ -51,7 +51,7 @@ async def stream_vibe_chat_claude(
     try:
         async with client.messages.stream(
             model=model,
-            max_tokens=2048,
+            max_tokens=8000,
             system=system,
             messages=[{"role": "user", "content": prompt}],
         ) as stream:

@@ -9,6 +9,7 @@ from google import genai
 from google.genai import types
 
 from .claude_agent import _execute_tool, _build_system_prompt, NotebookState
+from . import agent_skills
 
 GENERATE_TIMEOUT_SEC = 300  # Gemini 단일 호출 타임아웃 (5분)
 REPEAT_CALL_LIMIT = 3      # 동일 tool+input 반복 허용 횟수
@@ -98,6 +99,21 @@ _FUNC_DECLARATIONS = [
         },
     },
     {
+        "name": "get_category_values",
+        "description": (
+            "Fetch distinct values of a category-like column (up to 100). "
+            "Use for non-_status/_type columns; _status/_type already injected in system prompt."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "mart_key": {"type": "STRING"},
+                "column": {"type": "STRING"},
+            },
+            "required": ["mart_key", "column"],
+        },
+    },
+    {
         "name": "write_cell_memo",
         "description": "Record insight about a cell's output into its memo (2~5줄 한국어).",
         "parameters": {
@@ -123,7 +139,9 @@ _FUNC_DECLARATIONS = [
     },
 ]
 
-_GEMINI_TOOL = types.Tool(function_declarations=_FUNC_DECLARATIONS)  # type: ignore[arg-type]
+_GEMINI_TOOL = types.Tool(
+    function_declarations=[*_FUNC_DECLARATIONS, *agent_skills.SKILL_TOOLS_GEMINI]  # type: ignore[arg-type]
+)
 
 
 def _to_gemini_history(conversation_history: list[dict]) -> list:
@@ -147,6 +165,7 @@ async def run_agent_stream_gemini(
         return
 
     client = genai.Client(api_key=api_key)
+    agent_skills.init_skill_ctx(notebook_state, user_message)
     system_prompt = _build_system_prompt(notebook_state)
 
     contents = _to_gemini_history(conversation_history)
@@ -190,6 +209,7 @@ async def run_agent_stream_gemini(
                                 system_instruction=system_prompt,
                                 tools=[_GEMINI_TOOL],
                                 temperature=0.2,
+                                max_output_tokens=32000,
                             ),
                         ),
                         timeout=GENERATE_TIMEOUT_SEC,
@@ -233,6 +253,17 @@ async def run_agent_stream_gemini(
                 yield {"type": "message_delta", "content": p.text}
 
             if not func_call_parts:
+                end_reminder = agent_skills.get_end_guard_reminder(notebook_state)
+                if end_reminder:
+                    yield {"type": "message_delta", "content": "\n\n_[분석가 체크리스트 재점검]_\n\n"}
+                    contents.append(candidate.content)
+                    contents.append(types.Content(
+                        role="user",
+                        parts=[types.Part.from_text(text=(
+                            f"[시스템 리마인더]\n{end_reminder}\n\n이 리마인더에 따라 추가 작업 후 마무리하세요."
+                        ))],
+                    ))
+                    continue
                 break
 
             # 무한 루프 방지: 동일 tool+input 호출 반복 감지
@@ -286,11 +317,12 @@ async def run_agent_stream_gemini(
                 )
 
             tool_response_parts = []
+            skill_reminders: list[str] = []
             for idx, p in enumerate(func_call_parts):
                 fc = p.function_call
                 args = dict(fc.args) if fc.args else {}
                 yield {"type": "tool_use", "tool": fc.name, "input": args}
-                if fc.name == "ask_user":
+                if fc.name in agent_skills.ASK_USER_LIKE_TOOLS:
                     ask_user_called = True
 
                 result, sse_events = await _execute_tool(fc.name, args, notebook_state)
@@ -302,10 +334,15 @@ async def run_agent_stream_gemini(
                     elif event["type"] == "cell_code_updated":
                         updated_cell_ids.append(event["cell_id"])
 
+                skill_reminders.extend(
+                    agent_skills.collect_post_hook_reminders(fc.name, args, result, notebook_state)
+                )
+
                 payload = dict(result) if isinstance(result, dict) else {"result": result}
                 image_b64 = payload.pop("image_png_base64", None)
-                if reminder_msgs and idx == len(func_call_parts) - 1:
-                    payload["_system_reminder"] = " / ".join(reminder_msgs)
+                combined_reminders = list(reminder_msgs) + skill_reminders if idx == len(func_call_parts) - 1 else []
+                if combined_reminders:
+                    payload["_system_reminder"] = " / ".join(combined_reminders)
 
                 tool_response_parts.append(
                     types.Part.from_function_response(name=fc.name, response=payload)

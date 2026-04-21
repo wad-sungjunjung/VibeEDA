@@ -97,11 +97,47 @@ def _unregister_file(nb_id: str) -> None:
 
 # ── 파일 I/O ──────────────────────────────────────────────────────────────────
 
+_EXCLUDED_DIR_NAMES = {"reports", "__pycache__"}
+
+
+def _iter_notebook_paths() -> list[Path]:
+    """NOTEBOOKS_DIR 아래 모든 .ipynb 파일 (reports/, hidden, __pycache__ 제외)."""
+    results: list[Path] = []
+    if not NOTEBOOKS_DIR.exists():
+        return results
+    for p in NOTEBOOKS_DIR.rglob("*.ipynb"):
+        try:
+            rel_parts = p.relative_to(NOTEBOOKS_DIR).parts
+        except ValueError:
+            continue
+        # 상위 디렉터리 중 하나라도 hidden/제외 디렉터리면 skip
+        parent_parts = rel_parts[:-1]
+        if any(part.startswith(".") or part in _EXCLUDED_DIR_NAMES for part in parent_parts):
+            continue
+        results.append(p)
+    return results
+
+
 def _nb_path(nb_id: str) -> Path:
     cfg = _read_config()
-    fname = cfg.get("id_to_file", {}).get(nb_id)
-    if fname:
-        return NOTEBOOKS_DIR / f"{fname}.ipynb"
+    rel = cfg.get("id_to_file", {}).get(nb_id)
+    if rel:
+        p = NOTEBOOKS_DIR / f"{rel}.ipynb"
+        if p.exists():
+            return p
+    # Fallback: 재귀 스캔으로 metadata.vibe.id 가 일치하는 파일 찾기
+    for p in _iter_notebook_paths():
+        try:
+            nb = json.loads(p.read_text(encoding="utf-8"))
+            if nb.get("metadata", {}).get("vibe", {}).get("id") == nb_id:
+                # 매핑 갱신 (상대 경로, 확장자 제외)
+                new_rel = str(p.relative_to(NOTEBOOKS_DIR).with_suffix(""))
+                cfg = _read_config()
+                cfg.setdefault("id_to_file", {})[nb_id] = new_rel
+                _write_config(cfg)
+                return p
+        except Exception:
+            continue
     # 하위 호환: 기존 UUID 파일명
     return NOTEBOOKS_DIR / f"{nb_id}.ipynb"
 
@@ -227,16 +263,16 @@ def _migrate_legacy_notebook(p: Path) -> str:
 
 def list_notebooks() -> list[dict]:
     _ensure_dir()
+    paths = _iter_notebook_paths()
     # 분석이 하나도 없으면 온보딩 노트북을 한 번 시딩한다.
-    if not any(NOTEBOOKS_DIR.glob("*.ipynb")):
+    if not paths:
         try:
             create_onboarding_notebook()
         except Exception:
             pass
-    cfg = _read_config()
-    registered_files = set(cfg.get("id_to_file", {}).values())
+        paths = _iter_notebook_paths()
     result = []
-    for p in sorted(NOTEBOOKS_DIR.glob("*.ipynb"), key=lambda x: x.stat().st_mtime, reverse=True):
+    for p in sorted(paths, key=lambda x: x.stat().st_mtime, reverse=True):
         try:
             nb = json.loads(p.read_text(encoding="utf-8"))
             vibe = nb.get("metadata", {}).get("vibe", {})
@@ -244,12 +280,18 @@ def list_notebooks() -> list[dict]:
             # Migrate legacy notebooks that have no id in metadata
             if not nb_id:
                 nb_id = _migrate_legacy_notebook(p)
-                cfg = _read_config()
-                registered_files = set(cfg.get("id_to_file", {}).values())
-                # Re-read after migration
                 p = _nb_path(nb_id)
                 nb = json.loads(p.read_text(encoding="utf-8"))
                 vibe = nb.get("metadata", {}).get("vibe", {})
+            # id_to_file 매핑을 실제 파일 위치와 동기화 (하위 폴더로 이동된 경우도 반영)
+            try:
+                rel = str(p.relative_to(NOTEBOOKS_DIR).with_suffix(""))
+                cfg = _read_config()
+                if cfg.setdefault("id_to_file", {}).get(nb_id) != rel:
+                    cfg["id_to_file"][nb_id] = rel
+                    _write_config(cfg)
+            except Exception:
+                pass
             stat = p.stat()
             result.append({
                 "id": nb_id,

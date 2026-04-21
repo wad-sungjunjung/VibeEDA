@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { Telescope, X, User, ArrowUp, Plus, FileCode, Search, SquarePen, ChevronDown, ChevronRight, Loader2, Wrench, FileCode2, PlayCircle, StickyNote, AlertTriangle, StopCircle } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
-import { useModelStore, AGENT_MODELS } from '@/store/modelStore'
+import { useModelStore, AGENT_MODELS, getModelContextWindow } from '@/store/modelStore'
 import { useConnectionStore } from '@/store/connectionStore'
 import { cn } from '@/lib/utils'
 import Markdown from '@/components/common/Markdown'
@@ -52,6 +52,7 @@ export default function AgentChatPanel() {
   const [pickerQuery, setPickerQuery] = useState('')
   const pickerInputRef = useRef<HTMLInputElement>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const autoCollapsedRef = useRef<Set<string>>(new Set())
   const toggleGroup = (id: string) => setCollapsedGroups((prev) => {
     const next = new Set(prev)
     next.has(id) ? next.delete(id) : next.add(id)
@@ -82,8 +83,51 @@ export default function AgentChatPanel() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [agentChatHistory])
 
+  // 작업 그룹이 "완료"(뒤에 다른 아이템이 붙음)되면 한 번만 자동으로 접는다.
+  useEffect(() => {
+    const toCollapse: string[] = []
+    for (let i = 0; i < chatItems.length - 1; i++) {
+      const it = chatItems[i]
+      if (it.kind === 'stepGroup' && !autoCollapsedRef.current.has(it.groupId)) {
+        toCollapse.push(it.groupId)
+      }
+    }
+    if (toCollapse.length > 0) {
+      toCollapse.forEach((id) => autoCollapsedRef.current.add(id))
+      setCollapsedGroups((prev) => {
+        const next = new Set(prev)
+        toCollapse.forEach((id) => next.add(id))
+        return next
+      })
+    }
+  }, [agentChatHistory])
+
   const refCellObjects = cells.filter((c) => agentRefCells.includes(c.id))
   const availableCells = cells.filter((c) => !agentRefCells.includes(c.id))
+
+  // 현재 세션이 "물고 있는" 대략적인 토큰량 추정 — 대화 히스토리와
+  // 다음 턴에 함께 전송되는 셀 스냅샷(코드 + 메모)을 문자열 길이로 환산.
+  // 한글/영문 혼재를 고려해 보수적으로 ~3 chars/token 비율을 사용.
+  const approxTokens = (() => {
+    const convo = agentChatHistory
+      .filter((m) => m.content)
+      .map((m) => m.content)
+      .join('\n')
+    const cellCtx = cells
+      .map((c) => `${c.name}\n${c.code}\n${c.memo ?? ''}`)
+      .join('\n')
+    const chars = convo.length + cellCtx.length
+    return Math.max(0, Math.round(chars / 3))
+  })()
+  const tokenLabel = approxTokens >= 1000
+    ? `~${(approxTokens / 1000).toFixed(1)}k`
+    : `~${approxTokens}`
+  const ctxWindow = getModelContextWindow(agentModel)
+  const ctxWindowLabel = ctxWindow >= 1_000_000
+    ? `${(ctxWindow / 1_000_000).toFixed(ctxWindow % 1_000_000 === 0 ? 0 : 1)}M`
+    : `${Math.round(ctxWindow / 1000)}k`
+  const ctxPct = Math.min(100, (approxTokens / ctxWindow) * 100)
+  const ctxColor = ctxPct >= 90 ? '#c94a2e' : ctxPct >= 70 ? '#d97706' : '#2c5282'
 
   const TYPE_COLORS: Record<string, string> = {
     sql: 'bg-[#e8e4d8] text-[#5c4a1e]',
@@ -105,15 +149,22 @@ export default function AgentChatPanel() {
           <div className="text-[12px] font-semibold text-text-primary">에이전트 모드</div>
           <div className="text-[10px] text-text-tertiary">노트북 전체와 대화하며 분석을 이어가세요</div>
         </div>
-        <div className="relative shrink-0">
-          <select
-            value={agentModel}
-            onChange={(e) => setAgentModel(e.target.value)}
-            className="appearance-none text-[10px] font-medium text-text-secondary bg-white border border-border rounded-md pl-2 pr-6 py-1 cursor-pointer hover:border-primary hover:text-primary outline-none transition-colors"
-          >
-            {AGENT_MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-          <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-tertiary" />
+        <div
+          className="shrink-0 flex flex-col items-end gap-1 px-2 py-1 rounded-md border"
+          style={{ backgroundColor: '#ffffff', borderColor: '#ede9dd' }}
+          title={`이번 턴에 전송되는 토큰 추정치(대화 이력 + 셀 코드/메모 기반) / 선택 모델의 최대 컨텍스트 윈도우\n${approxTokens.toLocaleString()} / ${ctxWindow.toLocaleString()} tokens (${ctxPct.toFixed(1)}%)`}
+        >
+          <div className="flex items-center gap-1.5 text-[10px] font-mono leading-none" style={{ color: ctxColor }}>
+            <span className="font-semibold">{tokenLabel}</span>
+            <span className="text-text-disabled">/ {ctxWindowLabel}</span>
+            <span className="text-text-tertiary">({ctxPct < 1 ? ctxPct.toFixed(2) : ctxPct.toFixed(1)}%)</span>
+          </div>
+          <div className="w-28 h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#f0ece0' }}>
+            <div
+              className="h-full rounded-full transition-all"
+              style={{ width: `${ctxPct}%`, backgroundColor: ctxColor }}
+            />
+          </div>
         </div>
         <button
           title={agentChatHistory.length > 0 ? '새 대화 시작 (현재 대화 아카이브)' : '새 대화 시작 (대화 없음)'}
@@ -214,7 +265,7 @@ export default function AgentChatPanel() {
                   className="px-3 py-2 rounded-xl text-[13px] text-text-primary text-left leading-relaxed break-words"
                   style={{ backgroundColor: msg.role === 'user' ? '#fdede8' : '#faf8f2', border: '1px solid', borderColor: msg.role === 'user' ? '#f5d5c8' : '#ede9dd' }}
                 >
-                  {msg.role === 'assistant' && !msg.content && agentLoading && isLast ? (
+                  {msg.role === 'assistant' && agentLoading && isLast ? (
                     <div className="flex flex-col gap-1.5">
                       <span className="flex items-center gap-2 whitespace-nowrap" style={{ color: '#c94a2e' }}>
                         <Loader2 size={12} className="animate-spin" />
@@ -231,7 +282,8 @@ export default function AgentChatPanel() {
                           <StopCircle size={11} />중지
                         </button>
                       </span>
-                      {agentElapsed >= 300 && !agentChatHistory.slice(0, idx).some((m) => m.role === 'assistant' && !!m.content) && (
+                      {msg.content && <Markdown content={msg.content} />}
+                      {agentElapsed >= 300 && !msg.content && !agentChatHistory.slice(0, idx).some((m) => m.role === 'assistant' && !!m.content) && (
                         <div
                           className="flex items-start gap-1.5 text-[11px] leading-relaxed px-2 py-1.5 rounded-md"
                           style={{ backgroundColor: '#fff7ed', border: '1px dashed #f5c5b5', color: '#7a3a22' }}
@@ -356,39 +408,50 @@ export default function AgentChatPanel() {
         </div>
       </div>
 
-      {/* Input */}
+      {/* Input — 바이브 챗 박스와 동일 포맷: 모델 select 좌하단, 전송 우하단 */}
       <div className="px-4 py-3">
-        <div className="relative">
+        <div
+          className="relative rounded-2xl"
+          style={{ backgroundColor: '#ffffff', border: '1px solid #ede9dd', boxShadow: '0 1px 2px rgba(45,42,38,0.03)' }}
+        >
           <textarea
-            className="w-full text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none resize-none leading-relaxed rounded-xl overflow-hidden"
-            style={{ minHeight: '44px', height: '44px', padding: '12px 48px 12px 14px', backgroundColor: '#faf8f2', border: '1px solid #ede9dd' }}
+            className="w-full bg-transparent text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none resize-none leading-relaxed overflow-hidden rounded-2xl"
+            style={{ minHeight: '56px', height: '56px', padding: '10px 48px 28px 16px' }}
             placeholder="에이전트에게 노트북 전체에 대해 질문하거나 분석을 요청하세요..."
             value={agentChatInput}
             onChange={(e) => {
               setAgentChatInput(e.target.value)
-              e.target.style.height = '44px'
+              e.target.style.height = '56px'
               e.target.style.height = e.target.scrollHeight + 'px'
             }}
-            onFocus={(e) => { e.target.style.borderColor = '#D95C3F' }}
-            onBlur={(e) => { e.target.style.borderColor = '#ede9dd' }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
                 submitAgentMessage(agentChatInput)
-                e.currentTarget.style.height = '44px'
+                e.currentTarget.style.height = '56px'
               }
             }}
           />
+          <div className="absolute left-3 bottom-2.5 flex items-center gap-1" style={{ zIndex: 10 }}>
+            <div className="relative flex items-center">
+              <select
+                value={agentModel}
+                onChange={(e) => setAgentModel(e.target.value)}
+                className="appearance-none text-[10px] font-medium text-text-disabled bg-transparent border-none pl-0 pr-4 py-0 cursor-pointer hover:text-text-secondary outline-none transition-colors"
+              >
+                {AGENT_MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+              <ChevronDown size={9} className="absolute right-0 pointer-events-none text-text-disabled" />
+            </div>
+          </div>
           <button
             title="전송"
             disabled={!agentChatInput.trim()}
             onClick={() => submitAgentMessage(agentChatInput)}
             className={cn(
-              'absolute right-2 bottom-2 w-8 h-8 rounded-full flex items-center justify-center transition-all',
-              agentChatInput.trim()
-                ? 'bg-primary text-white shadow-[0_2px_6px_rgba(217,92,63,0.3)]'
-                : 'bg-bg-sidebar text-text-disabled cursor-not-allowed'
+              'absolute right-3 bottom-2 w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:cursor-not-allowed',
             )}
+            style={{ backgroundColor: agentChatInput.trim() ? '#D95C3F' : '#ede9dd', color: '#ffffff', zIndex: 10 }}
           >
             <ArrowUp size={16} strokeWidth={2.5} />
           </button>

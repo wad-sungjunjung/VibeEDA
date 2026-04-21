@@ -61,6 +61,24 @@ def get_report(report_id: str):
     return r
 
 
+@router.post("/reports/{report_id}/save")
+def save_report(report_id: str):
+    """Draft 리포트를 영구 저장으로 승격."""
+    result = report_service.promote_draft(report_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Draft report not found")
+    return result
+
+
+@router.delete("/reports/drafts/{report_id}")
+def discard_draft(report_id: str):
+    """미저장 draft 리포트 삭제."""
+    ok = report_service.delete_draft(report_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    return {"ok": True}
+
+
 @router.delete("/reports/{report_id}")
 def delete_report(report_id: str):
     ok = report_service.delete_report(report_id)

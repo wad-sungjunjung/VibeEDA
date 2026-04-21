@@ -12,6 +12,7 @@ from app.api.marts import router as marts_router
 from app.api.execute import router as execute_router
 from app.api.recommend import router as recommend_router
 from app.api.report import router as report_router
+from app.api.files import router as files_router
 import app.services.notebook_store as notebook_store
 from app.services.notebook_store import _ensure_dir
 
@@ -29,6 +30,22 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     _ensure_dir()
+    # 카테고리 캐시 주기적 갱신 스케줄러 — 30분 간격으로 Snowflake last_altered 체크 후
+    # 변경된 마트만 재쿼리. Snowflake 미연결이면 즉시 패스.
+    import asyncio as _asyncio
+    from app.services import category_cache as _cc
+
+    async def _periodic_category_refresh():
+        while True:
+            await _asyncio.sleep(30 * 60)   # 30분
+            try:
+                loop = _asyncio.get_event_loop()
+                await loop.run_in_executor(None, _cc.prewarm_all_marts)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("periodic category refresh failed: %s", e)
+
+    _asyncio.create_task(_periodic_category_refresh())
 
 
 @app.get("/healthz")
@@ -73,3 +90,4 @@ app.include_router(marts_router, prefix="/v1")
 app.include_router(execute_router, prefix="/v1")
 app.include_router(recommend_router, prefix="/v1")
 app.include_router(report_router, prefix="/v1")
+app.include_router(files_router, prefix="/v1")

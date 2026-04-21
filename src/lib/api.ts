@@ -334,16 +334,49 @@ export interface ReportSummary {
   byte_size: number
 }
 
+export interface SuspiciousNumber {
+  value: number
+  unit: string
+  raw: string
+  context: string
+}
+
+export interface ReportProcessingNotes {
+  missing_charts: string[]
+  unreferenced_charts: string[]
+  suspicious_numbers: SuspiciousNumber[]
+  suspicious_number_count: number
+  outline_sections: number
+}
+
+export interface ReportOutline {
+  report_title?: string
+  tldr?: string[]
+  sections?: Array<{
+    heading: string
+    thesis?: string
+    cite_cells?: string[]
+    cite_charts?: string[]
+    key_numbers?: string[]
+  }>
+  insights?: string[]
+  limitations?: string[]
+}
+
 export interface ReportDetail extends ReportSummary {
   source_cell_ids: string[]
   markdown: string
+  processing_notes?: ReportProcessingNotes | null
+  outline?: ReportOutline | null
+  is_draft?: boolean
 }
 
-export type ReportStage = 'collecting' | 'collected' | 'writing' | 'finalizing'
+export type ReportStage = 'collecting' | 'collected' | 'outlining' | 'outlined' | 'writing' | 'finalizing'
 
 export type ReportEvent =
   | { type: 'delta'; content: string }
   | { type: 'stage'; stage: ReportStage; label: string }
+  | { type: 'meta'; processing_notes: ReportProcessingNotes; outline: ReportOutline | null }
   | {
       type: 'complete'
       id: string
@@ -353,6 +386,7 @@ export type ReportEvent =
       byte_size: number
       model: string
       source_notebook_id: string
+      is_draft?: boolean
     }
   | { type: 'error'; message: string }
 
@@ -381,3 +415,49 @@ export const listReports = () => apiFetch<ReportSummary[]>('/reports')
 export const getReport = (id: string) => apiFetch<ReportDetail>(`/reports/${id}`)
 export const deleteReport = (id: string) =>
   apiFetch<{ ok: boolean }>(`/reports/${id}`, { method: 'DELETE' })
+export const saveReportDraft = (id: string) =>
+  apiFetch<ReportSummary & { is_draft: boolean }>(`/reports/${id}/save`, { method: 'POST' })
+export const discardReportDraft = (id: string) =>
+  apiFetch<{ ok: boolean }>(`/reports/drafts/${id}`, { method: 'DELETE' })
+
+// ─── Root files tree ─────────────────────────────────────────────────────────
+
+export interface FileNode {
+  name: string
+  path: string
+  type: 'folder' | 'file'
+  kind: 'folder' | 'file' | 'notebook' | 'report'
+  notebook_id?: string
+  report_id?: string
+  children?: FileNode[]
+  size?: number
+  modified?: number
+  ext?: string
+  truncated?: boolean
+}
+
+export interface FilesTreeResponse {
+  root: string
+  tree: FileNode[]
+  truncated?: boolean
+}
+
+export const getFilesTree = () => apiFetch<FilesTreeResponse>('/files/tree')
+
+export const mkdirFolder = (parent: string, name: string) =>
+  apiFetch<{ ok: boolean; path: string }>('/files/mkdir', {
+    method: 'POST',
+    body: JSON.stringify({ parent, name }),
+  })
+
+export const rmdirFolder = (path: string, recursive = false) =>
+  apiFetch<{ ok: boolean }>('/files/rmdir', {
+    method: 'POST',
+    body: JSON.stringify({ path, recursive }),
+  })
+
+export const moveEntry = (src: string, dstDir: string) =>
+  apiFetch<{ ok: boolean; path: string }>('/files/move', {
+    method: 'POST',
+    body: JSON.stringify({ src, dst_dir: dstDir }),
+  })

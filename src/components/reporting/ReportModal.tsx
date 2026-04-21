@@ -5,17 +5,17 @@ import { useModelStore, REPORT_MODELS } from '@/store/modelStore'
 import { cn } from '@/lib/utils'
 
 export default function ReportModal() {
-  const { showReportModal, cells, setShowReportModal, generateReport } = useAppStore()
+  const { showReportModal, cells, analysisDescription, setShowReportModal, generateReport } = useAppStore()
   const { reportModel, setReportModel } = useModelStore()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [goal, setGoal] = useState('')
 
   useEffect(() => {
     if (showReportModal) {
-      setSelectedIds(cells.filter((c) => c.executed).map((c) => c.id))
-      setGoal('')
+      setSelectedIds(cells.filter((c) => c.type === 'markdown' || c.executed).map((c) => c.id))
+      setGoal(analysisDescription ?? '')
     }
-  }, [showReportModal, cells])
+  }, [showReportModal, cells, analysisDescription])
 
   if (!showReportModal) return null
 
@@ -23,6 +23,16 @@ export default function ReportModal() {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
+  }
+
+  // 리포트에 포함 가능한 셀: 실행된 셀 + Markdown 셀 (실행 여부 무관)
+  const isSelectable = (c: { type: string; executed: boolean }) => c.type === 'markdown' || c.executed
+  const executableCells = cells.filter(isSelectable)
+  const allSelected = executableCells.length > 0 && executableCells.every((c) => selectedIds.includes(c.id))
+  const someSelected = executableCells.some((c) => selectedIds.includes(c.id))
+  const toggleAll = () => {
+    if (allSelected) setSelectedIds([])
+    else setSelectedIds(executableCells.map((c) => c.id))
   }
 
   const TYPE_STYLES: Record<string, string> = {
@@ -80,34 +90,59 @@ export default function ReportModal() {
 
         {/* Cell list */}
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
-          <div className="text-[11px] font-semibold text-text-secondary mb-1">
-            포함할 셀 <span className="text-text-disabled font-normal">({selectedIds.length}개 선택)</span>
-          </div>
-          {cells.map((cell) => (
-            <label
-              key={cell.id}
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-[11px] font-semibold text-text-secondary">
+              포함할 셀 <span className="text-text-disabled font-normal">({selectedIds.length}개 선택)</span>
+            </div>
+            <button
+              type="button"
+              onClick={toggleAll}
+              disabled={executableCells.length === 0}
               className={cn(
-                'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                !cell.executed && 'opacity-50 cursor-not-allowed',
-                selectedIds.includes(cell.id) ? 'border-primary-border bg-primary-light' : 'border-border hover:border-border-hover'
+                'flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-md border transition-colors',
+                executableCells.length === 0
+                  ? 'text-text-disabled border-border-subtle cursor-not-allowed'
+                  : 'text-text-secondary border-border hover:border-primary hover:text-primary'
               )}
             >
               <input
                 type="checkbox"
-                disabled={!cell.executed}
-                checked={selectedIds.includes(cell.id)}
-                onChange={() => toggle(cell.id)}
-                className="accent-primary"
+                readOnly
+                checked={allSelected}
+                ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected }}
+                className="accent-primary pointer-events-none"
               />
-              <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0', TYPE_STYLES[cell.type])}>
-                {cell.type === 'markdown' ? 'MD' : cell.type.toUpperCase()}
-              </span>
-              <span className="text-[13px] text-text-primary flex-1 truncate">{cell.name}</span>
-              {!cell.executed && (
-                <span className="text-[10px] text-warning shrink-0">⚠ 미실행</span>
-              )}
-            </label>
-          ))}
+              {allSelected ? '모두 해제' : '모두 선택'}
+            </button>
+          </div>
+          {cells.map((cell) => {
+            const selectable = isSelectable(cell)
+            return (
+              <label
+                key={cell.id}
+                className={cn(
+                  'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                  !selectable && 'opacity-50 cursor-not-allowed',
+                  selectedIds.includes(cell.id) ? 'border-primary-border bg-primary-light' : 'border-border hover:border-border-hover'
+                )}
+              >
+                <input
+                  type="checkbox"
+                  disabled={!selectable}
+                  checked={selectedIds.includes(cell.id)}
+                  onChange={() => toggle(cell.id)}
+                  className="accent-primary"
+                />
+                <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0', TYPE_STYLES[cell.type])}>
+                  {cell.type === 'markdown' ? 'MD' : cell.type.toUpperCase()}
+                </span>
+                <span className="text-[13px] text-text-primary flex-1 truncate">{cell.name}</span>
+                {!cell.executed && cell.type !== 'markdown' && (
+                  <span className="text-[10px] text-warning shrink-0">⚠ 미실행</span>
+                )}
+              </label>
+            )
+          })}
         </div>
 
         {/* Actions */}

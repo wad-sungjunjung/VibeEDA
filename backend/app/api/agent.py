@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from ..config import get_llm_config, settings
 from ..services import notebook_store
+from ..services import category_cache
 from ..services.claude_agent import NotebookState, CellState, run_agent_stream as run_agent_claude
 from ..services.gemini_agent_service import run_agent_stream_gemini as run_agent_gemini
 
@@ -76,10 +77,14 @@ async def agent_stream_endpoint(
     use_gemini = config.agent_model.startswith("gemini-")
     agent_api_key = (x_gemini_key or settings.gemini_api_key) if use_gemini else config.anthropic_api_key
 
+    # 선택된 마트의 _status/_type 컬럼 distinct 값을 캐시에서 주입
+    enriched_marts = category_cache.enrich_mart_metadata(
+        [m.model_dump() for m in req.mart_metadata]
+    )
     notebook_state = NotebookState(
         cells=[CellState(id=c.id, name=c.name, type=c.type, code=c.code, executed=c.executed) for c in req.cells],
         selected_marts=req.selected_marts,
-        mart_metadata=[m.model_dump() for m in req.mart_metadata],
+        mart_metadata=enriched_marts,
         analysis_theme=req.analysis_theme,
         analysis_description=req.analysis_description,
         notebook_id=req.notebook_id or "",

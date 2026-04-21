@@ -15,7 +15,17 @@ import {
   User,
   Plus,
   FileText,
+  File,
+  FileSpreadsheet,
+  FileJson,
+  FileCode,
+  FileImage,
+  FileArchive,
+  HardDrive,
+  RefreshCw,
+  Check,
 } from 'lucide-react'
+import type { FileNode } from '@/lib/api'
 import { useAppStore } from '@/store/useAppStore'
 import { useConnectionStore } from '@/store/connectionStore'
 import { cn } from '@/lib/utils'
@@ -44,6 +54,10 @@ export default function LeftSidebar() {
     openReport,
     removeReport,
     currentReportId,
+    filesTree,
+    filesRoot,
+    filesLoading,
+    fetchFilesTree,
   } = useAppStore()
 
   const sfUser = useConnectionStore((s) => s.sfUser)
@@ -116,142 +130,69 @@ export default function LeftSidebar() {
         </button>
       </div>
 
-      {/* Folders section */}
-      <div className="border-b border-border-subtle">
-        <div className="flex items-center justify-between px-3 py-2">
-          <div className="flex items-center gap-1.5 text-[11px] text-text-tertiary font-semibold uppercase tracking-wide">
-            <Folder size={12} />
-            폴더
-          </div>
-          <button
-            title="폴더 추가"
-            onClick={() => setAddingFolder(true)}
-            className="p-1 text-text-tertiary hover:text-primary hover:bg-primary-light rounded transition-colors"
-          >
-            <FolderPlus size={14} />
-          </button>
-        </div>
-        {addingFolder && (
-          <div className="mx-3 mb-2 flex items-center gap-1 bg-white border border-border rounded px-2 py-1">
-            <Folder size={12} className="text-text-tertiary shrink-0" />
-            <input
-              autoFocus
-              className="flex-1 text-[12px] bg-transparent outline-none"
-              placeholder="폴더 이름"
-              maxLength={100}
-              value={folderInput}
-              onChange={(e) => setFolderInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleAddFolder()
-                if (e.key === 'Escape') { setAddingFolder(false); setFolderInput('') }
-              }}
-            />
-            <button onClick={handleAddFolder} className="text-[11px] text-primary font-medium hover:underline">추가</button>
-            <button onClick={() => { setAddingFolder(false); setFolderInput('') }} className="text-text-tertiary hover:text-danger">
-              <X size={12} />
-            </button>
-          </div>
-        )}
-        <div className="px-2 pb-2 space-y-0.5">
-          {folders.length === 0 && (
-            <div className="px-2 py-1 text-[11px] text-text-disabled italic">폴더 없음</div>
-          )}
-          {folders.map((folder) => {
-            const folderHistories = histories.filter((h) => h.folderId === folder.id)
-            return (
-              <div key={folder.id}>
-                <div className="group flex items-center gap-1 px-2 py-1 rounded hover:bg-white cursor-pointer">
-                  <button onClick={() => toggleFolder(folder.id)} className="flex items-center gap-1 flex-1 min-w-0">
-                    {folder.isOpen ? <ChevronDown size={12} className="text-text-tertiary shrink-0" /> : <ChevronRight size={12} className="text-text-tertiary shrink-0" />}
-                    {folder.isOpen ? <FolderOpen size={12} className="text-text-secondary shrink-0" /> : <Folder size={12} className="text-text-secondary shrink-0" />}
-                    <span className="text-[12px] text-text-secondary truncate">{folder.name}</span>
-                  </button>
-                  <button title="폴더 삭제" onClick={() => deleteFolder(folder.id)} className="opacity-0 group-hover:opacity-100 p-0.5 text-text-tertiary hover:text-danger transition-opacity">
-                    <X size={11} />
-                  </button>
-                </div>
-                {folder.isOpen && (
-                  <div className="ml-4">
-                    {folderHistories.length === 0 ? (
-                      <div className="px-2 py-1 text-[11px] text-text-disabled italic">비어있음</div>
-                    ) : (
-                      folderHistories.map((h) => (
-                        <HistoryItemRow key={h.id} item={h} folders={folders} menuOpen={historyMenuOpen === h.id} menuView={historyMenuView}
-                          onMenuOpen={() => setHistoryMenuOpen(h.id)} onMenuClose={() => setHistoryMenuOpen(null)} onMenuView={setHistoryMenuView}
-                          onDuplicate={() => duplicateHistory(h.id)} onDelete={() => deleteHistory(h.id)} onMove={(fid) => moveHistory(h.id, fid)}
-                          onLoad={() => loadAnalysis(h.id)} />
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      {/* Unified 폴더 tree (filesystem) */}
+      <UnifiedFolderSection
+        tree={filesTree}
+        root={filesRoot}
+        loading={filesLoading}
+        onRefresh={() => void fetchFilesTree()}
+        currentNotebookId={useAppStore.getState().notebookId}
+        currentReportId={currentReportId}
+        onOpenNotebook={(id) => loadAnalysis(id)}
+        onOpenReport={(id) => openReport(id)}
+      />
 
-      {/* History header */}
+      {/* History: 전체 분석 (폴더 위치 포함 서브타이틀) */}
       <div className="flex items-center px-3 py-2">
         <div className="flex items-center gap-1.5 text-[11px] text-text-tertiary font-semibold uppercase tracking-wide">
           <History size={12} />
           히스토리
         </div>
       </div>
-
-      {/* History list — root only */}
       <div className="flex-1 overflow-y-auto hide-scrollbar px-2 pb-2 space-y-0.5">
-        {rootHistories.map((h) => (
-          <HistoryItemRow key={h.id} item={h} folders={folders} menuOpen={historyMenuOpen === h.id} menuView={historyMenuView}
-            onMenuOpen={() => setHistoryMenuOpen(h.id)} onMenuClose={() => setHistoryMenuOpen(null)} onMenuView={setHistoryMenuView}
-            onDuplicate={() => duplicateHistory(h.id)} onDelete={() => deleteHistory(h.id)} onMove={(fid) => moveHistory(h.id, fid)}
-            onLoad={() => loadAnalysis(h.id)} />
-        ))}
-      </div>
+        {(() => {
+          // filesTree 로부터: notebook_id → {folderName, path} · 루트 폴더 리스트
+          const nbInfo = new Map<string, { folderName: string | null; path: string }>()
+          const rootFolders: { name: string; path: string }[] = []
+          const walk = (nodes: typeof filesTree, parent: string | null) => {
+            for (const n of nodes) {
+              if (n.type === 'folder') {
+                if (parent === null) rootFolders.push({ name: n.name, path: n.path })
+                if (n.children) walk(n.children, n.name)
+              } else if (n.kind === 'notebook' && n.notebook_id) {
+                nbInfo.set(n.notebook_id, { folderName: parent, path: n.path })
+              }
+            }
+          }
+          walk(filesTree, null)
 
-      {/* Reports */}
-      <div className="border-t border-border-subtle max-h-[30%] flex flex-col">
-        <div className="flex items-center gap-1.5 px-3 py-2 text-[11px] text-text-tertiary font-semibold uppercase tracking-wide shrink-0">
-          <FileText size={12} />
-          리포트
-          {reports.length > 0 && (
-            <span className="text-[10px] text-text-disabled font-normal">{reports.length}</span>
-          )}
-        </div>
-        <div className="overflow-y-auto hide-scrollbar px-2 pb-2 space-y-0.5">
-          {reports.length === 0 && (
-            <div className="px-2 py-1 text-[11px] text-text-disabled italic">생성된 리포트 없음</div>
-          )}
-          {reports.map((r) => (
-            <div
-              key={r.id}
-              className={cn(
-                'group flex items-center gap-1 px-2 py-1 rounded cursor-pointer',
-                currentReportId === r.id ? 'bg-white border border-primary-border' : 'hover:bg-white',
-              )}
-              onClick={() => openReport(r.id)}
-              title={`${r.title} · ${r.created_at}`}
-            >
-              <div className="flex-1 min-w-0">
-                <div className={cn('text-[12px] truncate', currentReportId === r.id && 'text-primary font-semibold')}>
-                  {r.title}
-                </div>
-                <div className="text-[10px] text-text-disabled truncate">
-                  {r.created_at?.slice(0, 16).replace('T', ' ')}
-                </div>
-              </div>
-              <button
-                title="리포트 삭제"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (confirm(`리포트 "${r.title}" 을 삭제할까요?`)) removeReport(r.id)
-                }}
-                className="p-1 text-text-tertiary hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <Trash2 size={11} />
-              </button>
-            </div>
-          ))}
-        </div>
+          const rows = histories.filter((h) => nbInfo.has(h.id))
+          if (rows.length === 0) {
+            return <div className="px-2 py-1 text-[11px] text-text-disabled italic">분석 없음</div>
+          }
+          return rows.map((h) => {
+            const info = nbInfo.get(h.id)!
+            return (
+              <HistoryItemRow
+                key={h.id}
+                item={h}
+                folderName={info.folderName}
+                notebookPath={info.path}
+                rootPath={filesRoot}
+                rootFolders={rootFolders}
+                menuOpen={historyMenuOpen === h.id}
+                menuView={historyMenuView}
+                onMenuOpen={() => setHistoryMenuOpen(h.id)}
+                onMenuClose={() => setHistoryMenuOpen(null)}
+                onMenuView={setHistoryMenuView}
+                onDuplicate={() => duplicateHistory(h.id)}
+                onDelete={() => deleteHistory(h.id)}
+                onLoad={() => loadAnalysis(h.id)}
+                onRefresh={() => void fetchFilesTree()}
+              />
+            )
+          })
+        })()}
       </div>
 
       {/* Settings */}
@@ -303,7 +244,10 @@ export default function LeftSidebar() {
 
 interface HistoryItemRowProps {
   item: ReturnType<typeof useAppStore.getState>['histories'][number]
-  folders: ReturnType<typeof useAppStore.getState>['folders']
+  folderName: string | null
+  notebookPath: string
+  rootPath: string
+  rootFolders: { name: string; path: string }[]
   menuOpen: boolean
   menuView: 'main' | 'move'
   onMenuOpen: () => void
@@ -311,13 +255,16 @@ interface HistoryItemRowProps {
   onMenuView: (v: 'main' | 'move') => void
   onDuplicate: () => void
   onDelete: () => void
-  onMove: (folderId: string | null) => void
   onLoad: () => void
+  onRefresh: () => void
 }
 
 function HistoryItemRow({
   item,
-  folders,
+  folderName,
+  notebookPath,
+  rootPath,
+  rootFolders,
   menuOpen,
   menuView,
   onMenuOpen,
@@ -325,8 +272,8 @@ function HistoryItemRow({
   onMenuView,
   onDuplicate,
   onDelete,
-  onMove,
   onLoad,
+  onRefresh,
 }: HistoryItemRowProps) {
   const btnRef = useRef<HTMLButtonElement>(null)
   const [menuPos, setMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -357,7 +304,16 @@ function HistoryItemRow({
         )}>
           {item.title}
         </div>
-        <div className="text-[10px] text-text-disabled">{item.date}</div>
+        <div className="text-[10px] text-text-disabled truncate flex items-center gap-1">
+          <span>{item.date}</span>
+          {folderName && (
+            <>
+              <span>·</span>
+              <Folder size={9} className="shrink-0" />
+              <span className="truncate">{folderName}</span>
+            </>
+          )}
+        </div>
       </div>
       <button
         ref={btnRef}
@@ -413,28 +369,50 @@ function HistoryItemRow({
               <div className="border-t border-bg-sidebar my-0.5" />
               <button
                 className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] text-text-secondary hover:bg-stone-100"
-                onClick={() => onMove(null)}
+                onClick={async () => {
+                  if (folderName === null) { onMenuClose(); return }
+                  try {
+                    const api = await import('@/lib/api')
+                    await api.moveEntry(notebookPath, rootPath)
+                    onRefresh()
+                  } catch (e) {
+                    alert(`이동 실패: ${(e as Error).message}`)
+                  } finally {
+                    onMenuClose()
+                  }
+                }}
               >
                 <span className="flex items-center gap-2">
                   <History size={12} />
                   루트
                 </span>
-                {!item.folderId && <span className="text-primary text-[10px]">✓</span>}
+                {folderName === null && <span className="text-primary text-[10px]">✓</span>}
               </button>
-              {folders.map((f) => (
+              {rootFolders.map((f) => (
                 <button
-                  key={f.id}
+                  key={f.path}
                   className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] text-text-secondary hover:bg-stone-100"
-                  onClick={() => onMove(f.id)}
+                  onClick={async () => {
+                    if (folderName === f.name) { onMenuClose(); return }
+                    try {
+                      const api = await import('@/lib/api')
+                      await api.moveEntry(notebookPath, f.path)
+                      onRefresh()
+                    } catch (e) {
+                      alert(`이동 실패: ${(e as Error).message}`)
+                    } finally {
+                      onMenuClose()
+                    }
+                  }}
                 >
                   <span className="flex items-center gap-2">
                     <Folder size={12} />
                     {f.name}
                   </span>
-                  {item.folderId === f.id && <span className="text-primary text-[10px]">✓</span>}
+                  {folderName === f.name && <span className="text-primary text-[10px]">✓</span>}
                 </button>
               ))}
-              {folders.length === 0 && (
+              {rootFolders.length === 0 && (
                 <div className="px-3 py-2 text-[11px] text-text-disabled">
                   폴더를 먼저 만드세요
                 </div>
@@ -444,6 +422,300 @@ function HistoryItemRow({
         </div>,
         document.body
       )}
+    </div>
+  )
+}
+
+// ─── Unified 폴더 section (filesystem-backed) ─────────────────────────────────
+
+function fileIconFor(node: FileNode) {
+  if (node.kind === 'notebook') return FileCode
+  if (node.kind === 'report') return FileText
+  const e = (node.ext || '').toLowerCase()
+  if (['csv', 'tsv', 'xlsx', 'xls', 'parquet', 'feather'].includes(e)) return FileSpreadsheet
+  if (['json', 'jsonl', 'ndjson', 'yaml', 'yml', 'toml'].includes(e)) return FileJson
+  if (['py', 'sql', 'js', 'ts', 'tsx', 'jsx', 'sh'].includes(e)) return FileCode
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp'].includes(e)) return FileImage
+  if (['zip', 'tar', 'gz', 'tgz', '7z', 'rar'].includes(e)) return FileArchive
+  if (e === 'md' || e === 'txt') return FileText
+  return File
+}
+
+function formatSize(n: number | undefined): string {
+  if (!n && n !== 0) return ''
+  if (n < 1024) return `${n}B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)}K`
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)}M`
+  return `${(n / 1024 / 1024 / 1024).toFixed(1)}G`
+}
+
+function UnifiedFolderSection({
+  tree, root, loading, onRefresh,
+  currentNotebookId, currentReportId,
+  onOpenNotebook, onOpenReport,
+}: {
+  tree: FileNode[]
+  root: string
+  loading: boolean
+  onRefresh: () => void
+  currentNotebookId: string | null
+  currentReportId: string | null
+  onOpenNotebook: (id: string) => void
+  onOpenReport: (id: string) => void
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const submittingRef = useRef(false)
+  const { fetchFilesTree } = useAppStore()
+
+  async function createRootFolder() {
+    // 동기 guard — React state 는 비동기라 중복 호출 막으려면 ref 필요
+    if (submittingRef.current) return
+    const trimmed = name.trim()
+    if (!trimmed) { setAdding(false); return }
+    submittingRef.current = true
+    try {
+      const api = await import('@/lib/api')
+      await api.mkdirFolder(root, trimmed)
+    } catch (e) {
+      const msg = (e as Error).message
+      // 트리 먼저 동기화 (409 인 경우에도 실제 폴더는 있으니 UI 반영되어야 함)
+      await fetchFilesTree()
+      if (msg.includes('409') || msg.includes('already exists')) {
+        alert(`"${trimmed}" 폴더가 이미 존재합니다. (왼쪽 트리에 반영되었습니다)`)
+      } else {
+        alert(`폴더 생성 실패: ${msg}`)
+      }
+      setAdding(false); setName('')
+      submittingRef.current = false
+      return
+    }
+    setAdding(false); setName('')
+    await fetchFilesTree()
+    submittingRef.current = false
+  }
+
+  return (
+    <div className="border-b border-border-subtle flex-1 flex flex-col min-h-0">
+      <div className="flex items-center justify-between px-3 py-2 shrink-0">
+        <button
+          className="flex items-center gap-1.5 text-[11px] text-text-tertiary font-semibold uppercase tracking-wide hover:text-text-secondary"
+          onClick={() => setExpanded((v) => !v)}
+          title={root ? `루트: ${root}` : '폴더'}
+        >
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <HardDrive size={12} />
+          폴더
+        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            title="새 폴더"
+            onClick={() => setAdding(true)}
+            className="p-1 text-text-tertiary hover:text-primary hover:bg-primary-light rounded transition-colors"
+          >
+            <FolderPlus size={14} />
+          </button>
+          <button
+            title="새로고침"
+            onClick={onRefresh}
+            className={cn(
+              'p-1 text-text-tertiary hover:text-primary hover:bg-primary-light rounded transition-colors',
+              loading && 'animate-spin text-primary',
+            )}
+          >
+            <RefreshCw size={12} />
+          </button>
+        </div>
+      </div>
+      {adding && (
+        <div className="mx-3 mb-2 flex items-center gap-1 bg-white border border-border rounded px-2 py-1 shrink-0">
+          <Folder size={12} className="text-text-tertiary shrink-0" />
+          <input
+            autoFocus
+            className="flex-1 text-[12px] bg-transparent outline-none"
+            placeholder="폴더 이름"
+            maxLength={100}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void createRootFolder()
+              if (e.key === 'Escape') { setAdding(false); setName('') }
+            }}
+          />
+          <button onClick={() => void createRootFolder()} className="text-[11px] text-primary font-medium hover:underline">추가</button>
+          <button onClick={() => { setAdding(false); setName('') }} className="text-text-tertiary hover:text-danger">
+            <X size={12} />
+          </button>
+        </div>
+      )}
+      {expanded && (
+        <div className="px-2 pb-2 flex-1 overflow-y-auto hide-scrollbar min-h-0">
+          {tree.length === 0 && !loading && (
+            <div className="px-2 py-1 text-[11px] text-text-disabled italic">
+              비어있음 — 우측 상단 + 로 폴더 생성
+            </div>
+          )}
+          {tree
+            // 루트 수준의 ipynb 는 히스토리 섹션에서 보여주므로 트리에서 중복 표시 생략
+            .filter((n) => !(n.type === 'file' && n.kind === 'notebook'))
+            .map((node) => (
+              <FileTreeNode
+                key={node.path}
+                node={node}
+                depth={0}
+                currentNotebookId={currentNotebookId}
+                currentReportId={currentReportId}
+                onOpenNotebook={onOpenNotebook}
+                onOpenReport={onOpenReport}
+              />
+            ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FileTreeNode({
+  node, depth, currentNotebookId, currentReportId, onOpenNotebook, onOpenReport,
+}: {
+  node: FileNode
+  depth: number
+  currentNotebookId: string | null
+  currentReportId: string | null
+  onOpenNotebook: (id: string) => void
+  onOpenReport: (id: string) => void
+}) {
+  const [open, setOpen] = useState(depth < 1)
+  const [copied, setCopied] = useState(false)
+  const indent = 4 + depth * 10
+  const { fetchFilesTree } = useAppStore()
+
+  async function copyPath() {
+    try {
+      await navigator.clipboard.writeText(node.path)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1200)
+    } catch (e) {
+      console.warn('copy path failed', e)
+    }
+  }
+
+  async function deleteFolder() {
+    if (!confirm(`폴더 "${node.name}" 을 삭제할까요?${node.children && node.children.length > 0 ? ' (하위 내용 포함)' : ''}`)) return
+    try {
+      const api = await import('@/lib/api')
+      const recursive = !!(node.children && node.children.length > 0)
+      await api.rmdirFolder(node.path, recursive)
+      await fetchFilesTree()
+    } catch (e) {
+      alert(`폴더 삭제 실패: ${(e as Error).message}`)
+    }
+  }
+
+  if (node.type === 'folder') {
+    return (
+      <div>
+        <div
+          className="group flex items-center gap-1 py-0.5 rounded hover:bg-white cursor-pointer"
+          style={{ paddingLeft: indent }}
+          onClick={() => setOpen((v) => !v)}
+          title={node.path}
+        >
+          {open ? (
+            <ChevronDown size={11} className="text-text-tertiary shrink-0" />
+          ) : (
+            <ChevronRight size={11} className="text-text-tertiary shrink-0" />
+          )}
+          {open ? (
+            <FolderOpen size={12} className="text-text-secondary shrink-0" />
+          ) : (
+            <Folder size={12} className="text-text-secondary shrink-0" />
+          )}
+          <span className="text-[12px] text-text-secondary truncate flex-1">{node.name}</span>
+          <button
+            title={copied ? '복사됨' : '경로 복사'}
+            onClick={(e) => { e.stopPropagation(); void copyPath() }}
+            className="opacity-0 group-hover:opacity-100 p-0.5 text-text-tertiary hover:text-primary transition-opacity shrink-0"
+          >
+            {copied ? <Check size={11} /> : <Copy size={11} />}
+          </button>
+          <button
+            title="폴더 삭제"
+            onClick={(e) => { e.stopPropagation(); void deleteFolder() }}
+            className="opacity-0 group-hover:opacity-100 p-0.5 text-text-tertiary hover:text-danger transition-opacity shrink-0"
+          >
+            <X size={11} />
+          </button>
+        </div>
+        {open && node.children && (
+          <div>
+            {node.children.length === 0 && (
+              <div style={{ paddingLeft: indent + 14 }} className="py-0.5 text-[11px] text-text-disabled italic">
+                비어있음
+              </div>
+            )}
+            {node.children.map((c) => (
+              <FileTreeNode
+                key={c.path} node={c} depth={depth + 1}
+                currentNotebookId={currentNotebookId}
+                currentReportId={currentReportId}
+                onOpenNotebook={onOpenNotebook}
+                onOpenReport={onOpenReport}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // File node — 클릭 동작은 kind 별로 분기
+  const Icon = fileIconFor(node)
+  const isCurrentNb = node.kind === 'notebook' && node.notebook_id === currentNotebookId
+  const isCurrentRep = node.kind === 'report' && node.report_id === currentReportId
+  const isActive = isCurrentNb || isCurrentRep
+
+  function handleClick() {
+    if (node.kind === 'notebook' && node.notebook_id) {
+      onOpenNotebook(node.notebook_id)
+    } else if (node.kind === 'report' && node.report_id) {
+      onOpenReport(node.report_id)
+    } else {
+      void copyPath()
+    }
+  }
+
+  const titleText = node.kind === 'notebook'
+    ? `분석 열기\n${node.path}`
+    : node.kind === 'report'
+    ? `리포트 열기\n${node.path}`
+    : `클릭해 경로 복사\n${node.path}`
+
+  return (
+    <div
+      className={cn(
+        'group flex items-center gap-1 py-0.5 rounded cursor-pointer',
+        isActive ? 'bg-white border border-primary-border' : 'hover:bg-white',
+      )}
+      style={{ paddingLeft: indent + 14 }}
+      onClick={handleClick}
+      title={titleText}
+    >
+      <Icon size={12} className={cn('shrink-0', isActive ? 'text-primary' : 'text-text-secondary')} />
+      <span className={cn('text-[12px] truncate flex-1', isActive ? 'text-primary font-semibold' : 'text-text-secondary')}>
+        {node.name}
+      </span>
+      {node.size != null && node.kind === 'file' && (
+        <span className="text-[10px] text-text-disabled shrink-0">{formatSize(node.size)}</span>
+      )}
+      <button
+        title={copied ? '복사됨' : '경로 복사'}
+        onClick={(e) => { e.stopPropagation(); void copyPath() }}
+        className="opacity-0 group-hover:opacity-100 p-0.5 text-text-tertiary hover:text-primary transition-opacity shrink-0"
+      >
+        {copied ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+      </button>
     </div>
   )
 }

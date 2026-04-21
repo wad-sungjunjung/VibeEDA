@@ -3,17 +3,21 @@ import { persist } from 'zustand/middleware'
 
 export const ALL_MODELS = [
   // ── Gemini 3 (Preview) ─────────────────────────────────────────
-  { value: 'gemini-3.1-pro-preview',   label: 'Gemini 3.1 Pro (Preview)',        provider: 'gemini' as const },
-  { value: 'gemini-3-flash-preview',   label: 'Gemini 3 Flash (Preview, 빠름)',  provider: 'gemini' as const },
+  { value: 'gemini-3.1-pro-preview',   label: 'Gemini 3.1 Pro (Preview)',        provider: 'gemini' as const, contextWindow: 1_000_000 },
+  { value: 'gemini-3-flash-preview',   label: 'Gemini 3 Flash (Preview, 빠름)',  provider: 'gemini' as const, contextWindow: 1_000_000 },
   // ── Gemini 2.5 (Stable) ────────────────────────────────────────
-  { value: 'gemini-2.5-pro',           label: 'Gemini 2.5 Pro',                  provider: 'gemini' as const },
-  { value: 'gemini-2.5-flash',         label: 'Gemini 2.5 Flash (빠름)',         provider: 'gemini' as const },
-  { value: 'gemini-2.5-flash-lite',    label: 'Gemini 2.5 Flash Lite (최저비용)', provider: 'gemini' as const },
+  { value: 'gemini-2.5-pro',           label: 'Gemini 2.5 Pro',                  provider: 'gemini' as const, contextWindow: 2_000_000 },
+  { value: 'gemini-2.5-flash',         label: 'Gemini 2.5 Flash (빠름)',         provider: 'gemini' as const, contextWindow: 1_000_000 },
+  { value: 'gemini-2.5-flash-lite',    label: 'Gemini 2.5 Flash Lite (최저비용)', provider: 'gemini' as const, contextWindow: 1_000_000 },
   // ── Claude 4 ──────────────────────────────────────────────────
-  { value: 'claude-opus-4-7',          label: 'Claude Opus 4.7',                 provider: 'claude' as const },
-  { value: 'claude-sonnet-4-6',        label: 'Claude Sonnet 4.6 (빠름)',        provider: 'claude' as const },
-  { value: 'claude-haiku-4-5-20251001',label: 'Claude Haiku 4.5 (최저비용)',     provider: 'claude' as const },
+  { value: 'claude-opus-4-7',          label: 'Claude Opus 4.7',                 provider: 'claude' as const, contextWindow: 1_000_000 },
+  { value: 'claude-sonnet-4-6',        label: 'Claude Sonnet 4.6 (빠름)',        provider: 'claude' as const, contextWindow: 1_000_000 },
+  { value: 'claude-haiku-4-5-20251001',label: 'Claude Haiku 4.5 (최저비용)',     provider: 'claude' as const, contextWindow: 200_000 },
 ]
+
+export function getModelContextWindow(value: string): number {
+  return ALL_MODELS.find((m) => m.value === value)?.contextWindow ?? 200_000
+}
 
 export const VIBE_MODELS   = ALL_MODELS
 export const AGENT_MODELS  = ALL_MODELS

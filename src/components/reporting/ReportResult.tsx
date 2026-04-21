@@ -1,4 +1,4 @@
-import { FileText, X, Copy, Check, Sparkles, Download, AlertTriangle, Loader2, CheckCircle2, Circle } from 'lucide-react'
+import { FileText, X, Copy, Check, Sparkles, Download, AlertTriangle, Loader2, CheckCircle2, Circle, Save } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import Markdown from '@/components/common/Markdown'
@@ -6,6 +6,7 @@ import { API_BASE_URL } from '@/lib/api'
 
 const STAGE_ORDER = [
   { key: 'collecting', label: '셀 데이터 수집' },
+  { key: 'outlining', label: '개요 설계' },
   { key: 'writing', label: '리포트 작성' },
   { key: 'finalizing', label: '차트 삽입·저장' },
 ] as const
@@ -20,7 +21,11 @@ export default function ReportResult() {
     currentReportId,
     reportStages,
     reportStartedAt,
-    setShowReport,
+    reportProcessingNotes,
+    reportIsDraft,
+    reportSaving,
+    saveCurrentReport,
+    closeCurrentReport,
   } = useAppStore()
   const [copied, setCopied] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -40,11 +45,22 @@ export default function ReportResult() {
   // 다운로드용 원본(reportContent)은 그대로 유지. hook은 early-return 이전에 호출해야 함.
   const displayContent = useMemo(() => {
     if (!currentReportId) return reportContent
-    const pattern = new RegExp(
+    // 신규 구조: ![alt](./xxx.png) — 리포트 폴더 내부 상대 경로
+    const newPattern = /\]\(\.\/([A-Za-z0-9_\-]+\.png)\)/g
+    let rewritten = reportContent.replace(
+      newPattern,
+      `](${API_BASE_URL}/reports/${currentReportId}/assets/$1)`,
+    )
+    // 레거시 구조: ![alt](./{id}_images/xxx.png)
+    const legacyPattern = new RegExp(
       `\\./${currentReportId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}_images/`,
       'g',
     )
-    return reportContent.replace(pattern, `${API_BASE_URL}/reports/${currentReportId}/assets/`)
+    rewritten = rewritten.replace(
+      legacyPattern,
+      `${API_BASE_URL}/reports/${currentReportId}/assets/`,
+    )
+    return rewritten
   }, [reportContent, currentReportId])
 
   if (!showReport) return null
@@ -74,8 +90,13 @@ export default function ReportResult() {
   function stageStatus(key: typeof STAGE_ORDER[number]['key']): 'done' | 'active' | 'pending' {
     if (hasComplete) return 'done'
     if (key === 'collecting') {
-      if (stageSet.has('collected') || stageSet.has('writing') || stageSet.has('finalizing')) return 'done'
+      if (stageSet.has('collected') || stageSet.has('outlining') || stageSet.has('outlined') || stageSet.has('writing') || stageSet.has('finalizing')) return 'done'
       if (stageSet.has('collecting')) return 'active'
+      return 'pending'
+    }
+    if (key === 'outlining') {
+      if (stageSet.has('outlined') || stageSet.has('writing') || stageSet.has('finalizing')) return 'done'
+      if (stageSet.has('outlining')) return 'active'
       return 'pending'
     }
     if (key === 'writing') {
@@ -97,8 +118,19 @@ export default function ReportResult() {
         <div className="flex items-center gap-2 px-5 py-4 border-b border-border-subtle">
           <FileText size={16} className="text-primary" />
           <div className="flex-1 min-w-0">
-            <div className="text-[14px] font-semibold text-text-primary truncate">
-              {reportTitle || '리포트'}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="text-[14px] font-semibold text-text-primary truncate">
+                {reportTitle || '리포트'}
+              </div>
+              {reportIsDraft && !generatingReport && (
+                <span
+                  className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                  style={{ backgroundColor: '#fff1d6', color: '#7a4a00' }}
+                  title="저장하지 않은 임시 리포트입니다. 저장하지 않고 닫으면 삭제됩니다."
+                >
+                  임시
+                </span>
+              )}
             </div>
             {currentReportId && (
               <div className="text-[10px] text-text-tertiary truncate">{currentReportId}.md</div>
@@ -128,8 +160,25 @@ export default function ReportResult() {
             <Download size={13} /> 다운로드
           </button>
           <button
-            onClick={() => setShowReport(false)}
+            onClick={() => { void saveCurrentReport() }}
+            disabled={!reportContent || !reportIsDraft || reportSaving || generatingReport}
+            title={reportIsDraft ? '~/vibe-notebooks/reports/ 에 영구 저장' : '이미 저장된 리포트입니다'}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors disabled:opacity-50"
+            style={
+              !reportContent || !reportIsDraft || reportSaving || generatingReport
+                ? { backgroundColor: 'var(--tw-bg-sidebar, #f3f1ec)', color: '#9aa0a6' }
+                : { backgroundColor: '#D95C3F', color: '#fff' }
+            }
+          >
+            {reportSaving
+              ? <Loader2 size={13} className="animate-spin" />
+              : <Save size={13} />}
+            {reportIsDraft ? '저장하기' : '저장됨'}
+          </button>
+          <button
+            onClick={() => { void closeCurrentReport() }}
             className="p-1 text-text-tertiary hover:text-text-secondary ml-1"
+            title={reportIsDraft ? '닫기 (저장하지 않으면 임시 리포트는 삭제됩니다)' : '닫기'}
           >
             <X size={16} />
           </button>
@@ -142,7 +191,9 @@ export default function ReportResult() {
               {STAGE_ORDER.map((s, i) => {
                 const status = stageStatus(s.key)
                 const stageInfo = reportStages.find((x) =>
-                  x.stage === s.key || (s.key === 'collecting' && x.stage === 'collected'),
+                  x.stage === s.key
+                    || (s.key === 'collecting' && x.stage === 'collected')
+                    || (s.key === 'outlining' && x.stage === 'outlined'),
                 )
                 const label = stageInfo?.label || s.label
                 return (
@@ -169,6 +220,32 @@ export default function ReportResult() {
               })}
             </div>
           </div>
+        )}
+
+        {/* Quality banner (processing notes) */}
+        {reportProcessingNotes && (
+          (reportProcessingNotes.missing_charts.length > 0
+            || reportProcessingNotes.unreferenced_charts.length > 0
+            || reportProcessingNotes.suspicious_number_count > 0) && (
+            <div className="px-5 py-2 text-[11px] border-b border-border-subtle" style={{ backgroundColor: '#fff7e6', color: '#7a4a00' }}>
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {reportProcessingNotes.missing_charts.length > 0 && (
+                    <span>차트 미삽입 {reportProcessingNotes.missing_charts.length}개: <code className="font-mono">{reportProcessingNotes.missing_charts.join(', ')}</code></span>
+                  )}
+                  {reportProcessingNotes.unreferenced_charts.length > 0 && (
+                    <span>본문 미참조 {reportProcessingNotes.unreferenced_charts.length}개 (부록 추가됨)</span>
+                  )}
+                  {reportProcessingNotes.suspicious_number_count > 0 && (
+                    <span title={reportProcessingNotes.suspicious_numbers.slice(0, 10).map((n) => n.raw).join(' · ')}>
+                      검증 불가 수치 {reportProcessingNotes.suspicious_number_count}개 — 원문 확인 필요
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
         )}
 
         {/* Error */}

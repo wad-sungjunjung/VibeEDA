@@ -9,7 +9,33 @@ import anthropic
 
 from .naming import to_snake_case
 from . import mart_tools
-from .code_style import SQL_STYLE_GUIDE, PYTHON_RULES
+from . import agent_skills
+from . import category_cache
+from . import file_profile_cache
+from .code_style import SQL_STYLE_GUIDE, PYTHON_RULES, MARKDOWN_RULES
+
+
+# ─── 메모 새니타이저 ──────────────────────────────────────────────────────────
+# 에이전트가 프롬프트를 어겨 `**관찰**`, `**비교 기준**` 같은 볼드 라벨을 넣는 경우가 잦아,
+# 서버에서 일괄 제거해 평문만 남긴다. 메모는 셀 단위의 짧은 인사이트이므로 강조 마커 불필요.
+_MEMO_BOLD_RE = re.compile(r"\*\*(.+?)\*\*", re.DOTALL)
+_MEMO_BOLD_UNDERSCORE_RE = re.compile(r"__(.+?)__", re.DOTALL)
+_MEMO_HEADER_RE = re.compile(r"^\s{0,3}#{1,6}\s+", re.MULTILINE)
+_MEMO_LABEL_RE = re.compile(
+    r"^(\s*[-*]\s*)(관찰|분석|인사이트|결론|해석|요약|다음 행동|다음 단계|비교 기준|발견|이상치|가설)(\s*[:：]\s*)",
+    re.MULTILINE,
+)
+
+
+def _sanitize_memo(memo: str) -> str:
+    if not memo:
+        return memo
+    s = _MEMO_BOLD_RE.sub(r"\1", memo)
+    s = _MEMO_BOLD_UNDERSCORE_RE.sub(r"\1", s)
+    s = _MEMO_HEADER_RE.sub("", s)
+    # "- **관찰:** ..." 같은 라벨 머리말을 평문으로 (이미 볼드는 제거됨)
+    s = _MEMO_LABEL_RE.sub(r"\1", s)
+    return s
 
 
 # ─── SQL whitelist 검증 ───────────────────────────────────────────────────────
@@ -69,6 +95,7 @@ class NotebookState:
     analysis_theme: str = ""
     analysis_description: str = ""
     notebook_id: str = ""
+    skill_ctx: dict = field(default_factory=dict)
 
 
 # ─── Tool definitions ────────────────────────────────────────────────────────
@@ -176,6 +203,23 @@ TOOLS = [
         },
     },
     {
+        "name": "get_category_values",
+        "description": (
+            "Fetch distinct values of a **category-like column** (예: `_status`, `_type` 접미, "
+            "또는 `category`, `channel`, `mode` 같은 구분자 컬럼). 최대 100개까지 반환. "
+            "`*_status` / `*_type` 컬럼은 이미 시스템 프롬프트에 주입되어 있으므로 **그 외 컬럼** 에만 호출. "
+            "WHERE 절 값을 추측하지 말고 이 도구로 확인하라."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "mart_key": {"type": "string"},
+                "column": {"type": "string", "description": "컬럼명 (원본 대소문자 유지)"},
+            },
+            "required": ["mart_key", "column"],
+        },
+    },
+    {
         "name": "write_cell_memo",
         "description": (
             "Write or update a cell's memo (노트). Use this to record INSIGHTS derived from the cell's output "
@@ -186,7 +230,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "cell_id": {"type": "string"},
-                "memo": {"type": "string", "description": "Markdown-friendly insight memo, Korean"},
+                "memo": {"type": "string", "description": "Korean plain-text insight memo. 2~5 줄 불릿. **절대** `**볼드**`, `__강조__`, `# 헤더`, `- **관찰:**`·`- **인사이트:**` 같은 라벨 머리말을 쓰지 말 것. 평문(`- `)과 일반 문장만 허용."},
             },
             "required": ["cell_id", "memo"],
         },
@@ -212,6 +256,7 @@ TOOLS = [
             "required": ["question"],
         },
     },
+    *agent_skills.SKILL_TOOLS_CLAUDE,
 ]
 
 
@@ -272,6 +317,15 @@ def _format_output_for_claude(output: dict) -> str:
 
 async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dict, list[dict]]:
     """Returns (tool_result_dict, list_of_sse_events)."""
+
+    # 스킬 프레임워크 pre-guard — 플랜 강제 등 거부 규칙
+    guard_err = agent_skills.check_pre_guard(name, inp, state)
+    if guard_err is not None:
+        return guard_err, []
+
+    # 스킬 신규 tool 라우팅 (create_plan / update_plan / request_marts)
+    if name in agent_skills.SKILL_TOOL_NAMES:
+        return agent_skills.handle_skill_tool(name, inp, state, CellState)
 
     if name == "read_notebook_context":
         return {
@@ -457,6 +511,54 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
             return {"error": "Cell has not been executed"}, []
         return {"cell_id": cell.id, "output_summary": _format_output_for_claude(cell.output)}, []
 
+    if name == "get_category_values":
+        mart_key = (inp.get("mart_key") or "").strip()
+        col = (inp.get("column") or "").strip()
+        selected_lc = {m.lower() for m in state.selected_marts}
+        if state.selected_marts and mart_key.lower() not in selected_lc:
+            return {
+                "error": "mart_not_selected",
+                "message": f"'{mart_key}' 는 선택된 마트가 아닙니다. 현재 선택: [{', '.join(state.selected_marts)}]",
+            }, []
+        if not col:
+            return {"error": "column_required"}, []
+        # D: on-demand — 패턴 제약 없이 모든 컬럼 허용 (캐시는 동일 엔진 사용)
+        import asyncio as _asyncio
+        loop = _asyncio.get_event_loop()
+        try:
+            # is_category_column 체크를 우회하기 위해 _query_distinct 를 호출 + 수동 캐시 저장
+            def _fetch():
+                key = (mart_key.lower(), col.lower())
+                with category_cache._lock:
+                    entry = category_cache._cache.get(key)
+                if entry and category_cache._fresh(entry):
+                    return entry.get("values")
+                try:
+                    vals = category_cache._query_distinct(mart_key, col)
+                except category_cache._QueryFailed as exc:
+                    raise RuntimeError(str(exc))
+                import time as _t
+                with category_cache._lock:
+                    category_cache._cache[key] = {"values": vals, "fetched_at": _t.time()}
+                category_cache._flush_to_disk()
+                return vals
+            vals = await loop.run_in_executor(None, _fetch)
+        except Exception as e:
+            return {"error": str(e)}, []
+        if vals is None:
+            return {
+                "mart_key": mart_key,
+                "column": col,
+                "too_many": True,
+                "message": f"`{col}` 는 distinct 값이 100개를 초과합니다 — 카테고리성 컬럼이 아님. `profile_mart` 로 분포 파악을 고려하세요.",
+            }, []
+        return {
+            "mart_key": mart_key,
+            "column": col,
+            "count": len(vals),
+            "values": vals,
+        }, []
+
     if name in ("get_mart_schema", "preview_mart", "profile_mart"):
         mart_key = inp.get("mart_key", "")
         # 선택된 마트 whitelist 체크.
@@ -488,7 +590,7 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
         cell = next((c for c in state.cells if c.id == inp["cell_id"]), None)
         if not cell:
             return {"success": False, "error": "Cell not found"}, []
-        memo = inp.get("memo", "")
+        memo = _sanitize_memo(inp.get("memo", ""))
         cell.memo = memo
         # 영속화: 노트북에 즉시 반영
         if state.notebook_id:
@@ -524,11 +626,35 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
 def _build_system_prompt(state: NotebookState) -> str:
     marts = ", ".join(state.selected_marts) if state.selected_marts else "없음"
     from . import snowflake_session
+    import datetime as _dt
     sf_connected = snowflake_session.is_connected()
+
+    # 오늘 날짜 + 데이터 최신화 경계 (D-1). 한국 표준시 기준.
+    try:
+        from zoneinfo import ZoneInfo
+        now_kst = _dt.datetime.now(ZoneInfo("Asia/Seoul"))
+    except Exception:
+        now_kst = _dt.datetime.now()
+    today_kst = now_kst.date()
+    data_cutoff = today_kst - _dt.timedelta(days=1)
+    weekday_ko = "월화수목금토일"[today_kst.weekday()]
+    date_block = (
+        f"\n## 오늘 날짜 & 데이터 최신화\n"
+        f"- 오늘: **{today_kst.isoformat()} ({weekday_ko})** (KST)\n"
+        f"- 데이터 최신화: **{data_cutoff.isoformat()} 까지** (전일자 D-1 기준). 오늘 날짜({today_kst.isoformat()}) 데이터는 아직 적재되지 않았을 수 있음.\n"
+        f"- 사용자가 '최근', '최신', '어제', '이번 주/달' 등 상대 기간을 쓰면 위 날짜 기준으로 해석하라:\n"
+        f"  - '어제' = {data_cutoff.isoformat()}\n"
+        f"  - '최근 7일' = {(data_cutoff - _dt.timedelta(days=6)).isoformat()} ~ {data_cutoff.isoformat()} (오늘 제외)\n"
+        f"  - '최근 30일' = {(data_cutoff - _dt.timedelta(days=29)).isoformat()} ~ {data_cutoff.isoformat()}\n"
+        f"  - '이번 달' = {today_kst.replace(day=1).isoformat()} ~ {data_cutoff.isoformat()}\n"
+        f"- SQL 작성 시 `CURRENT_DATE` 대신 **위 고정 날짜** 를 리터럴로 쓰는 것을 우선 고려하라 — 재실행 시 결과가 달라지는 것을 방지.\n"
+        f"- 기간이 모호하면(예: '최근 매출') 반드시 `ask_user` 로 정확한 범위를 재확인.\n"
+    )
     sf_status = "연결됨" if sf_connected else "미연결 — Snowflake 관련 도구(get_mart_schema, preview_mart, profile_mart, SQL 실행) 사용 불가. 필요 시 ask_user로 연결 요청"
 
     # 선택된 마트의 컬럼 스키마를 프롬프트에 미리 주입 → get_mart_schema 재호출 불필요
     mart_schema_block = ""
+    category_lines: list[str] = []
     if state.mart_metadata:
         lines = []
         for m in state.mart_metadata:
@@ -541,10 +667,29 @@ def _build_system_prompt(state: NotebookState) -> str:
             lines.append(
                 f"- [{m.get('key', '')}] {m.get('description', '')}\n  Columns: {col_descs}"
             )
+            # 카테고리 컬럼(_status/_type) 의 distinct 값 목록
+            mk = m.get("key", "")
+            for c in cols:
+                cats = c.get("categories")
+                if cats:
+                    preview = ", ".join(f"'{v}'" for v in cats)
+                    category_lines.append(
+                        f"- {mk}.{c.get('name', '')} ∈ {{{preview}}}  (총 {len(cats)}개)"
+                    )
         mart_schema_block = (
             "\n## 선택된 마트 스키마 (이미 로드됨 — `get_mart_schema` 재호출 불필요)\n"
             + "\n".join(lines) + "\n"
         )
+        if category_lines:
+            mart_schema_block += (
+                "\n### 카테고리 컬럼 허용 값 (status/type — SQL `WHERE` 작성 시 정확한 값 사용)\n"
+                + "\n".join(category_lines) + "\n"
+                + "- 위 목록에 없는 값을 WHERE 에 쓰면 결과가 비게 되니 주의. "
+                "목록에 없고 필요해 보이면 `ask_user` 로 확인.\n"
+            )
+
+    # 루트 폴더에 드롭된 로컬 데이터 파일 (CSV/Parquet 등) 프로파일
+    local_files_block = file_profile_cache.format_for_prompt()
     return f"""You are an expert data analyst AI for an advertising platform analytics tool called Vibe EDA.
 You help analysts explore ad platform data by creating, modifying, and executing notebook cells.
 
@@ -553,7 +698,7 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - Description: {state.analysis_description}
 - Data Marts: {marts}
 - Snowflake: {sf_status}
-{mart_schema_block}
+{date_block}{mart_schema_block}{local_files_block}
 
 ## Tools
 - read_notebook_context: See all current cells and their state
@@ -578,7 +723,28 @@ You help analysts explore ad platform data by creating, modifying, and executing
   - 서버는 메모 없이 다음 셀을 만들려 하면 `memo_required_before_next_cell` 에러를 반환하며 거부한다.
   - 메모에는 반드시 (1) 직전 출력에서 관찰한 핵심 수치·인사이트·이상치, (2) 그로부터 "왜 이 다음 셀을 만드는가"의 근거 — 둘 다 담아라. 2~5줄 불릿.
 - 차트 셀의 경우 tool_result 에 **렌더링된 PNG 이미지**가 함께 전달된다. 이미지를 실제로 보고(축/범례/분포) 의도에 부합하는지 검증한 뒤 메모를 작성하라. 같은 차트를 반복 생성하지 말고, 의도와 다르면 `update_cell_code`로 수정하라.
+
+## ⚠️ 차트 퀄리티 게이트 (리포팅 수준 도달 전 다음 task 금지 — 절대 준수)
+차트 셀을 생성해 PNG 이미지를 받은 직후, **다음 task(새 셀 생성·분석 단계 이동·마무리)로 넘어가기 전에** 반드시 이미지를 리포팅 품질 기준으로 평가한다. 아래 체크리스트 중 **하나라도 미흡하면 `update_cell_code`로 같은 셀을 수정해 재렌더링**하고, 통과할 때까지 반복한다. 퀄리티 미달 상태로 다음 셀을 만들거나 분석을 종료하면 규칙 위반이다.
+
+### 체크리스트 (리포팅에 그대로 실릴 수 있는 수준인가?)
+1. **제목·축 라벨**: 차트 제목, x축/y축 제목이 한국어로 명확히 붙어 있는가? 단위(원, 건, %, K/M 등)가 포함되어 있는가?
+2. **가독성**: x축 라벨이 겹치거나 잘리지 않는가? (카테고리 많으면 `xaxis=dict(tickangle=-30)` 또는 가로 막대로 전환, `fig.update_layout(margin=dict(b=120))`)
+3. **정렬·순서**: 카테고리 차트는 값 기준 정렬(내림차순이 기본). 시계열은 시간 순. 의미 없는 알파벳 순 금지.
+4. **수치 라벨**: 막대/선 차트에서 핵심 값이 작아 읽기 어려우면 `text`/`texttemplate`로 값 라벨을 표시. 비율은 `%` 포맷, 큰 수는 `,` 천 단위.
+5. **범례**: 시리즈가 2개 이상이면 범례가 의미 있는 이름으로 표시되는가? (trace `name` 지정)
+6. **색상·스타일**: 기본 파란색만 남발하지 말고, 비교가 필요하면 대비, 단일 지표면 Vibe 프라이머리 톤(`#D95C3F`) 또는 일관된 팔레트. 과도한 색 남발 금지.
+7. **데이터 충실도**: 표본이 너무 적어 의미 없는 그룹(n=1~2)이 섞여 있으면 Top N 필터 또는 "기타" 묶기를 적용. 이상치 하나 때문에 스케일이 뭉개지면 로그 스케일 또는 이상치 제외 버전을 고려.
+8. **여백·크기**: 레이아웃이 과도하게 답답하지 않은가? (`fig.update_layout(width=900, height=500, margin=...)` 등으로 조정)
+9. **차트 타입 적합성**: 분포면 histogram/box, 비교면 bar, 추세면 line, 구성비면 stacked bar/treemap — 데이터 성격에 맞는 타입인가? 파이차트는 3~5개 이하 카테고리에서만 허용.
+10. **추가 정보 필요 여부**: 차트만으로 스토리가 안 서면(예: 비교 기준선, 평균선, 전년 동월 비교 없음) → SQL을 수정해 컬럼을 추가로 뽑거나 Python에서 보조선/주석(`add_hline`, `add_annotation`)을 넣어라.
+
+### 판정과 행동
+- 위 항목 중 하나라도 실패 → **내레이션에 "차트 퀄리티 부족: [어느 항목] — [어떻게 수정]"을 명시**한 뒤 `update_cell_code`로 동일 셀을 수정해 재렌더링. 새 셀을 만들지 말 것.
+- 모든 항목 통과 → 내레이션에 "차트 퀄리티 OK: 리포팅에 사용 가능"을 명시하고 `write_cell_memo` → 다음 셀로 진행.
+- 동일 차트를 3회 수정해도 품질이 안 나오면 근본 원인(데이터 자체가 부족/부적합)일 수 있으니 `ask_user` 로 추가 차원·기간·마트를 요청하라. 같은 실패를 4회 이상 반복하지 말 것.
 - 메모 내용 예: "서울·경기가 전체 예약의 62% 차지 → 지역별 편중을 매장 단위로 분해하기 위해 다음 셀 생성", "강남점 1개 매장이 서울 매출의 38%, 이상치로 판단 → 이 매장을 제외한 분포 재확인"
+- **메모 서식 제약 — 절대 준수**: 메모에는 `**관찰**`, `**인사이트**`, `**결론**` 같은 강조(볼드) 라벨이나 머리말을 쓰지 말 것. `**...**`, `__...__` 등 볼드/강조 마커 자체를 사용하지 말고, 섹션 헤더(`#`, `##`)도 넣지 말 것. 평문 불릿(`- `)과 일반 텍스트만으로 2~5줄을 작성하라.
 - 전체 분석 요약은 마지막 Markdown 셀로 별도 작성 (메모는 개별 셀 단위 통찰)
 
 ## 맥락 수집 우선순위 (SQL 작성 전 필수)
@@ -625,6 +791,12 @@ You help analysts explore ad platform data by creating, modifying, and executing
   - "다음 단계로 넘어갑니다" 같은 공허한 문장
 - 단, 맨 처음 사용자 요청을 받은 직후(첫 도구 호출 전)에는 내레이션을 생략해도 된다. 또한 `ask_user` 호출 직후에는 사용자 답변을 기다리는 짧은 안내문만 출력한다.
 
+## ⚠️ tool_result / 시스템 리마인더 복제 금지 (절대 준수)
+- tool_result 의 원본 구조(`{{...}}`, `output_summary:[...]`, `auto_executed:true`, `cell_id:...`, `success:true` 등 dict/JSON 형태)를 **사용자에게 보이는 내레이션 텍스트에 절대 그대로 복사/인용하지 말 것.** 백엔드가 이미 UI에 표시한다.
+- `[시스템 리마인더]` 블록의 문장, `auto_executed`, `cell_id`, `output_summary`, `_system_reminder` 같은 키 이름도 내레이션에 등장하면 안 된다.
+- tool_result 의 수치·인사이트는 **자연스러운 한국어 문장**으로 재서술(paraphrase)해서만 사용하라. 예: `output_summary:[bar 1 n=12, bar 2 n=15 ...]` 대신 "막대 차트 5개 그룹 중 '2024년 신규' 코호트가 n=27로 가장 크고..." 처럼.
+- 위반 사례(실제 관찰된 실수): 메모 내용을 내레이션에 넣으면서 `,auto_executed:true,cell_id:xxx,output_summary:[...],success:true}}` 를 통째로 붙여버리는 것. 이런 행위는 버그 수준의 규칙 위반이다.
+
 ## 분석 순서
 1. SQL 셀 생성 → 실제 데이터 확인 → 필요시 쿼리 수정
 2. Python 셀 생성 (실제 데이터 기반 시각화) → 차트 정상 여부 확인
@@ -641,9 +813,13 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - Markdown: 실제 출력 수치를 근거로 인사이트 작성
 - 모든 응답과 설명은 한국어로
 
+{agent_skills.SKILLS_SYSTEM_PROMPT}
+
 {SQL_STYLE_GUIDE}
 
-{PYTHON_RULES}"""
+{PYTHON_RULES}
+
+{MARKDOWN_RULES}"""
 
 
 # ─── Agent loop ───────────────────────────────────────────────────────────────
@@ -672,6 +848,7 @@ async def run_agent_stream(
         return
 
     client = anthropic.AsyncAnthropic(api_key=api_key)
+    agent_skills.init_skill_ctx(notebook_state, user_message)
     system_prompt = _build_system_prompt(notebook_state)
 
     messages: list[dict] = list(conversation_history)
@@ -726,7 +903,7 @@ async def run_agent_stream(
                     cached_tools[-1] = last
                 async with client.messages.stream(
                     model=model,
-                    max_tokens=16000,
+                    max_tokens=32000,
                     system=cached_system,  # type: ignore[arg-type]
                     tools=cached_tools,  # type: ignore[arg-type]
                     messages=messages,  # type: ignore[arg-type]
@@ -766,6 +943,17 @@ async def run_agent_stream(
                 break
 
             if not tool_uses:
+                # 스킬 end-guard: 미검증 가설 / 세그먼트 미탐색이면 리마인더 1회 주입 후 재개
+                end_reminder = agent_skills.get_end_guard_reminder(notebook_state)
+                if end_reminder:
+                    yield {"type": "message_delta", "content": "\n\n_[분석가 체크리스트 재점검]_\n\n"}
+                    messages.append({"role": "assistant", "content": _content_to_dict(response.content)})
+                    messages.append({
+                        "role": "user",
+                        "content": f"[시스템 리마인더]\n{end_reminder}\n\n이 리마인더에 따라 추가 작업 후 마무리하세요.",
+                    })
+                    turn_index += 1
+                    continue
                 break
 
             # 무한 루프 방지: 정규화된 tool+input 반복 호출 감지 + 총 호출 상한
@@ -793,9 +981,10 @@ async def run_agent_stream(
                 return
 
             tool_results = []
+            skill_reminders: list[str] = []
             for tool_block in tool_uses:
                 yield {"type": "tool_use", "tool": tool_block.name, "input": tool_block.input}
-                if tool_block.name == "ask_user":
+                if tool_block.name in agent_skills.ASK_USER_LIKE_TOOLS:
                     ask_user_called = True
 
                 result, sse_events = await _execute_tool(tool_block.name, tool_block.input, notebook_state)
@@ -806,6 +995,12 @@ async def run_agent_stream(
                         created_cell_ids.append(sse_event["cell_id"])
                     elif sse_event["type"] == "cell_code_updated":
                         updated_cell_ids.append(sse_event["cell_id"])
+
+                skill_reminders.extend(
+                    agent_skills.collect_post_hook_reminders(
+                        tool_block.name, tool_block.input, result, notebook_state,
+                    )
+                )
 
                 image_b64 = result.pop("image_png_base64", None) if isinstance(result, dict) else None
                 if image_b64:
@@ -833,7 +1028,7 @@ async def run_agent_stream(
 
             messages.append({"role": "assistant", "content": _content_to_dict(response.content)})
 
-            reminders: list[str] = []
+            reminders: list[str] = list(skill_reminders)
             # 내레이션 강제: 규칙 위반시 매 턴마다 리마인더 재주입 (1회 한정 X)
             if turn_index > 0 and len(full_text.strip()) < NARRATION_MIN_CHARS:
                 reminders.append(

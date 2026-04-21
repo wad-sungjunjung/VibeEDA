@@ -23,6 +23,10 @@ export default function RightNav() {
     agentChatHistory,
     agentSessions,
     agentSessionTitle,
+    currentSessionCreatedAtMs,
+    currentSessionId,
+    collapsedSessionIds,
+    toggleSessionCollapsed,
     newAgentSession,
     resumeAgentSession,
     deleteAgentSession,
@@ -37,14 +41,6 @@ export default function RightNav() {
     cellActiveEntryId,
   } = useAppStore()
 
-  const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set())
-  function toggleSession(id: string) {
-    setCollapsedSessions((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
 
   type SessionMenu = { kind: 'session'; id: string; x: number; y: number }
   type CellMenu = { kind: 'cell'; id: string; x: number; y: number }
@@ -475,66 +471,111 @@ export default function RightNav() {
               </div>
             ) : (
               <div className="space-y-2">
-                {/* 완료된 세션들 */}
-                {agentSessions.map((session, sIdx) => {
-                  const collapsed = collapsedSessions.has(session.id)
-                  const userMsgs = session.messages.filter((m) => m.role === 'user')
-                  return (
-                    <div
-                      key={session.id}
-                      className="rounded-md border overflow-hidden"
-                      style={{ borderColor: '#e7e5e0' }}
-                      onContextMenu={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setContextMenu({ kind: 'session', id: session.id, x: e.clientX, y: e.clientY })
-                      }}
-                    >
+                {/* 아카이브 세션 + 현재 대화를 하나의 리스트로 merge.
+                    - 모든 항목이 안정적 ID 를 갖는다 (현재 = currentSessionId, 아카이브 = session.id).
+                    - 접힘 상태는 store 의 collapsedSessionIds[id] 로 ID 기준 추적 → resume/archive 사이클 거쳐도 일관.
+                    - createdAtMs 오름차순으로 고정 정렬 → 바 순서가 상호작용으로 움직이지 않음. */}
+                {(() => {
+                  type Row = {
+                    id: string
+                    at: number
+                    title: string
+                    startedAt: string
+                    turns: number
+                    messages: typeof agentChatHistory
+                    isCurrent: boolean
+                  }
+                  const rows: Row[] = agentSessions.map((s) => ({
+                    id: s.id,
+                    at: s.createdAtMs ?? 0,
+                    title: s.title || '대화',
+                    startedAt: s.startedAt,
+                    turns: s.messages.filter((m) => m.role === 'user').length,
+                    messages: s.messages,
+                    isCurrent: false,
+                  }))
+                  if (agentChatHistory.length > 0 && currentSessionId) {
+                    rows.push({
+                      id: currentSessionId,
+                      at: currentSessionCreatedAtMs ?? Number.MAX_SAFE_INTEGER,
+                      title: agentSessionTitle ?? '현재 대화',
+                      startedAt: agentChatHistory[0]?.timestamp ?? '',
+                      turns: agentChatHistory.filter((m) => m.role === 'user').length,
+                      messages: agentChatHistory,
+                      isCurrent: true,
+                    })
+                  }
+                  rows.sort((a, b) => a.at - b.at)
+
+                  return rows.map((row) => {
+                    const collapsed = !!collapsedSessionIds[row.id]
+                    const borderColor = row.isCurrent ? '#ebc2b5' : '#e7e5e0'
+                    const headerBg = row.isCurrent ? '#fdede8' : '#f5f3ef'
+                    const titleColor = row.isCurrent ? 'text-primary' : 'text-text-secondary'
+                    return (
                       <div
-                        className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-stone-50 transition-colors"
-                        style={{ backgroundColor: '#f5f3ef' }}
+                        key={row.id}
+                        className="group/session rounded-md border overflow-hidden"
+                        style={{ borderColor }}
+                        onContextMenu={row.isCurrent ? undefined : (e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setContextMenu({ kind: 'session', id: row.id, x: e.clientX, y: e.clientY })
+                        }}
                       >
-                        <button
-                          title={collapsed ? '펼치기' : '접기'}
-                          onClick={() => toggleSession(session.id)}
-                          className="shrink-0 p-0.5 -ml-0.5 rounded hover:bg-stone-200 text-text-disabled"
+                        <div
+                          className="w-full flex items-center gap-1.5 px-2 py-1.5"
+                          style={{ backgroundColor: headerBg }}
                         >
-                          {collapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
-                        </button>
-                        <button
-                          className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
-                          title={`"${session.title || `대화 ${sIdx + 1}`}" 대화 이어가기`}
-                          onClick={() => resumeAgentSession(session.id)}
-                        >
-                          <span className="text-[10px] font-semibold text-text-secondary flex-1 truncate hover:text-primary transition-colors">
-                            {session.title || `대화 ${sIdx + 1}`}
+                          <button
+                            title={collapsed ? '펼치기' : '접기'}
+                            onClick={() => toggleSessionCollapsed(row.id)}
+                            className={cn(
+                              'shrink-0 p-0.5 -ml-0.5 rounded hover:bg-stone-200',
+                              row.isCurrent ? 'text-primary' : 'text-text-disabled',
+                            )}
+                          >
+                            {collapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
+                          </button>
+                          {row.isCurrent && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />
+                          )}
+                          <span
+                            className={cn('text-[10px] font-semibold flex-1 truncate cursor-default', titleColor)}
+                            onDoubleClick={row.isCurrent ? undefined : () => resumeAgentSession(row.id)}
+                            title={row.isCurrent
+                              ? row.title
+                              : `더블클릭: 이 대화 이어가기 · 우클릭: 메뉴 · "${row.title}"`}
+                          >
+                            {row.title}
                           </span>
-                          <span className="text-[9px] text-text-disabled shrink-0">{session.startedAt} · {userMsgs.length}턴</span>
-                        </button>
-                      </div>
-                      {!collapsed && (
-                        <div className="space-y-1 p-1.5 pt-1">
-                          <AgentTurnList messages={session.messages} scope={session.id} />
+                          <span className="text-[9px] text-text-disabled shrink-0">
+                            {row.startedAt ? `${row.startedAt} · ` : ''}{row.turns}턴
+                          </span>
+                          {!row.isCurrent && (
+                            <button
+                              title="이력 삭제"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (confirm('이 에이전트 이력을 삭제할까요?')) {
+                                  deleteAgentSession(row.id)
+                                }
+                              }}
+                              className="shrink-0 p-0.5 rounded text-text-disabled hover:bg-red-50 hover:text-danger opacity-0 group-hover/session:opacity-100 transition-opacity"
+                            >
+                              <Trash2 size={10} strokeWidth={2.5} />
+                            </button>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
-                {/* 현재 진행 중인 대화 */}
-                {agentChatHistory.length > 0 && (
-                  <div className="rounded-md border overflow-hidden" style={{ borderColor: '#ebc2b5' }}>
-                    <div className="flex items-center gap-1.5 px-2 py-1.5" style={{ backgroundColor: '#fdede8' }}>
-                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />
-                      <span className="text-[10px] font-semibold text-primary flex-1 truncate" title={agentSessionTitle ?? '현재 대화'}>
-                        {agentSessionTitle ?? '현재 대화'}
-                      </span>
-                      <span className="text-[9px] text-text-disabled shrink-0">{agentChatHistory.filter((m) => m.role === 'user').length}턴</span>
-                    </div>
-                    <div className="space-y-1 p-1.5 pt-1">
-                      <AgentTurnList messages={agentChatHistory} scope="current" />
-                    </div>
-                  </div>
-                )}
+                        {!collapsed && (
+                          <div className="space-y-1 p-1.5 pt-1">
+                            <AgentTurnList messages={row.messages} scope={row.id} />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                })()}
               </div>
             )}
           </div>
