@@ -9,9 +9,9 @@ Jupyter Notebook의 상위 버전 — 자연어 채팅으로 SQL/Python 코드�
 ## 아키텍처
 
 ```
-React UI (localhost:5173)
+React UI (localhost:9700)
     ↕ REST / SSE
-FastAPI 백엔드 (localhost:8000)
+FastAPI 백엔드 (localhost:4750)
     ├── .ipynb 파일 I/O  →  ~/vibe-notebooks/
     ├── 리포트 파일 I/O  →  ~/vibe-notebooks/reports/{id}.md + {id}_images/
     ├── Python 커널 (exec, in-process, 노트북별 namespace, Plotly + kaleido PNG 렌더)
@@ -170,7 +170,7 @@ cp .env.example .env   # ANTHROPIC_API_KEY / GEMINI_API_KEY 설정 (최소 하�
                        # DEFAULT_AGENT_MODEL=claude-opus-4-7
                        # DEFAULT_REPORT_MODEL=claude-opus-4-7
                        # SNOWFLAKE_* (선택, 프론트 UI로도 주입 가능)
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --port 4750
 # → ~/vibe-notebooks/ 폴더 자동 생성 (reports/ 는 최초 리포트 생성 시 자동 생성)
 
 # 프론트엔드

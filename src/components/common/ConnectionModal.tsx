@@ -13,7 +13,7 @@ interface Props {
 type ConnectState = 'idle' | 'connecting' | 'ok' | 'error'
 type Tab = 'snowflake' | 'local'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000/v1'
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4750/v1'
 const BACKEND_BASE = API_BASE.replace('/v1', '')
 const FRONTEND_ORIGIN = window.location.origin
 

@@ -1,7 +1,7 @@
 # Vibe EDA — API 명세서
 
 **버전**: v2.0 (로컬 전용 구현 반영)
-**Base URL**: `http://localhost:8000`
+**Base URL**: `http://localhost:4750`
 **Content-Type**: `application/json`
 **작성일**: 2026-04-20
 **범위**: 실제 구현된 FastAPI 엔드포인트와 SSE 이벤트 스키마. 이전 v1.0 (JWT/WebSocket/Cloud 기반) 스펙은 폐기되었음.
@@ -24,7 +24,7 @@
 > **주의**: Google OAuth 기반 멀티유저 인증은 미구현 (`backend/app/dependencies.py`의 TODO 참고).
 
 ### 0.2 CORS
-`backend/app/config.py`의 `ALLOWED_ORIGINS` (기본 `http://localhost:5173`, `http://localhost:4173`).
+`backend/app/config.py`의 `ALLOWED_ORIGINS` (기본 `http://localhost:9700`, `http://localhost:4173`).
 
 ### 0.3 SSE
 스트리밍 엔드포인트는 `text/event-stream`. 각 이벤트는 JSON 라인 `data: {...}\n\n` 형식.

@@ -8,4 +8,11 @@ export default defineConfig({
       '@': '/src',
     },
   },
+  server: {
+    port: Number(process.env.FRONTEND_PORT) || 9700,
+    strictPort: false,
+  },
+  preview: {
+    port: Number(process.env.FRONTEND_PORT) || 9700,
+  },
 })

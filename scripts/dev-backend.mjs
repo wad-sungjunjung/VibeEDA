@@ -17,6 +17,7 @@ if (bin === 'uvicorn') {
   console.warn('  (시스템 전역 uvicorn 으로 폴백합니다)')
 }
 
-const args = ['main:app', '--reload', '--port', '8000']
+const port = process.env.BACKEND_PORT || '4750'
+const args = ['main:app', '--reload', '--port', port]
 const child = spawn(bin, args, { cwd: BACKEND, stdio: 'inherit' })
 child.on('exit', (code) => process.exit(code ?? 0))

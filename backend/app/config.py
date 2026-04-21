@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     default_report_model: str = Field(default="claude-opus-4-7", alias="DEFAULT_REPORT_MODEL")
 
     allowed_origins: list[str] = Field(
-        default=["http://localhost:5173", "http://localhost:4173"],
+        default=["http://localhost:9700", "http://localhost:4173"],
         alias="ALLOWED_ORIGINS",
     )
 

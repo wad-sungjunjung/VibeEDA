@@ -26,7 +26,7 @@ npm run setup   # 최초 1회: venv, pip, npm, .env 생성
 npm run dev     # 백엔드 + 프론트엔드 동시 실행
 ```
 
-브라우저에서 `http://localhost:5173` 접속.
+브라우저에서 `http://localhost:9700` 접속.
 
 > `npm run setup` 이 하는 일:
 > 1. `backend/.venv` 가상환경 생성
@@ -34,7 +34,8 @@ npm run dev     # 백엔드 + 프론트엔드 동시 실행
 > 3. `backend/.env` 자동 생성 (`.env.example` 복사)
 > 4. `npm install`
 >
-> `npm run dev` 는 `concurrently`로 백엔드(8000) + 프론트엔드(5173)를 한 터미널에서 같이 띄운다. `Ctrl+C` 한 번이면 둘 다 종료.
+> `npm run dev` 는 `concurrently`로 백엔드(4750) + 프론트엔드(9700)를 한 터미널에서 같이 띄운다. `Ctrl+C` 한 번이면 둘 다 종료.
+> 포트를 바꿔야 하면 `BACKEND_PORT=xxxx FRONTEND_PORT=yyyy npm run dev` 로 오버라이드 가능.
 
 ---
 
@@ -172,9 +173,9 @@ backend\.venv\Scripts\python -m app.api.mcp_server
 - `python3 --version` 혹은 `python --version` 으로 3.10+ 가 설치돼 있는지 확인.
 - Windows: 공식 설치 시 "Add Python to PATH" 옵션 체크.
 
-**포트 8000 / 5173 이미 사용 중**
-- 백엔드 포트 변경: `scripts/dev-backend.mjs` 의 `--port` 값과 `src/lib/api.ts` 의 `BASE_URL` 을 함께 수정.
-- Vite는 자동으로 5174로 올라가는데, 이 경우 `backend/.env` 의 `ALLOWED_ORIGINS` 에 새 포트를 추가.
+**포트 4750 / 9700 이미 사용 중**
+- 한 번만: `BACKEND_PORT=xxxx FRONTEND_PORT=yyyy npm run dev` 로 실행 시 오버라이드.
+- 영구 변경: `scripts/dev-backend.mjs` 의 `BACKEND_PORT` 기본값, `vite.config.ts` 의 `server.port` 를 수정. `backend/.env` 의 `ALLOWED_ORIGINS` 와 루트 `.env.local` 의 `VITE_API_BASE_URL` 도 같이 맞춰야 CORS·API 호출이 깨지지 않는다.
 
 **`ModuleNotFoundError` (백엔드 시작 실패)**
 - `npm run setup` 을 다시 실행해서 `backend/.venv` 를 재생성.

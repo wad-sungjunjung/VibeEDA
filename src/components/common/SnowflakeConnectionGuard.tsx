@@ -3,7 +3,7 @@ import { WifiOff, X, Loader2 } from 'lucide-react'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useAppStore } from '@/store/useAppStore'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000/v1'
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4750/v1'
 
 type Phase = 'checking' | 'retrying' | 'connected' | 'disconnected' | 'dismissed'
 
