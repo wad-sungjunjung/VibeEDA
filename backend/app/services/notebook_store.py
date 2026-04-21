@@ -236,6 +236,8 @@ def _fmt_agent_messages(vibe: dict) -> list[dict]:
             "content": m.get("content", ""),
             "created_cell_ids": m.get("created_cell_ids", []),
             "created_at": m.get("ts", datetime.now().isoformat()),
+            # 블록 배열 — 레거시 엔트리에는 없음. 프론트가 optional 로 처리.
+            "blocks": m.get("blocks", []),
         }
         for i, m in enumerate(vibe.get("agent_history", []))
     ]
@@ -788,14 +790,23 @@ def truncate_chat_history(nb_id: str, cell_id: str, keep: int) -> None:
     _write_nb(nb_id, nb)
 
 
-def add_agent_message(nb_id: str, role: str, content: str, created_cell_ids: list = None) -> None:
+def add_agent_message(
+    nb_id: str,
+    role: str,
+    content: str,
+    created_cell_ids: list = None,
+    blocks: list = None,
+) -> None:
     nb = _read_nb(nb_id)
     vibe = nb.setdefault("metadata", {}).setdefault("vibe", {})
-    vibe.setdefault("agent_history", []).append({
+    entry: dict = {
         "role": role, "content": content,
         "created_cell_ids": created_cell_ids or [],
         "ts": datetime.now().isoformat(),
-    })
+    }
+    if blocks:
+        entry["blocks"] = blocks
+    vibe.setdefault("agent_history", []).append(entry)
     _write_nb(nb_id, nb)
 
 

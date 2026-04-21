@@ -111,6 +111,17 @@ export interface AgentMessage {
   collapsed?: boolean      // true면 UI에서 접힌 상태
 }
 
+// 서버 persist 용 블록 — 스트림 이벤트의 순서/의미를 보존하는 serializable form.
+// rowToAgentMsg 에서 블록 배열을 UI 용 AgentMessage 시퀀스로 확장한다.
+export type AgentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; tool: string; input: Record<string, unknown> }
+  | { type: 'cell_created'; cell_id: string; cell_type: string; cell_name: string; code: string }
+  | { type: 'cell_code_updated'; cell_id: string; code: string }
+  | { type: 'cell_executed'; cell_id: string; is_error: boolean; error_message?: string }
+  | { type: 'cell_memo_updated'; cell_id: string; memo: string }
+  | { type: 'error'; message: string }
+
 export interface AgentSession {
   id: string
   title: string

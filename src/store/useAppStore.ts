@@ -125,17 +125,104 @@ function rowToCell(row: CellRow): Cell {
   }
 }
 
-function rowToAgentMsg(row: AgentMessageRow): AgentMessage {
-  return {
-    id: row.id,
-    role: row.role,
-    content: row.content,
-    timestamp: new Date(row.created_at).toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    createdCellIds: row.created_cell_ids,
+function rowToAgentMsgs(row: AgentMessageRow): AgentMessage[] {
+  const ts = new Date(row.created_at).toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  // 레거시 엔트리(blocks 없음) 또는 user role → 단일 메시지.
+  if (row.role === 'user' || !row.blocks || row.blocks.length === 0) {
+    return [
+      {
+        id: row.id,
+        role: row.role,
+        content: row.content,
+        timestamp: ts,
+        createdCellIds: row.created_cell_ids,
+      },
+    ]
   }
+  // assistant + blocks: 라이브 스트림과 동일한 step/message 시퀀스로 확장.
+  const out: AgentMessage[] = []
+  let idx = 0
+  const nextId = () => `${row.id}-b${idx++}`
+  let lastTextIdx = -1
+  for (const block of row.blocks) {
+    if (block.type === 'text') {
+      out.push({ id: nextId(), role: 'assistant', content: block.text, timestamp: ts, kind: 'message' })
+      lastTextIdx = out.length - 1
+    } else if (block.type === 'tool_use') {
+      out.push({
+        id: nextId(), role: 'assistant', content: '', timestamp: ts,
+        kind: 'step', stepType: 'tool',
+        stepLabel: toolStatusLabel(block.tool, block.input),
+        collapsed: true,
+      })
+    } else if (block.type === 'cell_created') {
+      out.push({
+        id: nextId(), role: 'assistant', content: '', timestamp: ts,
+        kind: 'step', stepType: 'cell_created',
+        stepLabel: `셀 생성 · ${block.cell_name}`,
+        stepDetail: block.code,
+        collapsed: true,
+      })
+    } else if (block.type === 'cell_code_updated') {
+      out.push({
+        id: nextId(), role: 'assistant', content: '', timestamp: ts,
+        kind: 'step', stepType: 'cell_created',
+        stepLabel: '셀 코드 수정',
+        stepDetail: block.code,
+        collapsed: true,
+      })
+    } else if (block.type === 'cell_executed') {
+      // 라이브 UX 와 동일: 직전 cell_created step 을 in-place 업그레이드.
+      const prev = out[out.length - 1]
+      const patch = {
+        stepType: (block.is_error ? 'error' : 'cell_executed') as NonNullable<AgentMessage['stepType']>,
+        stepLabel: block.is_error ? '셀 실행 실패' : '셀 실행 완료',
+        stepDetail: block.is_error ? (block.error_message || '알 수 없는 오류') : undefined,
+      }
+      if (prev && prev.kind === 'step' && prev.stepType === 'cell_created') {
+        out[out.length - 1] = { ...prev, ...patch }
+      } else {
+        out.push({
+          id: nextId(), role: 'assistant', content: '', timestamp: ts,
+          kind: 'step', collapsed: true, ...patch,
+        })
+      }
+    } else if (block.type === 'cell_memo_updated') {
+      out.push({
+        id: nextId(), role: 'assistant', content: '', timestamp: ts,
+        kind: 'step', stepType: 'cell_memo',
+        stepLabel: '인사이트 메모 기록',
+        stepDetail: block.memo,
+        collapsed: true,
+      })
+    } else if (block.type === 'error') {
+      out.push({
+        id: nextId(), role: 'assistant', content: '', timestamp: ts,
+        kind: 'step', stepType: 'error',
+        stepLabel: '오류 발생',
+        stepDetail: block.message,
+        collapsed: true,
+      })
+    }
+  }
+  // createdCellIds 는 마지막 텍스트 버블(= "최종 답변") 에 부착.
+  if (lastTextIdx >= 0 && row.created_cell_ids?.length) {
+    out[lastTextIdx] = { ...out[lastTextIdx], createdCellIds: row.created_cell_ids }
+  } else if (out.length > 0 && row.created_cell_ids?.length) {
+    // 텍스트가 전혀 없으면 마지막 step 에 부착.
+    out[out.length - 1] = { ...out[out.length - 1], createdCellIds: row.created_cell_ids }
+  }
+  // blocks 만으로 복원 실패 시 최소한 content 로 폴백
+  if (out.length === 0 && row.content) {
+    out.push({
+      id: row.id, role: 'assistant', content: row.content, timestamp: ts,
+      createdCellIds: row.created_cell_ids,
+    })
+  }
+  return out
 }
 
 function formatNotebookDate(iso: string): string {
@@ -1743,7 +1830,7 @@ function _applyNotebookDetail(detail: NotebookDetail, _isFirst: boolean) {
       seenIds.add(c.id)
       return true
     })
-  const agentChatHistory = detail.agent_messages.map(rowToAgentMsg)
+  const agentChatHistory = detail.agent_messages.flatMap(rowToAgentMsgs)
   const agentSessions = loadAgentSessions(detail.id)
 
   useAppStore.setState((s) => ({

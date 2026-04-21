@@ -67,6 +67,7 @@ export interface AgentMessageRow {
   content: string
   created_cell_ids: string[]
   created_at: string
+  blocks?: import('@/types').AgentBlock[]
 }
 
 export interface NotebookDetail extends NotebookRow {
