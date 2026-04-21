@@ -245,6 +245,9 @@ export default function AgentChatPanel() {
             const msg = item.msg
             const idx = item.idx
             const isLast = idx === agentChatHistory.length - 1
+            const isEmptyAssistant = msg.role === 'assistant' && !msg.content
+            // 에이전트가 턴 전환 중 생성한 빈 말풍선은 로딩이 끝나면 숨긴다 (마지막 메시지는 제외)
+            if (isEmptyAssistant && !agentLoading && !isLast) return null
             return (
             <div key={msg.id} className={cn('flex gap-2.5', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
               <div
@@ -301,6 +304,12 @@ export default function AgentChatPanel() {
                         </div>
                       )}
                     </div>
+                  ) : isEmptyAssistant && agentLoading ? (
+                    // 턴 전환 중인 빈 말풍선 — 현재 상태 라벨을 붙여 진행 맥락을 보여준다.
+                    <span className="flex items-center gap-2 whitespace-nowrap text-primary-hover">
+                      <Loader2 size={12} className="animate-spin" />
+                      <span className="text-[12px] font-semibold">{agentStatus ?? '출력 분석 중'}</span>
+                    </span>
                   ) : msg.role === 'assistant' ? (
                     <Markdown content={msg.content} />
                   ) : (
@@ -416,7 +425,8 @@ export default function AgentChatPanel() {
       {/* Input — 바이브 챗 박스와 동일 포맷: 모델 select 좌하단, 전송 우하단 */}
       <div className="px-4 py-3">
         <div
-          className="relative rounded-2xl bg-surface border border-border-subtle shadow-sm"
+          className="relative rounded-2xl border border-border shadow-sm"
+          style={{ backgroundColor: 'rgb(var(--color-surface-hover))' }}
         >
           <textarea
             className="w-full bg-transparent text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none resize-none leading-relaxed overflow-hidden rounded-2xl"

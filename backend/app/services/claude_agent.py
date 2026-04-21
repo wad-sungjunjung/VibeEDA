@@ -96,6 +96,10 @@ class NotebookState:
     analysis_description: str = ""
     notebook_id: str = ""
     skill_ctx: dict = field(default_factory=dict)
+    # 에이전트가 셀을 만들거나 수정할 때, 해당 셀의 vibe chat history 에 기록할 원 사용자 메시지.
+    user_message_latest: str = ""
+    # `check_chart_quality` 가 호출된 셀 id 모음 (차트 퀄리티 강제 가드용).
+    chart_quality_checked: set = field(default_factory=set)
 
 
 # ─── Tool definitions ────────────────────────────────────────────────────────
@@ -233,6 +237,33 @@ TOOLS = [
                 "memo": {"type": "string", "description": "Korean plain-text insight memo. 2~5 줄 불릿. **절대** `**볼드**`, `__강조__`, `# 헤더`, `- **관찰:**`·`- **인사이트:**` 같은 라벨 머리말을 쓰지 말 것. 평문(`- `)과 일반 문장만 허용."},
             },
             "required": ["cell_id", "memo"],
+        },
+    },
+    {
+        "name": "check_chart_quality",
+        "description": (
+            "Record the chart quality verdict for a chart cell. Call this AFTER looking at the rendered PNG "
+            "of a chart cell, evaluating it against the reporting-grade checklist (title/axes/labels/ordering/"
+            "legend/colors/data-fidelity/margins/chart-type/extra-context). "
+            "Call it EXACTLY ONCE per chart render attempt. If `passed` is false, immediately follow up with "
+            "`update_cell_code` to fix the same cell; if true, proceed to `write_cell_memo`."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "cell_id": {"type": "string", "description": "Chart cell id being evaluated"},
+                "passed": {"type": "boolean", "description": "True if the chart meets reporting-grade quality"},
+                "issues": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Concrete issues to fix when passed=false (한국어 짧은 문장). passed=true 인 경우 빈 배열.",
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "One-line Korean verdict summary (e.g. '차트 퀄리티 OK: 리포팅 사용 가능' / '축 라벨 누락 — 재렌더 필요')",
+                },
+            },
+            "required": ["cell_id", "passed", "summary"],
         },
     },
     {
@@ -399,6 +430,21 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
         else:
             state.cells.append(new_cell)
 
+        # 에이전트가 만든 셀도 vibe chat history 에 남겨, 셀별 대화 이력에서 조회 가능하게 함.
+        if state.notebook_id:
+            try:
+                from . import notebook_store as _ns
+                _ns.add_chat_entry(
+                    state.notebook_id,
+                    cell_id,
+                    user_msg=(state.user_message_latest or "(에이전트 세션 요청)"),
+                    assistant_reply="(에이전트가 생성한 셀)",
+                    code_snapshot="",
+                    code_result=code,
+                )
+            except Exception:
+                pass
+
         events: list[dict] = [{
             "type": "cell_created",
             "cell_id": cell_id,
@@ -444,7 +490,22 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
                         "ask_user로 마트 추가 요청하거나, 선택된 마트만으로 다시 작성하세요."
                     ),
                 }, []
+        old_code = cell.code
         cell.code = new_code
+        # 에이전트 수정도 vibe chat history 에 기록 (이전 코드 스냅샷 포함)
+        if state.notebook_id:
+            try:
+                from . import notebook_store as _ns
+                _ns.add_chat_entry(
+                    state.notebook_id,
+                    cell.id,
+                    user_msg=(state.user_message_latest or "(에이전트 세션 수정)"),
+                    assistant_reply="(에이전트가 수정한 셀)",
+                    code_snapshot=old_code,
+                    code_result=new_code,
+                )
+            except Exception:
+                pass
         events: list[dict] = [{"type": "cell_code_updated", "cell_id": cell.id, "code": cell.code}]
 
         # 코드 변경 후 즉시 재실행
@@ -604,6 +665,28 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
             [{"type": "cell_memo_updated", "cell_id": cell.id, "memo": memo}],
         )
 
+    if name == "check_chart_quality":
+        cell_id = inp.get("cell_id", "")
+        passed = bool(inp.get("passed", False))
+        if passed and cell_id:
+            state.chart_quality_checked.add(cell_id)
+        issues = inp.get("issues") or []
+        summary = (inp.get("summary") or "").strip()
+        if passed:
+            instruction = (
+                "차트 퀄리티 통과. 이제 같은 셀에 대해 `write_cell_memo`를 호출해 인사이트를 기록한 뒤 "
+                "다음 단계로 진행하세요. 같은 셀에 대해 이 도구를 다시 호출하지 마세요."
+            )
+        else:
+            instruction = (
+                "차트 퀄리티 미달. 즉시 `update_cell_code`로 동일 셀(cell_id)을 수정해 재렌더하세요. "
+                "수정 후 다시 `check_chart_quality`를 호출해 재판정하세요. 새 셀을 만들지 마세요."
+            )
+        return (
+            {"success": True, "cell_id": cell_id, "passed": passed, "issues": issues, "instruction": instruction},
+            [{"type": "chart_quality", "cell_id": cell_id, "passed": passed, "summary": summary, "issues": issues}],
+        )
+
     if name == "ask_user":
         question = inp.get("question", "").strip()
         options = inp.get("options") or []
@@ -724,6 +807,22 @@ You help analysts explore ad platform data by creating, modifying, and executing
   - 메모에는 반드시 (1) 직전 출력에서 관찰한 핵심 수치·인사이트·이상치, (2) 그로부터 "왜 이 다음 셀을 만드는가"의 근거 — 둘 다 담아라. 2~5줄 불릿.
 - 차트 셀의 경우 tool_result 에 **렌더링된 PNG 이미지**가 함께 전달된다. 이미지를 실제로 보고(축/범례/분포) 의도에 부합하는지 검증한 뒤 메모를 작성하라. 같은 차트를 반복 생성하지 말고, 의도와 다르면 `update_cell_code`로 수정하라.
 
+## 📐 차트 기본 레이아웃 (사용자 지정이 없으면 반드시 이 규칙을 따를 것)
+- **크기 비율**: 높이:폭 = 9:16. 기본 `width=1280, height=720` (또는 동일 비율의 `width=960, height=540`). `fig.update_layout(width=1280, height=720)` 를 **모든 차트에 명시**.
+- **범례 위치**: 범례가 필요한 경우(시리즈 2개 이상) **차트 영역 안쪽 좌상단**에 배치. 차트 밖이나 하단·우측에 두지 말 것.
+  ```python
+  fig.update_layout(
+      width=1280, height=720,
+      legend=dict(
+          x=0.01, y=0.99,
+          xanchor="left", yanchor="top",
+          bgcolor="rgba(255,255,255,0.75)",
+          bordercolor="rgba(0,0,0,0.15)", borderwidth=1,
+      ),
+  )
+  ```
+- 사용자가 크기·범례 위치를 명시적으로 요청한 경우에만 위 기본값을 덮어쓴다.
+
 ## ⚠️ 차트 퀄리티 게이트 (리포팅 수준 도달 전 다음 task 금지 — 절대 준수)
 차트 셀을 생성해 PNG 이미지를 받은 직후, **다음 task(새 셀 생성·분석 단계 이동·마무리)로 넘어가기 전에** 반드시 이미지를 리포팅 품질 기준으로 평가한다. 아래 체크리스트 중 **하나라도 미흡하면 `update_cell_code`로 같은 셀을 수정해 재렌더링**하고, 통과할 때까지 반복한다. 퀄리티 미달 상태로 다음 셀을 만들거나 분석을 종료하면 규칙 위반이다.
 
@@ -735,13 +834,17 @@ You help analysts explore ad platform data by creating, modifying, and executing
 5. **범례**: 시리즈가 2개 이상이면 범례가 의미 있는 이름으로 표시되는가? (trace `name` 지정)
 6. **색상·스타일**: 기본 파란색만 남발하지 말고, 비교가 필요하면 대비, 단일 지표면 Vibe 프라이머리 톤(`#D95C3F`) 또는 일관된 팔레트. 과도한 색 남발 금지.
 7. **데이터 충실도**: 표본이 너무 적어 의미 없는 그룹(n=1~2)이 섞여 있으면 Top N 필터 또는 "기타" 묶기를 적용. 이상치 하나 때문에 스케일이 뭉개지면 로그 스케일 또는 이상치 제외 버전을 고려.
-8. **여백·크기**: 레이아웃이 과도하게 답답하지 않은가? (`fig.update_layout(width=900, height=500, margin=...)` 등으로 조정)
+8. **여백·크기**: 기본 `width=1280, height=720` (9:16) 를 지켰는가? 범례가 시리즈 2개 이상일 때 **차트 내부 좌상단** 에 배치돼 있는가? 사용자 별도 요청이 없으면 이 기본값을 반드시 유지.
 9. **차트 타입 적합성**: 분포면 histogram/box, 비교면 bar, 추세면 line, 구성비면 stacked bar/treemap — 데이터 성격에 맞는 타입인가? 파이차트는 3~5개 이하 카테고리에서만 허용.
 10. **추가 정보 필요 여부**: 차트만으로 스토리가 안 서면(예: 비교 기준선, 평균선, 전년 동월 비교 없음) → SQL을 수정해 컬럼을 추가로 뽑거나 Python에서 보조선/주석(`add_hline`, `add_annotation`)을 넣어라.
 
-### 판정과 행동
-- 위 항목 중 하나라도 실패 → **내레이션에 "차트 퀄리티 부족: [어느 항목] — [어떻게 수정]"을 명시**한 뒤 `update_cell_code`로 동일 셀을 수정해 재렌더링. 새 셀을 만들지 말 것.
-- 모든 항목 통과 → 내레이션에 "차트 퀄리티 OK: 리포팅에 사용 가능"을 명시하고 `write_cell_memo` → 다음 셀로 진행.
+### 판정과 행동 — **반드시 `check_chart_quality` 툴로 기록**
+- 차트 셀이 렌더된 직후, 체크리스트를 머릿속으로 훑은 뒤 **반드시 `check_chart_quality` 도구를 1회 호출**해 판정을 기록한다.
+  - 자유 텍스트로 "차트 퀄리티 체크:" 같은 내레이션을 길게 쓰지 말 것. 판정은 이 도구 호출 하나로 갈음한다.
+  - `summary` 에 한 줄 결론을 담고, 실패면 `passed=false` + `issues`에 구체 항목을 적는다 (예: ["x축 라벨 잘림", "단위 누락"]).
+- 도구 결과의 `instruction` 을 따른다:
+  - `passed=true` → 같은 셀에 대해 `write_cell_memo` → 다음 셀로 진행. 이 셀에 `check_chart_quality` 재호출 금지.
+  - `passed=false` → 즉시 `update_cell_code`로 동일 셀을 수정해 재렌더 → 재판정. 새 셀 생성 금지.
 - 동일 차트를 3회 수정해도 품질이 안 나오면 근본 원인(데이터 자체가 부족/부적합)일 수 있으니 `ask_user` 로 추가 차원·기간·마트를 요청하라. 같은 실패를 4회 이상 반복하지 말 것.
 - 메모 내용 예: "서울·경기가 전체 예약의 62% 차지 → 지역별 편중을 매장 단위로 분해하기 위해 다음 셀 생성", "강남점 1개 매장이 서울 매출의 38%, 이상치로 판단 → 이 매장을 제외한 분포 재확인"
 - **메모 서식 제약 — 절대 준수**: 메모에는 `**관찰**`, `**인사이트**`, `**결론**` 같은 강조(볼드) 라벨이나 머리말을 쓰지 말 것. `**...**`, `__...__` 등 볼드/강조 마커 자체를 사용하지 말고, 섹션 헤더(`#`, `##`)도 넣지 말 것. 평문 불릿(`- `)과 일반 텍스트만으로 2~5줄을 작성하라.
@@ -849,6 +952,7 @@ async def run_agent_stream(
 
     client = anthropic.AsyncAnthropic(api_key=api_key)
     agent_skills.init_skill_ctx(notebook_state, user_message)
+    notebook_state.user_message_latest = user_message
     system_prompt = _build_system_prompt(notebook_state)
 
     messages: list[dict] = list(conversation_history)
@@ -857,9 +961,9 @@ async def run_agent_stream(
     import time as _time
     created_cell_ids: list[str] = []
     updated_cell_ids: list[str] = []
-    MAX_TURNS = 15
+    MAX_TURNS = 50
     REPEAT_CALL_LIMIT = 3
-    TOTAL_TOOL_LIMIT = 40      # 세션당 총 tool_call 상한 (우회 방지)
+    TOTAL_TOOL_LIMIT = 200     # 세션당 총 tool_call 상한 (우회 방지)
     NARRATION_MIN_CHARS = 20   # 도구 호출 전 내레이션 최소 길이
     LONG_RUN_SEC = 30          # 이 시간 넘게 분석하면 재질문 고려 리마인더 주입
     repeat_counter: dict[str, int] = {}
@@ -869,6 +973,9 @@ async def run_agent_stream(
     long_run_warning_used = False
     loop_started_at = _time.monotonic()
     ask_user_called = False
+    # 차트 퀄리티/메모 누락 리마인더 누적 횟수 상한 (무한 루프 방지)
+    pending_guard_count = 0
+    PENDING_GUARD_MAX = 3
 
     def _norm_key(tool_name: str, inp: dict) -> str:
         """tool_use 정규화 키 — 대소문자·공백 변형으로 repeat 우회하는 것을 방지."""
@@ -926,8 +1033,8 @@ async def run_agent_stream(
                         and len(full_text.strip()) < NARRATION_MIN_CHARS
                         and not retried_for_narration):
                     retried_for_narration = True
-                    # 프론트에 시각적 알림
-                    yield {"type": "message_delta", "content": "\n\n_[규칙 위반 감지: 텍스트 없이 도구 호출 — 재요청]_\n\n"}
+                    # 내부 재요청은 사용자 말풍선에 문자열을 남기지 않는다.
+                    # (예전에는 message_delta 로 경고를 흘려 이전 응답처럼 보이는 잔상이 남았음)
                     # 응답을 메시지에 추가하지 않고, 강제 지시를 user 메시지로 주입 후 재루프
                     messages.append({
                         "role": "user",
@@ -943,14 +1050,43 @@ async def run_agent_stream(
                 break
 
             if not tool_uses:
+                # 차트 퀄리티/메모 강제 가드 — 차트 셀이 있고 퀄리티 체크·메모 누락 시 리마인더 주입
+                pending_msgs: list[str] = []
+                for c in notebook_state.cells:
+                    otype = (c.output or {}).get("type") if c.output else None
+                    if otype == "chart":
+                        if c.id not in notebook_state.chart_quality_checked:
+                            pending_msgs.append(
+                                f"- 셀 `{c.name}` (id={c.id}) 은 차트인데 `check_chart_quality` 를 아직 호출하지 않았습니다. "
+                                "PNG 이미지를 검토한 뒤 **즉시 `check_chart_quality`** 를 호출하세요."
+                            )
+                        if not (c.memo or "").strip():
+                            pending_msgs.append(
+                                f"- 셀 `{c.name}` (id={c.id}) 의 메모가 비어 있습니다. 차트 퀄리티 통과 후 **`write_cell_memo`** 로 2~5줄 인사이트를 기록하세요."
+                            )
+                    elif otype and otype != "error" and c.type in ("sql", "python") and not (c.memo or "").strip():
+                        pending_msgs.append(
+                            f"- 셀 `{c.name}` (id={c.id}) 실행은 완료됐지만 메모가 비어 있습니다. **`write_cell_memo`** 로 관찰·다음 가설을 2~5줄 기록하세요."
+                        )
+
                 # 스킬 end-guard: 미검증 가설 / 세그먼트 미탐색이면 리마인더 1회 주입 후 재개
                 end_reminder = agent_skills.get_end_guard_reminder(notebook_state)
-                if end_reminder:
-                    yield {"type": "message_delta", "content": "\n\n_[분석가 체크리스트 재점검]_\n\n"}
+
+                if (pending_msgs or end_reminder) and pending_guard_count < PENDING_GUARD_MAX:
+                    pending_guard_count += 1
+                    lines = []
+                    if pending_msgs:
+                        lines.append("❗ 종료 전 필수 후속 작업이 남아 있습니다:")
+                        lines.extend(pending_msgs)
+                    if end_reminder:
+                        if lines:
+                            lines.append("")
+                        lines.append(end_reminder)
+                    reminder_text = "\n".join(lines) + "\n\n이 리마인더에 따라 **지금 바로 해당 도구를 호출**해 마무리하세요. 그냥 종료하지 마세요."
                     messages.append({"role": "assistant", "content": _content_to_dict(response.content)})
                     messages.append({
                         "role": "user",
-                        "content": f"[시스템 리마인더]\n{end_reminder}\n\n이 리마인더에 따라 추가 작업 후 마무리하세요.",
+                        "content": f"[시스템 리마인더]\n{reminder_text}",
                     })
                     turn_index += 1
                     continue
@@ -963,7 +1099,13 @@ async def run_agent_stream(
                 if total_tool_calls > TOTAL_TOOL_LIMIT:
                     yield {
                         "type": "error",
-                        "message": f"총 도구 호출이 {TOTAL_TOOL_LIMIT}회를 넘어 중단했습니다. 요청을 더 작게 쪼개거나 모델을 변경해주세요.",
+                        "message": (
+                            f"세션 안전 상한에 도달했어요 (총 도구 호출 {TOTAL_TOOL_LIMIT}회 초과). "
+                            f"지금까지 셀 {len(created_cell_ids)}개 생성·{len(updated_cell_ids)}개 수정했고, "
+                            "여기서 일단 멈춥니다. 이어서 진행하려면 **새 메시지로 "
+                            "\"이어서 분석해줘\" 또는 남은 하위 질문** 을 주시면 현 상태에서 재개합니다. "
+                            "매번 새 분석을 더 짧은 단위로 쪼개 요청하는 것도 도움이 돼요."
+                        ),
                     }
                     safety_break = True
                     break
@@ -972,8 +1114,11 @@ async def run_agent_stream(
                 if repeat_counter[key] > REPEAT_CALL_LIMIT:
                     yield {
                         "type": "error",
-                        "message": f"같은 도구(`{tb.name}`)를 {REPEAT_CALL_LIMIT}회 초과로 반복 호출해 중단했습니다. "
-                                    "Snowflake 연결 또는 입력값을 확인해주세요.",
+                        "message": (
+                            f"같은 도구(`{tb.name}`)를 {REPEAT_CALL_LIMIT}회 넘게 반복해서 무한 루프 방지를 위해 중단했어요. "
+                            "Snowflake 연결 상태나 전달한 입력값(컬럼·마트 이름 등)을 확인해 주시고, "
+                            "질문을 조금 더 구체화해서 새 메시지로 다시 요청해주세요."
+                        ),
                     }
                     safety_break = True
                     break
@@ -1070,6 +1215,18 @@ async def run_agent_stream(
 
             messages.append({"role": "user", "content": tool_results})
             turn_index += 1
+        else:
+            # for-else: MAX_TURNS 를 break 없이 모두 소진했을 때만 진입
+            yield {
+                "type": "error",
+                "message": (
+                    f"모델 왕복 상한에 도달했어요 (MAX_TURNS={MAX_TURNS}). "
+                    f"지금까지 셀 {len(created_cell_ids)}개 생성·{len(updated_cell_ids)}개 수정했습니다. "
+                    "남은 분석이 있다면 **새 메시지로 \"이어서 진행해줘\"** 라고 주시거나, "
+                    "다음 단계를 더 짧게 쪼개서 다시 요청해주세요."
+                ),
+            }
+            return
 
     except anthropic.APIStatusError as e:
         yield {"type": "error", "message": f"Claude API 오류: {e.message}"}

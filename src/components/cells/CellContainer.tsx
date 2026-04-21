@@ -55,6 +55,8 @@ export default function CellContainer({ cell }: Props) {
   const [vSplitRatio, setVSplitRatio] = useState(() => loadCellUi(cell.id).vSplitRatio ?? 50)
   // 사용자가 직접 드래그로 조정한 패널 높이. 기본값은 360px.
   const [panelHeight, setPanelHeight] = useState(() => loadCellUi(cell.id).panelHeight ?? 360)
+  const hasSavedPanelHeight = loadCellUi(cell.id).panelHeight != null
+  const userResizedRef = useRef(hasSavedPanelHeight)
 
   useEffect(() => { saveCellUi(cell.id, { splitRatio }) }, [cell.id, splitRatio])
   useEffect(() => { saveCellUi(cell.id, { vSplitRatio }) }, [cell.id, vSplitRatio])
@@ -136,10 +138,13 @@ export default function CellContainer({ cell }: Props) {
     e.preventDefault()
     e.stopPropagation()
     const startY = e.clientY
-    const startH = panelHeight
+    // 드래그 시작 시점의 실제 화면상 높이(차트 자동확장분 포함)를 기준으로.
+    const currentEl = (e.currentTarget as HTMLElement).previousElementSibling as HTMLElement | null
+    const startH = currentEl?.getBoundingClientRect().height ?? panelHeight
+    userResizedRef.current = true
     const onMouseMove = (ev: MouseEvent) => {
       const next = startH + (ev.clientY - startY)
-      setPanelHeight(Math.min(Math.max(next, 160), 1200))
+      setPanelHeight(Math.min(Math.max(next, 160), 1600))
     }
     const onMouseUp = () => {
       document.removeEventListener('mousemove', onMouseMove)
@@ -387,6 +392,20 @@ export default function CellContainer({ cell }: Props) {
           const V_TOTAL = Math.max(notebookAreaHeight - CELL_HEADER - CONTENT_PAD - VIBE_CHAT - SAFETY, 200)
           const TAB_BAR = 30
           const panelMaxHeight = Math.max(V_TOTAL - TAB_BAR, 200)
+          // 차트 출력 셀은 Plotly layout.height(없으면 400)에 크롬 여백을 더해 자동 확장.
+          // 사용자가 직접 드래그로 더 크게 늘렸으면 그 값을 존중.
+          const CHART_CHROME = 24 // 테두리 + 상하 padding
+          const chartPreferredHeight = (() => {
+            if (cell.output?.type !== 'chart') return null
+            const layoutH = (cell.output.plotlyJson as any)?.layout?.height
+            const h = typeof layoutH === 'number' && layoutH > 0 ? layoutH : 400
+            return Math.min(h + CHART_CHROME, 1600)
+          })()
+          // 사용자가 드래그로 직접 조정한 적이 있으면 그 값을 그대로 씀.
+          // 아직 조정한 적이 없으면 차트 자연 높이로 초기 확장.
+          const effectiveHeight = userResizedRef.current
+            ? panelHeight
+            : (chartPreferredHeight ?? panelHeight)
           if (cell.splitMode && cell.splitDir === 'v') {
             const DIVIDER = 10
             const topPx = Math.round((V_TOTAL - DIVIDER) * vSplitRatio / 100)
@@ -425,14 +444,14 @@ export default function CellContainer({ cell }: Props) {
                     display: 'grid',
                     gridTemplateColumns: `${splitRatio}% 10px calc(${100 - splitRatio}% - 18px)`,
                     columnGap: 4,
-                    height: panelHeight,
+                    height: effectiveHeight,
                     alignItems: 'stretch',
                   }}
                 >
-                  <div ref={leftColRef} className="min-w-0 flex flex-col" style={{ height: panelHeight, overflow: 'hidden' }}>
+                  <div ref={leftColRef} className="min-w-0 flex flex-col" style={{ height: effectiveHeight, overflow: 'hidden' }}>
                     {renderTabBar(cell.leftTab, (t) => setSplitTab(cell.id, 'left', t))}
                     <div className={cn('flex-1 min-h-0', leftIsOutput ? 'overflow-hidden' : 'overflow-auto')}>
-                      {renderPanel(cell.leftTab, panelHeight, true)}
+                      {renderPanel(cell.leftTab, effectiveHeight, true)}
                     </div>
                   </div>
                   <div
@@ -442,10 +461,10 @@ export default function CellContainer({ cell }: Props) {
                   >
                     <div className="w-px h-full rounded-full transition-colors bg-border-subtle group-hover/div:bg-primary" />
                   </div>
-                  <div className="min-w-0 flex flex-col" style={{ height: panelHeight, overflow: 'hidden' }}>
+                  <div className="min-w-0 flex flex-col" style={{ height: effectiveHeight, overflow: 'hidden' }}>
                     {renderTabBar(cell.rightTab, (t) => setSplitTab(cell.id, 'right', t))}
                     <div className={cn('flex-1 min-h-0', rightIsOutput ? 'overflow-hidden' : 'overflow-auto')}>
-                      {renderPanel(cell.rightTab, panelHeight, true)}
+                      {renderPanel(cell.rightTab, effectiveHeight, true)}
                     </div>
                   </div>
                 </div>
@@ -458,8 +477,8 @@ export default function CellContainer({ cell }: Props) {
             return (
               <>
                 {renderTabBar(cell.activeTab, (t) => setCellTab(cell.id, t))}
-                <div style={{ height: panelHeight, overflow: 'hidden' }}>
-                  {renderPanel(cell.activeTab, panelHeight, true)}
+                <div style={{ height: effectiveHeight, overflow: 'hidden' }}>
+                  {renderPanel(cell.activeTab, effectiveHeight, true)}
                 </div>
                 <PanelResizeHandle onMouseDown={handlePanelResizeMouseDown} />
               </>

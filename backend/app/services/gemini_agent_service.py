@@ -166,6 +166,7 @@ async def run_agent_stream_gemini(
 
     client = genai.Client(api_key=api_key)
     agent_skills.init_skill_ctx(notebook_state, user_message)
+    notebook_state.user_message_latest = user_message
     system_prompt = _build_system_prompt(notebook_state)
 
     contents = _to_gemini_history(conversation_history)
@@ -174,16 +175,18 @@ async def run_agent_stream_gemini(
     created_cell_ids: list[str] = []
     import time as _time
     updated_cell_ids: list[str] = []
-    MAX_TURNS = 15
+    MAX_TURNS = 50
     NARRATION_MIN_CHARS = 20
     LONG_RUN_SEC = 30
-    TOTAL_TOOL_LIMIT = 40
+    TOTAL_TOOL_LIMIT = 200
     repeat_counter: dict[str, int] = {}  # 동일 툴 호출 반복 감지
     total_tool_calls = 0
     narration_warning_used = False
     long_run_warning_used = False
     loop_started_at = _time.monotonic()
     ask_user_called = False
+    pending_guard_count = 0
+    PENDING_GUARD_MAX = 3
 
     def _norm_key(tool_name: str, inp: dict) -> str:
         def _norm(v):
@@ -237,7 +240,7 @@ async def run_agent_stream_gemini(
                 if (turn > 0 and func_call_parts and text_total < NARRATION_MIN_CHARS
                         and not retried_for_narration):
                     retried_for_narration = True
-                    yield {"type": "message_delta", "content": "\n\n_[규칙 위반 감지: 텍스트 없이 도구 호출 — 재요청]_\n\n"}
+                    # 내부 재요청 경고는 사용자 말풍선에 노출하지 않음 (잔상 버그 방지)
                     contents.append(types.Content(
                         role="user",
                         parts=[types.Part.from_text(text=(
@@ -253,15 +256,42 @@ async def run_agent_stream_gemini(
                 yield {"type": "message_delta", "content": p.text}
 
             if not func_call_parts:
+                # 차트 퀄리티/메모 강제 가드 — 빠른 모델이 차트 후속 단계를 건너뛰는 문제 대응
+                pending_msgs: list[str] = []
+                for c in notebook_state.cells:
+                    otype = (c.output or {}).get("type") if c.output else None
+                    if otype == "chart":
+                        if c.id not in notebook_state.chart_quality_checked:
+                            pending_msgs.append(
+                                f"- 셀 `{c.name}` (id={c.id}) 은 차트인데 `check_chart_quality` 를 아직 호출하지 않았습니다. "
+                                "PNG 이미지를 검토한 뒤 **즉시 `check_chart_quality`** 를 호출하세요."
+                            )
+                        if not (c.memo or "").strip():
+                            pending_msgs.append(
+                                f"- 셀 `{c.name}` (id={c.id}) 의 메모가 비어 있습니다. 차트 퀄리티 통과 후 **`write_cell_memo`** 로 2~5줄 인사이트를 기록하세요."
+                            )
+                    elif otype and otype != "error" and c.type in ("sql", "python") and not (c.memo or "").strip():
+                        pending_msgs.append(
+                            f"- 셀 `{c.name}` (id={c.id}) 실행은 완료됐지만 메모가 비어 있습니다. **`write_cell_memo`** 로 관찰·다음 가설을 2~5줄 기록하세요."
+                        )
+
                 end_reminder = agent_skills.get_end_guard_reminder(notebook_state)
-                if end_reminder:
-                    yield {"type": "message_delta", "content": "\n\n_[분석가 체크리스트 재점검]_\n\n"}
+
+                if (pending_msgs or end_reminder) and pending_guard_count < PENDING_GUARD_MAX:
+                    pending_guard_count += 1
+                    lines = []
+                    if pending_msgs:
+                        lines.append("❗ 종료 전 필수 후속 작업이 남아 있습니다:")
+                        lines.extend(pending_msgs)
+                    if end_reminder:
+                        if lines:
+                            lines.append("")
+                        lines.append(end_reminder)
+                    reminder_text = "\n".join(lines) + "\n\n이 리마인더에 따라 **지금 바로 해당 도구를 호출**해 마무리하세요. 그냥 종료하지 마세요."
                     contents.append(candidate.content)
                     contents.append(types.Content(
                         role="user",
-                        parts=[types.Part.from_text(text=(
-                            f"[시스템 리마인더]\n{end_reminder}\n\n이 리마인더에 따라 추가 작업 후 마무리하세요."
-                        ))],
+                        parts=[types.Part.from_text(text=f"[시스템 리마인더]\n{reminder_text}")],
                     ))
                     continue
                 break
@@ -275,7 +305,12 @@ async def run_agent_stream_gemini(
                 if total_tool_calls > TOTAL_TOOL_LIMIT:
                     yield {
                         "type": "error",
-                        "message": f"총 도구 호출이 {TOTAL_TOOL_LIMIT}회를 넘어 중단했습니다. 요청을 더 작게 쪼개거나 모델을 변경해주세요.",
+                        "message": (
+                            f"세션 안전 상한에 도달했어요 (총 도구 호출 {TOTAL_TOOL_LIMIT}회 초과). "
+                            "여기서 일단 멈춥니다. 이어서 진행하려면 **새 메시지로 \"이어서 분석해줘\" "
+                            "또는 남은 하위 질문** 을 주시면 현 상태에서 재개합니다. "
+                            "매번 새 분석을 더 짧은 단위로 쪼개 요청하는 것도 도움이 돼요."
+                        ),
                     }
                     safety_break = True
                     break
@@ -285,8 +320,11 @@ async def run_agent_stream_gemini(
                     logger.warning("Gemini repeat-call guard triggered: %s", key)
                     yield {
                         "type": "error",
-                        "message": f"같은 도구(`{fc.name}`)를 {REPEAT_CALL_LIMIT}회 초과로 반복 호출해 중단했습니다. "
-                                    "Snowflake 연결 또는 입력값을 확인해주세요.",
+                        "message": (
+                            f"같은 도구(`{fc.name}`)를 {REPEAT_CALL_LIMIT}회 넘게 반복해서 무한 루프 방지를 위해 중단했어요. "
+                            "Snowflake 연결 상태나 전달한 입력값(컬럼·마트 이름 등)을 확인해 주시고, "
+                            "질문을 조금 더 구체화해서 새 메시지로 다시 요청해주세요."
+                        ),
                     }
                     safety_break = True
                     break
@@ -361,6 +399,17 @@ async def run_agent_stream_gemini(
                 long_run_warning_used = True
 
             contents.append(types.Content(role="user", parts=tool_response_parts))
+        else:
+            # for-else: MAX_TURNS 소진
+            yield {
+                "type": "error",
+                "message": (
+                    f"모델 왕복 상한에 도달했어요 (MAX_TURNS={MAX_TURNS}). "
+                    "남은 분석이 있다면 **새 메시지로 \"이어서 진행해줘\"** 라고 주시거나, "
+                    "다음 단계를 더 짧게 쪼개서 다시 요청해주세요."
+                ),
+            }
+            return
 
     except Exception as e:
         logger.exception("Gemini agent error")

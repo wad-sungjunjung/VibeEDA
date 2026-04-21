@@ -512,7 +512,8 @@ export default function RightNav() {
                   rows.sort((a, b) => a.at - b.at)
 
                   return rows.map((row) => {
-                    const collapsed = !!collapsedSessionIds[row.id]
+                    // 기본값 접힘. store 에 `true` 가 기록된 세션만 펼침.
+                    const collapsed = !collapsedSessionIds[row.id]
                     const titleColor = row.isCurrent ? 'text-primary' : 'text-text-secondary'
                     return (
                       <div

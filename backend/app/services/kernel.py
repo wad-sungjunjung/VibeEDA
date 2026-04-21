@@ -120,9 +120,22 @@ def _summarize_figure(fig) -> dict:
 
 
 def _render_figure_png_base64(fig) -> str | None:
-    """Plotly Figure를 저해상도 PNG로 렌더링하여 base64 문자열 반환. 실패 시 None."""
+    """Plotly Figure를 저해상도 PNG로 렌더링하여 base64 문자열 반환. 실패 시 None.
+    기본 비율은 9:16(height:width). fig.layout 에 명시된 width/height 가 있으면 존중.
+    LLM tool_result 로 보낼 이미지라 크기는 작게 유지.
+    """
     try:
-        img_bytes = fig.to_image(format="png", width=600, height=400, scale=1)
+        layout = getattr(fig, "layout", None)
+        w = getattr(layout, "width", None) if layout is not None else None
+        h = getattr(layout, "height", None) if layout is not None else None
+        # 명시값이 있으면 비율 유지하며 width 640 기준으로 축소
+        if w and h:
+            scale_factor = 640 / float(w)
+            width = 640
+            height = max(int(float(h) * scale_factor), 1)
+        else:
+            width, height = 640, 360  # 9:16
+        img_bytes = fig.to_image(format="png", width=width, height=height, scale=1)
         import base64
         return base64.b64encode(img_bytes).decode("ascii")
     except Exception:

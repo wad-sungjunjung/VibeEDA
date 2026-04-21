@@ -122,6 +122,11 @@ export function toolStatusLabel(tool: string, input?: Record<string, unknown>): 
     case 'preview_mart': return `샘플 데이터 조회 중${martKey}`
     case 'profile_mart': return `마트 프로파일링 중${martKey}`
     case 'write_cell_memo': return '인사이트 메모 기록 중'
+    case 'check_chart_quality': {
+      const passed = input?.passed
+      if (typeof passed === 'boolean') return passed ? '차트 퀄리티 통과' : '차트 퀄리티 재작업'
+      return '차트 퀄리티 검토 중'
+    }
     case 'ask_user': return '질문 준비 중'
     default: return `${tool} 실행 중`
   }

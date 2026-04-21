@@ -152,23 +152,27 @@ export default function CellOutput({ cell }: Props) {
     const pj = output.plotlyJson as { data?: unknown[]; layout?: Record<string, unknown> }
     const { template: _t, ...layoutRest } = (pj.layout ?? {}) as Record<string, unknown>
     const baseLayout = layoutRest as Record<string, any>
+    // Plotly layout에 지정된 폭/높이를 그대로 사용. 없으면 기본 600x400.
+    const natW = typeof baseLayout.width === 'number' && baseLayout.width > 0 ? baseLayout.width : 600
+    const natH = typeof baseLayout.height === 'number' && baseLayout.height > 0 ? baseLayout.height : 400
     return (
-      <div className="relative overflow-hidden group/output flex flex-col h-full">
+      <div className="relative group/output h-full overflow-auto flex items-center justify-center">
         <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
           <CopyButton
             label="이미지 복사"
             onCopy={() => copyPlotAsImage(plotDivRef.current?.querySelector('.js-plotly-plot') as HTMLElement | null)}
           />
         </div>
-        <div ref={plotDivRef} className="flex-1 min-h-0">
+        <div ref={plotDivRef} style={{ width: natW, height: natH, maxWidth: '100%' }}>
           <Plot
             data={(pj.data ?? []) as Plotly.Data[]}
             layout={{
               ...baseLayout,
-              // plotly TS 타입이 문자열 템플릿명을 직접 받지 않아 명시적 cast
               template: (isDark ? 'plotly_dark' : 'plotly_white') as unknown as Plotly.Template,
               autosize: true,
-              margin: { l: 16, r: 16, t: 40, b: 16, pad: 4 },
+              width: undefined,
+              height: undefined,
+              margin: baseLayout.margin ?? { l: 48, r: 16, t: 40, b: 40, pad: 4 },
               paper_bgcolor: isDark ? '#1b1916' : '#ffffff',
               plot_bgcolor: isDark ? '#1b1916' : '#ffffff',
               font: { family: 'Pretendard, -apple-system, sans-serif', size: 12, color: isDark ? '#e9e6df' : '#3d3530' },

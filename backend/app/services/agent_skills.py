@@ -344,6 +344,24 @@ def _render_plan_markdown(scope: str, hypotheses: list[dict], out_of_scope: list
     return "\n".join(lines)
 
 
+def _log_agent_chat(state: "NotebookState", cell_id: str, old_code: str, new_code: str, created: bool) -> None:
+    """에이전트 skill tool 로 만든/수정한 셀을 vibe chat_history 에 남긴다."""
+    if not getattr(state, "notebook_id", ""):
+        return
+    try:
+        from . import notebook_store as _ns
+        _ns.add_chat_entry(
+            state.notebook_id,
+            cell_id,
+            user_msg=(getattr(state, "user_message_latest", "") or "(에이전트 세션 요청)"),
+            assistant_reply="(에이전트가 생성한 셀)" if created else "(에이전트가 수정한 셀)",
+            code_snapshot=old_code,
+            code_result=new_code,
+        )
+    except Exception:
+        pass
+
+
 def handle_skill_tool(
     tool_name: str,
     inp: dict,
@@ -370,7 +388,9 @@ def handle_skill_tool(
         if existing_id:
             cell = next((c for c in state.cells if c.id == existing_id), None)
             if cell:
+                old_code = cell.code
                 cell.code = plan_md
+                _log_agent_chat(state, existing_id, old_code, plan_md, created=False)
                 return (
                     {"success": True, "plan_cell_id": existing_id, "hypotheses_count": len(hypotheses), "replaced": True},
                     [{"type": "cell_code_updated", "cell_id": existing_id, "code": plan_md}],
@@ -382,6 +402,7 @@ def handle_skill_tool(
         new_cell = cell_state_cls(id=cell_id, name=PLAN_CELL_NAME, type="markdown", code=plan_md)
         state.cells.insert(0, new_cell)
         ctx["plan_cell_id"] = cell_id
+        _log_agent_chat(state, cell_id, "", plan_md, created=True)
         return (
             {"success": True, "plan_cell_id": cell_id, "hypotheses_count": len(hypotheses)},
             [{
@@ -411,7 +432,9 @@ def handle_skill_tool(
             return {"success": False, "error": "empty_plan", "message": "`new_plan_markdown` 이 비어 있습니다."}, []
         if PLAN_MARKER not in new_md:
             new_md = PLAN_MARKER + "\n\n" + new_md
+        old_md = cell.code
         cell.code = new_md
+        _log_agent_chat(state, plan_id, old_md, new_md, created=False)
         return (
             {"success": True, "plan_cell_id": plan_id},
             [{"type": "cell_code_updated", "cell_id": plan_id, "code": new_md}],
