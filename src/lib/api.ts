@@ -17,6 +17,7 @@ export type AgentEvent =
   | { type: 'thinking'; content: string }
   | { type: 'tool_use'; tool: string; input: Record<string, unknown> }
   | { type: 'message_delta'; content: string }
+  | { type: 'reset_current_bubble' }
   | { type: 'cell_created'; cell_id: string; cell_type: CellType; cell_name: string; code: string; after_cell_id?: string | null }
   | { type: 'cell_code_updated'; cell_id: string; code: string }
   | { type: 'cell_executed'; cell_id: string; output?: import('@/types').CellOutput | null }

@@ -1365,6 +1365,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 m.id === msgId ? { ...m, content: m.content + event.content } : m
               ),
             }))
+          } else if (event.type === 'reset_current_bubble') {
+            // 백엔드가 내레이션 가드로 턴을 폐기할 때, 현재 말풍선에 흘러간 텍스트를 비운다.
+            const msgId = currentAssistantMsgId
+            set((s) => ({
+              agentChatHistory: s.agentChatHistory.map((m) =>
+                m.id === msgId ? { ...m, content: '' } : m
+              ),
+            }))
           } else if (event.type === 'cell_created') {
             createdCellIds.push(event.cell_id)
             set({ agentStatus: '셀 실행 중' })

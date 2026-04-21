@@ -1033,8 +1033,10 @@ async def run_agent_stream(
                         and len(full_text.strip()) < NARRATION_MIN_CHARS
                         and not retried_for_narration):
                     retried_for_narration = True
-                    # 내부 재요청은 사용자 말풍선에 문자열을 남기지 않는다.
-                    # (예전에는 message_delta 로 경고를 흘려 이전 응답처럼 보이는 잔상이 남았음)
+                    # 이 턴에 스트리밍된 짧은 텍스트는 버릴 것이므로 프론트 버블 내용을 리셋한다.
+                    # (안 그러면 재요청 시 재생성된 내레이션이 같은 버블에 이어붙어 중복처럼 보임)
+                    if full_text.strip():
+                        yield {"type": "reset_current_bubble"}
                     # 응답을 메시지에 추가하지 않고, 강제 지시를 user 메시지로 주입 후 재루프
                     messages.append({
                         "role": "user",

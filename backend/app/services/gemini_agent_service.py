@@ -240,7 +240,9 @@ async def run_agent_stream_gemini(
                 if (turn > 0 and func_call_parts and text_total < NARRATION_MIN_CHARS
                         and not retried_for_narration):
                     retried_for_narration = True
-                    # 내부 재요청 경고는 사용자 말풍선에 노출하지 않음 (잔상 버그 방지)
+                    # 짧은 텍스트가 이미 버블에 흘러갔다면 재요청 전 비운다 (중복 노출 방지)
+                    if text_total > 0:
+                        yield {"type": "reset_current_bubble"}
                     contents.append(types.Content(
                         role="user",
                         parts=[types.Part.from_text(text=(

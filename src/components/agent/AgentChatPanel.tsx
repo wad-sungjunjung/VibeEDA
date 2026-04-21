@@ -63,7 +63,8 @@ export default function AgentChatPanel() {
   type ChatItem =
     | { kind: 'msg'; msg: typeof agentChatHistory[number]; idx: number }
     | { kind: 'stepGroup'; groupId: string; steps: typeof agentChatHistory }
-  const chatItems: ChatItem[] = []
+    | { kind: 'turnGroup'; groupId: string; inner: ChatItem[] }
+  const rawChatItems: ChatItem[] = []
   for (let i = 0; i < agentChatHistory.length; i++) {
     const m = agentChatHistory[i]
     if (m.kind === 'step') {
@@ -74,11 +75,57 @@ export default function AgentChatPanel() {
         i++
       }
       i--
-      chatItems.push({ kind: 'stepGroup', groupId, steps })
+      rawChatItems.push({ kind: 'stepGroup', groupId, steps })
     } else {
-      chatItems.push({ kind: 'msg', msg: m, idx: i })
+      rawChatItems.push({ kind: 'msg', msg: m, idx: i })
     }
   }
+
+  // 대화가 종료(agentLoading=false)되면, 각 user 턴 내의
+  //   [작업들 + 중간 응답들]을 "턴 묶음" 토글로 접고, **마지막 assistant 응답만** 펼쳐 둔다.
+  const chatItems: ChatItem[] = (() => {
+    if (agentLoading) return rawChatItems
+    const isAsstMsg = (it: ChatItem) =>
+      it.kind === 'msg' && it.msg.role === 'assistant' && !!it.msg.content
+    const result: ChatItem[] = []
+    let segmentStart = 0
+    const flushSegment = (endExclusive: number) => {
+      const seg = rawChatItems.slice(segmentStart, endExclusive)
+      if (seg.length === 0) return
+      // segment 안의 마지막 assistant 응답 위치
+      let lastAsstLocalIdx = -1
+      for (let i = seg.length - 1; i >= 0; i--) {
+        if (isAsstMsg(seg[i])) { lastAsstLocalIdx = i; break }
+      }
+      // 마지막 응답이 없거나 항목이 1개뿐이면 그대로
+      if (lastAsstLocalIdx < 0 || seg.length === 1) {
+        for (const it of seg) result.push(it)
+        return
+      }
+      const earlier = seg.slice(0, lastAsstLocalIdx)
+      const tail = seg.slice(lastAsstLocalIdx)  // 마지막 assistant + 그 뒤 (보통 뒤는 없음)
+      if (earlier.length === 0) {
+        for (const it of tail) result.push(it)
+        return
+      }
+      if (earlier.length === 1) {
+        result.push(earlier[0])
+      } else {
+        result.push({ kind: 'turnGroup', groupId: `turn-${segmentStart}`, inner: earlier })
+      }
+      for (const it of tail) result.push(it)
+    }
+    for (let i = 0; i < rawChatItems.length; i++) {
+      const it = rawChatItems[i]
+      if (it.kind === 'msg' && it.msg.role === 'user') {
+        flushSegment(i)
+        result.push(it)
+        segmentStart = i + 1
+      }
+    }
+    flushSegment(rawChatItems.length)
+    return result
+  })()
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -234,6 +281,91 @@ export default function AgentChatPanel() {
                               <span className="text-[9px] text-text-disabled shrink-0">{step.timestamp}</span>
                             </div>
                           )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            }
+
+            if (item.kind === 'turnGroup') {
+              const collapsed = !collapsedGroups.has(item.groupId) // 기본 접힘
+              const stepCount = item.inner.reduce(
+                (acc, it) => acc + (it.kind === 'stepGroup' ? it.steps.length : 0), 0,
+              )
+              const msgCount = item.inner.filter(
+                (it) => it.kind === 'msg' && it.msg.role === 'assistant' && !!it.msg.content,
+              ).length
+              const firstTs = (() => {
+                for (const it of item.inner) {
+                  if (it.kind === 'msg') return it.msg.timestamp
+                  if (it.kind === 'stepGroup' && it.steps.length > 0) return it.steps[0].timestamp
+                }
+                return ''
+              })()
+              const summaryBits: string[] = []
+              if (stepCount > 0) summaryBits.push(`작업 ${stepCount}개`)
+              if (msgCount > 0) summaryBits.push(`응답 ${msgCount}개`)
+              return (
+                <div key={item.groupId} className="flex gap-2.5 flex-row">
+                  <div className="w-7 shrink-0 flex items-start justify-center pt-1">
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center bg-primary/15 text-primary">
+                      <Telescope size={11} strokeWidth={2.5} />
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0 max-w-[90%]">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(item.groupId)}
+                      className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-left text-[11.5px] font-medium border cursor-pointer hover:bg-chip transition-colors bg-bg-output border-border-subtle text-text-secondary"
+                    >
+                      {collapsed
+                        ? <ChevronRight size={10} className="text-text-disabled shrink-0" />
+                        : <ChevronDown size={10} className="text-text-disabled shrink-0" />}
+                      <span className="truncate flex-1">이번 턴 · {summaryBits.join(' · ') || '대화'}</span>
+                      <span className="text-[9px] text-text-disabled shrink-0 font-normal">{firstTs}</span>
+                    </button>
+                    {!collapsed && (
+                      <div className="mt-2 space-y-3 pl-1">
+                        {item.inner.map((inner) => {
+                          if (inner.kind === 'stepGroup') {
+                            return (
+                              <div key={inner.groupId} className="space-y-1">
+                                <div className="text-[10px] font-semibold text-text-disabled">작업 {inner.steps.length}개</div>
+                                {inner.steps.map((step) => {
+                                  const sIcon = STEP_ICONS[step.stepType ?? 'tool']
+                                  const SIconComp = sIcon.icon
+                                  return (
+                                    <div
+                                      key={step.id}
+                                      className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-text-secondary bg-bg-sidebar border border-border-subtle"
+                                    >
+                                      <div className={cn('w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0', sIcon.className)}>
+                                        <SIconComp size={8} strokeWidth={2.5} />
+                                      </div>
+                                      <span className="truncate flex-1">{step.stepLabel ?? '작업'}</span>
+                                      <span className="text-[9px] text-text-disabled shrink-0">{step.timestamp}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )
+                          }
+                          if (inner.kind === 'msg' && inner.msg.role === 'assistant' && inner.msg.content) {
+                            const m = inner.msg
+                            return (
+                              <div
+                                key={m.id}
+                                className="px-3 py-2 rounded-xl text-[12.5px] text-text-primary text-left leading-relaxed break-words border border-border-subtle"
+                                style={{ backgroundColor: 'rgb(var(--color-bg-sidebar))' }}
+                              >
+                                <div className="text-[9px] text-text-disabled mb-1">{m.timestamp}</div>
+                                <Markdown content={m.content} />
+                              </div>
+                            )
+                          }
+                          return null
                         })}
                       </div>
                     )}
