@@ -80,6 +80,25 @@ def _walk(path: Path, depth: int, counter: dict, ipynb_index: dict[str, str], re
     node: dict = {"name": name, "path": str(path)}
 
     if path.is_dir():
+        # 신규 리포트 폴더 구조: reports/{id}/ 안에 {id}.md 가 있으면 폴더를 report 노드로 압축.
+        # (레거시는 reports/{id}.md 평면 구조라 이 케이스 아님)
+        try:
+            if path.parent.resolve() == reports_dir.resolve():
+                md_inside = path / f"{path.name}.md"
+                if md_inside.exists():
+                    return {
+                        "name": path.name,
+                        "path": str(md_inside),
+                        "type": "file",
+                        "kind": "report",
+                        "report_id": path.name,
+                        "ext": "md",
+                        "size": md_inside.stat().st_size,
+                        "modified": int(md_inside.stat().st_mtime),
+                    }
+        except OSError:
+            pass
+
         node["type"] = "folder"
         node["kind"] = "folder"
         if depth >= _MAX_DEPTH:
@@ -113,11 +132,22 @@ def _walk(path: Path, depth: int, counter: dict, ipynb_index: dict[str, str], re
         nb_id = ipynb_index.get(str(path.resolve()))
         if nb_id:
             node["notebook_id"] = nb_id
-    elif ext == "md" and path.parent.resolve() == reports_dir.resolve():
-        rid = _parse_report_id(path.name)
-        if rid:
-            node["kind"] = "report"
-            node["report_id"] = rid
+    elif ext == "md":
+        reports_dir_r = reports_dir.resolve()
+        parent_r = path.parent.resolve()
+        is_legacy_report = parent_r == reports_dir_r  # reports/{id}.md
+        # 신규 폴더 구조: reports/{id}/{id}.md — 파일 stem 과 폴더명이 일치하고 상위가 reports_dir
+        is_folder_report = (
+            parent_r.parent == reports_dir_r
+            and path.stem == path.parent.name
+        )
+        if is_legacy_report or is_folder_report:
+            rid = _parse_report_id(path.name)
+            if rid:
+                node["kind"] = "report"
+                node["report_id"] = rid
+            else:
+                node["kind"] = "file"
         else:
             node["kind"] = "file"
     else:

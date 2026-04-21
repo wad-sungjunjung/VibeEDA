@@ -67,7 +67,7 @@ export default function ReportModal() {
               onChange={(e) => setGoal(e.target.value)}
               placeholder="예: 강남권 매장 쏠림 현상을 경영진에게 설명하기 위한 리포트"
               rows={2}
-              className="w-full text-[12px] px-3 py-2 rounded-md outline-none border border-border-subtle focus:border-primary leading-relaxed resize-y"
+              className="w-full text-[12px] px-3 py-2 rounded-md outline-none border border-border-subtle focus:border-primary leading-relaxed resize-y bg-surface text-text-primary placeholder-text-tertiary"
               style={{ fontFamily: 'inherit' }}
             />
           </div>

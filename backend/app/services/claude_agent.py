@@ -808,11 +808,11 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - 차트 셀의 경우 tool_result 에 **렌더링된 PNG 이미지**가 함께 전달된다. 이미지를 실제로 보고(축/범례/분포) 의도에 부합하는지 검증한 뒤 메모를 작성하라. 같은 차트를 반복 생성하지 말고, 의도와 다르면 `update_cell_code`로 수정하라.
 
 ## 📐 차트 기본 레이아웃 (사용자 지정이 없으면 반드시 이 규칙을 따를 것)
-- **크기 비율**: 높이:폭 = 9:16. 기본 `width=1280, height=720` (또는 동일 비율의 `width=960, height=540`). `fig.update_layout(width=1280, height=720)` 를 **모든 차트에 명시**.
+- **크기 비율**: 높이:폭 = 2:3. 기본 `width=900, height=600` (또는 동일 비율의 `width=1200, height=800`). `fig.update_layout(width=900, height=600)` 를 **모든 차트에 명시**.
 - **범례 위치**: 범례가 필요한 경우(시리즈 2개 이상) **차트 영역 안쪽 좌상단**에 배치. 차트 밖이나 하단·우측에 두지 말 것.
   ```python
   fig.update_layout(
-      width=1280, height=720,
+      width=900, height=600,
       legend=dict(
           x=0.01, y=0.99,
           xanchor="left", yanchor="top",
@@ -834,7 +834,7 @@ You help analysts explore ad platform data by creating, modifying, and executing
 5. **범례**: 시리즈가 2개 이상이면 범례가 의미 있는 이름으로 표시되는가? (trace `name` 지정)
 6. **색상·스타일**: 기본 파란색만 남발하지 말고, 비교가 필요하면 대비, 단일 지표면 Vibe 프라이머리 톤(`#D95C3F`) 또는 일관된 팔레트. 과도한 색 남발 금지.
 7. **데이터 충실도**: 표본이 너무 적어 의미 없는 그룹(n=1~2)이 섞여 있으면 Top N 필터 또는 "기타" 묶기를 적용. 이상치 하나 때문에 스케일이 뭉개지면 로그 스케일 또는 이상치 제외 버전을 고려.
-8. **여백·크기**: 기본 `width=1280, height=720` (9:16) 를 지켰는가? 범례가 시리즈 2개 이상일 때 **차트 내부 좌상단** 에 배치돼 있는가? 사용자 별도 요청이 없으면 이 기본값을 반드시 유지.
+8. **여백·크기**: 기본 `width=900, height=600` (높이:폭 2:3) 를 지켰는가? 범례가 시리즈 2개 이상일 때 **차트 내부 좌상단** 에 배치돼 있는가? 사용자 별도 요청이 없으면 이 기본값을 반드시 유지.
 9. **차트 타입 적합성**: 분포면 histogram/box, 비교면 bar, 추세면 line, 구성비면 stacked bar/treemap — 데이터 성격에 맞는 타입인가? 파이차트는 3~5개 이하 카테고리에서만 허용.
 10. **추가 정보 필요 여부**: 차트만으로 스토리가 안 서면(예: 비교 기준선, 평균선, 전년 동월 비교 없음) → SQL을 수정해 컬럼을 추가로 뽑거나 Python에서 보조선/주석(`add_hline`, `add_annotation`)을 넣어라.
 
