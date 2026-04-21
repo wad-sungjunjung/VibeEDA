@@ -14,7 +14,7 @@ export default function ApiKeyGuard() {
   if (hasAnyKey || dismissed) return null
 
   return (
-    <div className="fixed top-[84px] right-4 z-[60] animate-fade-in">
+    <div className="fixed top-[108px] right-4 z-[60] animate-fade-in">
       <div
         role="alert"
         className="flex items-start gap-2.5 bg-surface border border-primary-border rounded-xl shadow-lg px-4 py-3 w-[300px]"
