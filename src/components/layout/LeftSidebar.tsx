@@ -85,9 +85,12 @@ export default function LeftSidebar() {
     window.addEventListener('vibe:close-popups', onClose)
     function onOpenConnection() { setShowConnection(true) }
     window.addEventListener('vibe:open-connection', onOpenConnection)
+    function onOpenModelSettings() { setShowModelSettings(true) }
+    window.addEventListener('vibe:open-model-settings', onOpenModelSettings)
     return () => {
       window.removeEventListener('vibe:close-popups', onClose)
       window.removeEventListener('vibe:open-connection', onOpenConnection)
+      window.removeEventListener('vibe:open-model-settings', onOpenModelSettings)
     }
   }, [setHistoryMenuOpen])
 

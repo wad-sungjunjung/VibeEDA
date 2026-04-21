@@ -9,6 +9,7 @@ import AgentFAB from '@/components/agent/AgentFAB'
 import AgentChatPanel from '@/components/agent/AgentChatPanel'
 import RollbackToast from '@/components/common/RollbackToast'
 import SnowflakeConnectionGuard from '@/components/common/SnowflakeConnectionGuard'
+import ApiKeyGuard from '@/components/common/ApiKeyGuard'
 import ReportModal from '@/components/reporting/ReportModal'
 import ReportResult from '@/components/reporting/ReportResult'
 import { useAppStore } from '@/store/useAppStore'
@@ -140,6 +141,7 @@ export default function App() {
       {agentMode && <AgentChatPanel />}
       <RollbackToast />
       <SnowflakeConnectionGuard />
+      <ApiKeyGuard />
 
       {/* Modals */}
       <ReportModal />
