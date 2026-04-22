@@ -137,6 +137,17 @@ export function toolStatusLabel(tool: string, input?: Record<string, unknown>): 
     case 'create_sheet_cell': return '시트 셀 생성 중'
     case 'update_sheet_cell': return '시트 편집 중'
     case 'ask_user': return '질문 준비 중'
+    case 'query_data': {
+      const purpose = typeof input?.purpose === 'string' ? ` · ${input.purpose}` : ''
+      return `즉석 쿼리 확인 중${purpose}`
+    }
+    case 'analyze_output': return '결과 자동 통계 분석 중'
+    case 'list_available_marts': return '마트 카탈로그 조회 중'
+    case 'todo_write': return '작업 목록 갱신 중'
+    case 'get_category_values': return `카테고리 값 확인 중${martKey}`
+    case 'create_plan': return '분석 플랜 수립 중'
+    case 'update_plan': return '분석 플랜 갱신 중'
+    case 'request_marts': return '추가 마트 요청 준비 중'
     default: return `${tool} 실행 중`
   }
 }

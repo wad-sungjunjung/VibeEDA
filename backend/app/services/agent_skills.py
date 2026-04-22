@@ -313,6 +313,35 @@ def check_pre_guard(tool_name: str, inp: dict, state: "NotebookState") -> Option
                     ),
                 }
 
+        # Explore-before-query 가드: SQL 셀이 참조하는 마트 중 세션에서 한 번도 탐색되지 않은 것이 있으면 거부.
+        # profile_mart / preview_mart / get_mart_schema / get_category_values / query_data 중 하나라도 호출되어야 통과.
+        if cell_type == "sql":
+            from .claude_agent import _extract_referenced_tables
+            sql = inp.get("code") or ""
+            refs = _extract_referenced_tables(sql)
+            selected_lc = {m.lower() for m in state.selected_marts}
+            # 선택된 마트만 체크 대상 (whitelist 위반은 claude_agent 의 별도 가드가 담당)
+            refs_in_scope = refs & selected_lc
+            unexplored = refs_in_scope - set(state.explored_marts)
+            if unexplored:
+                return {
+                    "success": False,
+                    "error": "mart_not_explored",
+                    "message": (
+                        f"마트 `{', '.join(sorted(unexplored))}` 를 이 세션에서 아직 한 번도 탐색하지 않았습니다. "
+                        "SQL 셀을 만들기 전에 먼저 다음 중 하나를 호출하세요: "
+                        "`profile_mart` (행수/NULL/카디널리티/수치형 분포) — 가장 권장, "
+                        "`preview_mart` (샘플 3~5행), "
+                        "`get_mart_schema` (컬럼 description 이 부족할 때), "
+                        "또는 `query_data` (즉석 SELECT 로 구조 검증). "
+                        "탐색 없이 쿼리를 작성하면 컬럼 타입·분포를 몰라 엉뚱한 결과가 나올 수 있습니다."
+                    ),
+                    "unexplored_marts": sorted(unexplored),
+                }
+
+    # query_data whitelist 체크는 claude_agent 본체가 수행하므로 여기선 explore 카운트만 업데이트.
+    # (실제 실행 성공 시 claude_agent 내부에서 explored_marts 업데이트)
+
     return None
 
 

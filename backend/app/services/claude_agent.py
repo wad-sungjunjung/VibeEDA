@@ -87,6 +87,21 @@ class CellState:
     memo: str = ""
 
 
+# 병렬 실행이 안전한 읽기 전용 tool 집합 — 같은 턴에 이 tool 만 호출된 경우 asyncio.gather 로 병렬 실행.
+# 쓰기/상태 변경 tool 이 하나라도 섞이면 전체를 순차 실행 (순서 의존성 보존).
+PARALLEL_SAFE_TOOLS: set[str] = {
+    "read_notebook_context",
+    "read_cell_output",
+    "get_mart_schema",
+    "preview_mart",
+    "profile_mart",
+    "get_category_values",
+    "query_data",
+    "list_available_marts",
+    "analyze_output",
+}
+
+
 @dataclass
 class NotebookState:
     cells: list[CellState] = field(default_factory=list)
@@ -100,6 +115,11 @@ class NotebookState:
     user_message_latest: str = ""
     # `check_chart_quality` 가 호출된 셀 id 모음 (차트 퀄리티 강제 가드용).
     chart_quality_checked: set = field(default_factory=set)
+    # Explore-before-query 가드: 세션 내에서 이미 탐색(profile/preview/query_data/get_category_values)한 마트 키 모음.
+    # 이 목록에 없는 마트를 참조하는 SQL 셀 생성 시 거부된다.
+    explored_marts: set = field(default_factory=set)
+    # 분석 todo 리스트 — Claude Code 스타일 투명한 진행 상황 트래커
+    todos: list = field(default_factory=list)
 
 
 # ─── Tool definitions ────────────────────────────────────────────────────────
@@ -457,13 +477,361 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
         loop = _asyncio.get_event_loop()
         try:
             if name == "get_mart_schema":
-                return await loop.run_in_executor(None, mart_tools.get_mart_schema, mart_key), []
+                result = await loop.run_in_executor(None, mart_tools.get_mart_schema, mart_key)
+                state.explored_marts.add(mart_key.lower())
+                return result, []
             if name == "preview_mart":
                 limit = inp.get("limit", 5)
-                return await loop.run_in_executor(None, mart_tools.preview_mart, mart_key, limit), []
-            return await loop.run_in_executor(None, mart_tools.profile_mart, mart_key), []
+                result = await loop.run_in_executor(None, mart_tools.preview_mart, mart_key, limit)
+                state.explored_marts.add(mart_key.lower())
+                return result, []
+            result = await loop.run_in_executor(None, mart_tools.profile_mart, mart_key)
+            state.explored_marts.add(mart_key.lower())
+            return result, []
         except Exception as e:
             return {"error": str(e)}, []
+
+    if name == "query_data":
+        sql = (inp.get("sql") or "").strip()
+        purpose = (inp.get("purpose") or "").strip()
+        if not sql:
+            return {"error": "sql_required", "message": "`sql` 이 비어 있습니다."}, []
+        if not purpose:
+            return {
+                "error": "purpose_required",
+                "message": "`purpose` 한 줄로 이 쿼리를 실행하는 이유를 적어주세요 (로깅용).",
+            }, []
+        low = sql.lower().lstrip()
+        # SELECT/WITH 외의 statement 차단 (DML/DDL 금지)
+        if not (low.startswith("select") or low.startswith("with")):
+            return {
+                "error": "select_only",
+                "message": "`query_data` 는 SELECT(또는 WITH ... SELECT) 전용입니다. DML/DDL 금지.",
+            }, []
+        # 세미콜론으로 쪼개서 복수 statement 차단
+        statements = [s.strip() for s in sql.rstrip(";").split(";") if s.strip()]
+        if len(statements) > 1:
+            return {
+                "error": "single_statement_only",
+                "message": "한 번에 하나의 SELECT 문만 허용합니다.",
+            }, []
+        viol = _whitelist_violation(sql, state.selected_marts)
+        if viol:
+            return {
+                "success": False,
+                "error": "mart_not_selected_in_sql",
+                "message": (
+                    f"'{viol}' 테이블을 참조하는데 '사용 마트'에 포함되어 있지 않습니다. "
+                    f"선택된 마트는 [{', '.join(state.selected_marts)}] 뿐입니다."
+                ),
+            }, []
+        # explored_marts 에 참조 테이블 등록 — query_data 도 탐색으로 카운트
+        for ref in _extract_referenced_tables(sql):
+            state.explored_marts.add(ref)
+
+        import asyncio as _asyncio
+        from .snowflake_session import get_connection, is_connected
+        if not is_connected():
+            return {
+                "error": "snowflake_not_connected",
+                "message": "Snowflake 미연결. 왼쪽 사이드바에서 연결 후 재시도.",
+            }, []
+
+        def _run():
+            conn = get_connection()
+            cur = conn.cursor()
+            cur.execute(sql)
+            cols = [c[0] for c in (cur.description or [])]
+            rows_raw = cur.fetchmany(100)
+            # 직렬화
+            import datetime as _dt
+            from decimal import Decimal as _D
+            def _s(v):
+                if v is None:
+                    return None
+                if isinstance(v, _D):
+                    return float(v)
+                if isinstance(v, (_dt.date, _dt.datetime, _dt.time)):
+                    return v.isoformat()
+                if isinstance(v, (bytes, bytearray)):
+                    return v.hex()
+                return v
+            rows = [[_s(v) for v in row] for row in rows_raw]
+            return cols, rows
+
+        loop = _asyncio.get_event_loop()
+        try:
+            cols, rows = await loop.run_in_executor(None, _run)
+        except Exception as e:
+            return {"error": "query_failed", "message": str(e)}, []
+
+        return {
+            "success": True,
+            "purpose": purpose,
+            "columns": cols,
+            "rows": rows,
+            "row_count": len(rows),
+            "truncated": len(rows) >= 100,
+            "note": "query_data 는 셀을 남기지 않습니다. 결과가 분석에 의미 있으면 create_cell 로 정식 셀 작성.",
+        }, []
+
+    if name == "analyze_output":
+        cell = next((c for c in state.cells if c.id == inp.get("cell_id")), None)
+        if not cell:
+            return {"success": False, "error": "cell_not_found"}, []
+        if not cell.executed:
+            return {"success": False, "error": "not_executed", "message": "셀이 아직 실행되지 않았습니다."}, []
+        out = cell.output or {}
+        if out.get("type") != "table":
+            return {
+                "success": False,
+                "error": "not_a_table",
+                "message": f"이 셀의 출력은 {out.get('type', 'unknown')} 타입입니다. analyze_output 은 테이블 결과에만 동작.",
+            }, []
+
+        # 커널 namespace 에서 실제 DataFrame 가져오기
+        try:
+            from .kernel import get_namespace
+            ns = get_namespace(state.notebook_id)
+            df = ns.get(cell.name)
+            if df is None or not hasattr(df, "columns"):
+                return {
+                    "success": False,
+                    "error": "dataframe_missing",
+                    "message": f"커널에서 `{cell.name}` DataFrame 을 찾을 수 없습니다. 셀을 재실행 후 재시도.",
+                }, []
+        except Exception as e:
+            return {"success": False, "error": "kernel_error", "message": str(e)}, []
+
+        try:
+            import pandas as _pd
+            import numpy as _np
+        except Exception as e:
+            return {"success": False, "error": "pandas_missing", "message": str(e)}, []
+
+        focus = (inp.get("focus_column") or "").strip() or None
+        top_n = min(max(int(inp.get("top_n") or 5), 1), 20)
+
+        try:
+            row_count = len(df)
+            col_types: dict[str, str] = {str(c): str(df[c].dtype) for c in df.columns}
+            numeric_cols = [c for c in df.columns if _pd.api.types.is_numeric_dtype(df[c])]
+            if focus:
+                numeric_cols = [c for c in numeric_cols if str(c).lower() == focus.lower()]
+
+            # describe (수치형 중심)
+            describe_data: dict = {}
+            if numeric_cols:
+                desc = df[numeric_cols].describe().round(4)
+                describe_data = {
+                    str(c): {stat: (None if _pd.isna(desc.at[stat, c]) else float(desc.at[stat, c]))
+                             for stat in desc.index}
+                    for c in numeric_cols
+                }
+
+            # NULL 요약
+            null_summary: dict = {}
+            for c in df.columns:
+                nulls = int(df[c].isna().sum())
+                if nulls:
+                    null_summary[str(c)] = {
+                        "count": nulls,
+                        "ratio": round(nulls / row_count, 4) if row_count else 0.0,
+                    }
+
+            # 카디널리티
+            cardinality: dict = {}
+            for c in df.columns:
+                try:
+                    cardinality[str(c)] = int(df[c].nunique(dropna=True))
+                except Exception:
+                    continue
+
+            # Top / Bottom / 이상치 (IQR)
+            top_bottom: dict = {}
+            outliers: dict = {}
+            for c in numeric_cols[:10]:  # 너무 많은 컬럼 방지
+                try:
+                    s = df[c].dropna()
+                    if s.empty:
+                        continue
+                    # top/bottom: 해당 값과 id-like(첫 비수치 컬럼) 함께 반환
+                    idcol = None
+                    for oc in df.columns:
+                        if oc == c:
+                            continue
+                        if df[oc].dtype == object or _pd.api.types.is_string_dtype(df[oc]):
+                            idcol = oc
+                            break
+                    sub = df[[c] + ([idcol] if idcol else [])].dropna(subset=[c])
+                    top_rows = sub.nlargest(top_n, c).values.tolist()
+                    bot_rows = sub.nsmallest(top_n, c).values.tolist()
+                    # 값 직렬화
+                    def _ser(v):
+                        if v is None:
+                            return None
+                        if hasattr(v, "item"):
+                            try:
+                                return v.item()
+                            except Exception:
+                                return str(v)
+                        return v
+                    top_bottom[str(c)] = {
+                        "id_column": str(idcol) if idcol else None,
+                        "top": [[_ser(x) for x in r] for r in top_rows],
+                        "bottom": [[_ser(x) for x in r] for r in bot_rows],
+                    }
+                    # IQR 기반 이상치 개수
+                    q1, q3 = s.quantile(0.25), s.quantile(0.75)
+                    iqr = q3 - q1
+                    if iqr > 0:
+                        low_b = q1 - 1.5 * iqr
+                        high_b = q3 + 1.5 * iqr
+                        n_out = int(((s < low_b) | (s > high_b)).sum())
+                        if n_out:
+                            outliers[str(c)] = {
+                                "count": n_out,
+                                "ratio": round(n_out / len(s), 4),
+                                "iqr_low": float(low_b),
+                                "iqr_high": float(high_b),
+                            }
+                except Exception:
+                    continue
+
+            # 카테고리형 top-k value_counts
+            categorical_top: dict = {}
+            for c in df.columns:
+                if c in numeric_cols:
+                    continue
+                try:
+                    vc = df[c].value_counts(dropna=False).head(5)
+                    categorical_top[str(c)] = [
+                        {"value": (None if _pd.isna(k) else str(k)), "count": int(v)}
+                        for k, v in vc.items()
+                    ]
+                except Exception:
+                    continue
+
+            return {
+                "success": True,
+                "cell_name": cell.name,
+                "row_count": row_count,
+                "column_types": col_types,
+                "describe": describe_data,
+                "null_summary": null_summary,
+                "cardinality": cardinality,
+                "top_bottom": top_bottom,
+                "outliers": outliers,
+                "categorical_top": categorical_top,
+                "hint": (
+                    "이 통계 결과를 바탕으로 `write_cell_memo` 에 관찰·이상 신호·다음 행동을 기록하세요. "
+                    "outliers 가 비어있지 않으면 이상치 원인을 다음 셀에서 파고들지, 제외할지 결정."
+                ),
+            }, []
+        except Exception as e:
+            return {"success": False, "error": "analysis_failed", "message": str(e)}, []
+
+    if name == "list_available_marts":
+        # Snowflake 의 전체 마트 카탈로그 (키 + description) 만 반환.
+        # 스키마/컬럼은 선택된 마트에 대해서만 노출된다.
+        from .snowflake_session import is_connected, get_connection, get_status
+        if not is_connected():
+            return {
+                "error": "snowflake_not_connected",
+                "message": "Snowflake 미연결 — 카탈로그 조회 불가. ask_user 로 연결 요청.",
+            }, []
+        filter_kw = (inp.get("filter_keyword") or "").strip().lower()
+        import asyncio as _asyncio
+        loop = _asyncio.get_event_loop()
+
+        def _fetch():
+            conn = get_connection()
+            status = get_status()
+            database = status.get("database") or "WAD_DW_PROD"
+            schema = status.get("schema") or "MART"
+            cur = conn.cursor()
+            cur.execute(f"""
+                SELECT table_name, comment
+                FROM {database}.information_schema.tables
+                WHERE table_schema = '{schema.upper()}'
+                  AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            """)
+            return cur.fetchall()
+
+        try:
+            rows = await loop.run_in_executor(None, _fetch)
+        except Exception as e:
+            return {"error": "catalog_query_failed", "message": str(e)}, []
+
+        selected_lc = {m.lower() for m in state.selected_marts}
+        marts = []
+        for tbl, comment in rows:
+            k = tbl.lower()
+            desc = (comment or "").strip()
+            if filter_kw and filter_kw not in k and filter_kw not in desc.lower():
+                continue
+            marts.append({
+                "key": k,
+                "description": desc or tbl,
+                "selected": k in selected_lc,
+            })
+        total = len(marts)
+        # 너무 많으면 상위 50개만 (필터 사용 유도)
+        truncated = total > 50
+        return {
+            "success": True,
+            "total": total,
+            "truncated": truncated,
+            "filter_keyword": filter_kw or None,
+            "marts": marts[:50],
+            "hint": (
+                "현재 선택 안 된 마트 중 관련성이 높아 보이는 것이 있으면 `request_marts` 로 사용자에게 추가 요청. "
+                "선택된 마트는 `selected: true` 표시. 절대 직접 SQL 조회 시도하지 말 것."
+            ),
+        }, []
+
+    if name == "todo_write":
+        todos_in = inp.get("todos") or []
+        if not isinstance(todos_in, list):
+            return {"success": False, "error": "invalid_todos"}, []
+        normalized = []
+        in_progress_count = 0
+        for t in todos_in:
+            if not isinstance(t, dict):
+                continue
+            content = (t.get("content") or "").strip()
+            status_val = (t.get("status") or "pending").strip().lower()
+            if status_val not in ("pending", "in_progress", "completed"):
+                status_val = "pending"
+            if not content:
+                continue
+            if status_val == "in_progress":
+                in_progress_count += 1
+            normalized.append({
+                "content": content,
+                "status": status_val,
+                "active_form": (t.get("active_form") or content).strip(),
+            })
+        if in_progress_count > 1:
+            return {
+                "success": False,
+                "error": "multiple_in_progress",
+                "message": "한 번에 하나의 todo 만 `in_progress` 일 수 있습니다. 나머지를 `pending` 또는 `completed` 로 바꾸세요.",
+            }, []
+        state.todos = normalized
+        total = len(normalized)
+        completed = sum(1 for t in normalized if t["status"] == "completed")
+        return (
+            {
+                "success": True,
+                "total": total,
+                "completed": completed,
+                "in_progress": in_progress_count,
+                "todos": normalized,
+            },
+            [{"type": "todos_updated", "todos": normalized}],
+        )
 
     if name == "write_cell_memo":
         cell = next((c for c in state.cells if c.id == inp["cell_id"]), None)
@@ -679,22 +1047,41 @@ You help analysts explore ad platform data by creating, modifying, and executing
 {date_block}{mart_schema_block}{local_files_block}
 
 ## Tools
-- read_notebook_context: See all current cells and their state
-- create_cell: Create a new SQL, Python, or Markdown cell with code
-- update_cell_code: Modify an existing cell's code
-- execute_cell: Run a cell against the REAL Snowflake DB or Python kernel — always call this after creating/updating a cell
-- read_cell_output: Read previously executed cell output
-- get_mart_schema: **SQL 작성 전 반드시 호출** — 실제 컬럼명/타입/description을 확인해 `column not found` 에러 방지
-- preview_mart: 노트북에 셀을 남기지 않고 상위 N행만 확인 (데이터 생김새 파악용)
-- profile_mart: 행수, NULL 비율, 카디널리티, 수치형 min/max/avg — 이상치·결측 탐지 목적
-- write_cell_memo: **출력을 확인한 뒤 핵심 인사이트·이상치·후속 가설을 해당 셀의 메모(노트)에 기록**. 2~5줄의 불릿이 적당
-- ask_user: 요청이 모호하거나 필요한 맥락(기간·지역·지표 등)이 빠졌을 때 **빠르게** 사용자에게 질문한다.
+### 셀 조작
+- `read_notebook_context`: 현재 모든 셀 상태 조회
+- `create_cell`: SQL/Python/Markdown 셀 생성 (생성 즉시 자동 실행)
+- `update_cell_code`: 기존 셀 코드 수정 (수정 즉시 자동 재실행)
+- `execute_cell`: 드물게만 사용 (create/update 가 자동 실행하므로 보통 불필요)
+- `read_cell_output`: 이전 셀 출력 재확인
+- `write_cell_memo`: **출력 확인 후 핵심 인사이트·이상치·후속 가설 기록**. 2~5줄 평문 불릿
+- `check_chart_quality`: 차트 셀 렌더 직후 1회 호출 (아래 차트 게이트 참조)
+
+### 데이터 탐색 — **SQL 셀 만들기 전에 반드시 사용**
+- `profile_mart`: 행수·NULL 비율·카디널리티·수치형 min/max/avg. **세션 시작 직후 모든 선택 마트에 대해 한 번씩 호출 권장**
+- `preview_mart`: 상위 N행 샘플 (셀 생성 없음) — 데이터 생김새 확인
+- `get_mart_schema`: 컬럼 description 이 부족하거나 모호할 때만 추가 호출 (스키마 요약은 이미 프롬프트에 주입됨)
+- `get_category_values`: 카테고리 컬럼의 distinct 값 확인 — WHERE 절 값 추측 금지
+- `query_data`: **즉석 SELECT 실행 (셀 X)** — 가설 검증용 작은 쿼리. max 100행. 탐색용 throwaway 셀 대신 이걸 써라. 위 4개를 돌렸는데도 궁금한 게 남을 때 쓴다.
+- `analyze_output`: 기존 셀의 DataFrame 결과에 자동 통계(describe/top/bottom/outlier/NULL) 적용. **500행 이상 큰 결과는 눈으로 훑지 말고 이걸로 인사이트 추출**. 메모 쓰기 직전에 호출하면 근거가 단단해짐.
+- `list_available_marts`: 선택 안 된 마트까지 전체 카탈로그 조회. `request_marts` 호출 전에 먼저 실행해 정확한 마트 키로 추천.
+
+### 계획·흐름 관리
+- `create_plan`: 분석 시작 시 가설 3+ 플랜 선언 (서버가 SQL/Python 셀 전에 강제)
+- `update_plan`: 가설 검증 완료/드리프트 발생 시 플랜 갱신
+- `todo_write`: **3단계 이상 작업은 todo 리스트로 관리**. 한 번에 하나만 `in_progress`, 완료하자마자 `completed` 로 플립. 투명한 진행 상황 노출 — 사용자가 에이전트가 뭘 하는지 볼 수 있음. (단순 단일 집계는 사용 금지)
+- `ask_user`: 요청이 모호하거나 필요한 맥락(기간·지역·지표 등)이 빠졌을 때 **빠르게** 사용자에게 질문한다.
   **헷갈리면 추측하지 말고 반드시 `ask_user` 를 먼저 호출**하라. 호출 후엔 도구를 더 부르지 말고 짧은 안내 텍스트로 응답을 마감.
   `ask_user` 를 써야 하는 대표 시그널:
   - 기간 미지정 ("최근 매출" — 7일? 30일? 이번 달?)
   - 지표 모호 ("많다" / "쏠림" — 어떤 기준?)
   - 선택 마트만으로 데이터가 부족해 보임
   - 같은 요청을 두 번 다른 방식으로 해석 가능할 때
+- `request_marts`: 구조화된 마트 추가 요청 (ask_user 보다 우선). `list_available_marts` 로 키 확인 후 호출.
+
+### 효율 팁 — 병렬 호출
+- 서로 독립적인 **읽기 전용 도구**(profile_mart, get_mart_schema, preview_mart, get_category_values, list_available_marts) 는 **한 턴에 여러 개를 함께 호출**해도 좋다. 서버가 병렬로 실행한다.
+- 예: 선택 마트 3개가 있다면 턴 1에서 `profile_mart` x3 을 동시에 호출 → 한 번의 왕복으로 모든 프로파일 확보.
+- 쓰기성 도구(create_cell, update_cell_code, write_cell_memo, todo_write, create_plan)는 **절대 병렬 금지** — 순서 의존성 깨짐.
 
 ## 인사이트 기록 규칙 (절대 준수 — 서버가 강제)
 - **`create_cell` 호출 전에, 직전 실행 셀(sql/python, 정상 출력)의 메모가 비어 있다면 반드시 먼저 `write_cell_memo` 를 호출하라.**
@@ -753,25 +1140,46 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - (b) 현재 **선택된 마트**의 이름과 일반적인 성격만 보고, 해당 지표/차원이 담겨 있을 법한지 판단
 - (c) 판단 결과에 따라 분기:
   - **충분해 보임** → 1단계로 진행 ("선택된 마트 [X, Y]로 답할 수 있을 것 같아요. 스키마 확인 후 쿼리 작성할게요.")
-  - **부족해 보임 / 모호** → **반드시 `ask_user` 를 호출**하여 추가 마트 선택 또는 범위 재확인을 사용자에게 요청. 금지: 추측으로 다른 테이블 이름 조회 시도
-- 예: 선택 마트가 `dim_shop_base` 뿐인데 "예약수" 를 물어봤다면 → `dim_`은 dimension이라 예약 사실(fact)이 없을 가능성이 큼 → `ask_user`로 `fact_reservation` 계열 마트 추가 요청
+  - **부족해 보임 / 모호** → `list_available_marts` 로 카탈로그 확인 후 **`request_marts`** (또는 `ask_user`) 호출해 사용자에게 추가 마트 선택 요청. 금지: 추측으로 다른 테이블 이름 조회 시도
+- 예: 선택 마트가 `dim_shop_base` 뿐인데 "예약수" 를 물어봤다면 → `dim_`은 dimension이라 예약 사실(fact)이 없을 가능성이 큼 → `list_available_marts(filter_keyword='reservation')` → `request_marts` 로 추천
 
-### 1단계 이후
-1. **선택된 마트 스키마는 이미 위에 주입되어 있다** — 해당 컬럼명만으로 SQL 작성 가능하면 `get_mart_schema` 호출 생략 (시간 절약). 컬럼 해석이 애매하거나 description이 비어 있을 때만 호출.
-2. 필요시 `preview_mart` 로 샘플 1~5행 확인
-3. 추가 모호함이 남으면 `ask_user`로 재질문 — 추측해서 엉뚱한 쿼리 작성 금지
+### 1단계 — **탐색 우선 (Explore-First) — 서버가 강제**
+선택 마트에 대해 **SQL 셀을 처음 만들기 전에 반드시 `profile_mart` 또는 `preview_mart` 를 한 번 이상 호출**해야 한다. 미탐색 마트를 참조하는 SQL 셀 생성은 서버가 `mart_not_explored` 에러로 거부한다.
+- 선택 마트가 여러 개라면 **한 턴에 `profile_mart` 를 병렬로 호출**해 한 번의 왕복으로 모든 프로파일을 받아라.
+- `profile_mart` 로 NULL 비율·카디널리티·수치 분포를 먼저 봐야 GROUP BY 키 결정·이상치 제외 판단·JOIN 안정성 예측이 가능하다.
+- 이미 주입된 스키마 블록만으로 컬럼을 아는 경우에도 **통계 프로파일은 반드시 확보**하라. 이것이 "눈 감고 쿼리 작성" 을 막는다.
+
+### 2단계 — 가설 검증을 위한 가벼운 스크래치
+- 본격적인 셀 생성 전에 의심스러운 부분(예: "이 컬럼에 NULL 이 실제로 얼마나?", "JOIN 키가 정말 유니크한가?", "이 기간에 데이터가 있긴 한가?") 은 **`query_data` 로 즉석 SELECT** 해서 먼저 확인. 셀을 남기지 않으므로 노트북이 깨끗하게 유지됨.
+
+### 3단계 — 컬럼 값 확인
+- WHERE 절에 쓸 카테고리 값이 모호하면 `get_category_values` 로 실제 distinct 값 확인. 추측 금지.
+- 컬럼 description 이 비어 있거나 해석 애매하면 그때 `get_mart_schema` 호출.
+
+### 4단계 — 이 모든 준비 후에야 `create_cell(sql)` 로 정식 분석 시작
 
 ## 셀 파이프라인 (반드시 준수)
 모든 셀은 아래 사이클을 따른다:
 
-  [입력 작성] → [자동 실행] → [출력 확인] → [인사이트 메모 작성] → [수정 OR 다음 셀 생성]
+  [입력 작성] → [자동 실행] → [출력 확인] → [필요시 analyze_output] → [인사이트 메모 작성] → [수정 OR 다음 셀 생성]
 
 - `create_cell` 또는 `update_cell_code`를 호출하면 **자동으로 즉시 실행**되고 tool result에 실제 출력이 포함됨
 - 출력을 반드시 확인한 뒤 다음 행동을 결정할 것:
   - 오류 또는 의도와 다른 결과 → `update_cell_code`로 수정 (재실행 자동)
   - 결과가 올바름 → **반드시 `write_cell_memo` 호출** → 그 다음 셀 생성
+- 결과 테이블이 **30행 이상**이거나, **수치 컬럼이 여러 개**, 또는 **이상치 의심**이 들면 메모 쓰기 전에 `analyze_output` 을 먼저 호출해 통계 근거를 확보하라. 상위 10행 수기 관찰보다 훨씬 신뢰도 높은 메모가 나온다.
 - `execute_cell`을 직접 호출할 필요 없음 (생성/수정 시 자동 실행됨)
 - 서버가 "메모 없이는 다음 셀 생성 금지"를 강제한다. 예외 없음.
+
+## 📋 Todo 트래커 사용 원칙
+- 요청이 **3단계 이상의 작업**으로 분해되면 `todo_write` 로 todo 리스트를 먼저 선언하라. 사용자에게 작업 진행 상황이 투명하게 보인다.
+- 규칙:
+  1. 세션 시작 직후(또는 plan 작성 직후) 전체 todos 를 한 번에 등록 — 각 항목은 `status: pending`.
+  2. 작업 시작 직전에 해당 todo 를 `in_progress` 로 변경 (**한 번에 최대 1개만**).
+  3. 작업 완료 즉시 `completed` 로 플립하고 다음 todo 를 `in_progress` 로 띄움.
+  4. 중간에 새 서브태스크가 생기면 전체 리스트를 다시 넘겨서 추가.
+- 사용하지 말 것: "한 줄짜리 조회", "단일 집계 요청" 같은 trivial 케이스.
+- 예: "2024년 지역별 매출 편중과 원인 분석" → ["지역별 매출 집계 SQL", "상위 지역 편중률 계산", "상위 지역 내 매장별 분해", "원인 가설 차트", "최종 요약 Markdown"] — 5개 todos.
 
 ## ⚠️ 한 루프당 한 문단 내레이션 — 가장 중요한 규칙 (절대 준수)
 - tool_result 를 받은 **직후**, **다음 도구를 호출하기 전에** 반드시 한국어 텍스트 한 문단을 먼저 출력한다.
@@ -821,6 +1229,57 @@ You help analysts explore ad platform data by creating, modifying, and executing
 
 
 # ─── Agent loop ───────────────────────────────────────────────────────────────
+
+def _compact_messages_inplace(messages: list[dict], keep_recent_turns: int = 10) -> int:
+    """긴 세션에서 오래된 tool_result 페이로드를 요약으로 교체해 컨텍스트 부담을 줄인다.
+    - 첫 user 메시지(원 요청)는 손대지 않는다.
+    - 마지막 `keep_recent_turns` 개의 tool_result 는 원본 유지.
+    - 그 이전의 tool_result content 는 앞 600자 + "(...truncated for context budget)" 로 치환.
+    - 이미지 블록은 원본을 유지 (차트 해석에 필수).
+    Return: 압축된 tool_result 개수 (0 이면 작업 없음).
+    """
+    # tool_result 를 담은 user 메시지들만 뽑아서 순서 카운트.
+    tool_result_indices: list[int] = []
+    for i, m in enumerate(messages):
+        if m.get("role") != "user":
+            continue
+        content = m.get("content")
+        if isinstance(content, list) and any(
+            isinstance(b, dict) and b.get("type") == "tool_result" for b in content
+        ):
+            tool_result_indices.append(i)
+    if len(tool_result_indices) <= keep_recent_turns:
+        return 0
+    # 압축 대상: 앞쪽 (older) 인덱스들
+    to_compact = tool_result_indices[:-keep_recent_turns]
+    compacted = 0
+    for idx in to_compact:
+        msg = messages[idx]
+        new_blocks = []
+        for b in msg.get("content") or []:
+            if not (isinstance(b, dict) and b.get("type") == "tool_result"):
+                new_blocks.append(b)
+                continue
+            content = b.get("content")
+            if isinstance(content, str):
+                if len(content) > 600 and "(...truncated" not in content:
+                    b = dict(b)
+                    b["content"] = content[:600] + "  (...truncated for context budget)"
+                    compacted += 1
+            elif isinstance(content, list):
+                new_list = []
+                for blk in content:
+                    if isinstance(blk, dict) and blk.get("type") == "text":
+                        txt = blk.get("text", "")
+                        if len(txt) > 600 and "(...truncated" not in txt:
+                            blk = {**blk, "text": txt[:600] + "  (...truncated for context budget)"}
+                            compacted += 1
+                    new_list.append(blk)
+                b = {**b, "content": new_list}
+            new_blocks.append(b)
+        messages[idx] = {**msg, "content": new_blocks}
+    return compacted
+
 
 def _content_to_dict(blocks: list) -> list[dict]:
     result = []
@@ -1024,13 +1483,34 @@ async def run_agent_stream(
 
             tool_results = []
             skill_reminders: list[str] = []
-            for tool_block in tool_uses:
-                yield {"type": "tool_use", "tool": tool_block.name, "input": tool_block.input}
-                if tool_block.name in agent_skills.ASK_USER_LIKE_TOOLS:
-                    ask_user_called = True
 
-                result, sse_events = await _execute_tool(tool_block.name, tool_block.input, notebook_state)
+            # 모든 호출이 병렬 안전하면 asyncio.gather 로 한꺼번에 실행 — 탐색/프로파일 단계에서 왕복 수 절감.
+            all_parallel_safe = all(tb.name in PARALLEL_SAFE_TOOLS for tb in tool_uses)
+            if all_parallel_safe and len(tool_uses) > 1:
+                for tb in tool_uses:
+                    yield {"type": "tool_use", "tool": tb.name, "input": tb.input}
+                    if tb.name in agent_skills.ASK_USER_LIKE_TOOLS:
+                        ask_user_called = True
+                exec_results = await asyncio.gather(
+                    *[_execute_tool(tb.name, tb.input, notebook_state) for tb in tool_uses],
+                    return_exceptions=True,
+                )
+                paired = []
+                for tb, res in zip(tool_uses, exec_results):
+                    if isinstance(res, Exception):
+                        paired.append((tb, ({"error": "tool_exception", "message": str(res)}, [])))
+                    else:
+                        paired.append((tb, res))
+            else:
+                paired = []
+                for tb in tool_uses:
+                    yield {"type": "tool_use", "tool": tb.name, "input": tb.input}
+                    if tb.name in agent_skills.ASK_USER_LIKE_TOOLS:
+                        ask_user_called = True
+                    res = await _execute_tool(tb.name, tb.input, notebook_state)
+                    paired.append((tb, res))
 
+            for tool_block, (result, sse_events) in paired:
                 for sse_event in sse_events:
                     yield sse_event
                     if sse_event["type"] == "cell_created":
@@ -1112,6 +1592,10 @@ async def run_agent_stream(
 
             messages.append({"role": "user", "content": tool_results})
             turn_index += 1
+
+            # 컨텍스트 압축: 20턴 이상 길어지면 오래된 tool_result 를 요약으로 교체
+            if turn_index >= 20:
+                _compact_messages_inplace(messages, keep_recent_turns=10)
         else:
             # for-else: MAX_TURNS 를 break 없이 모두 소진했을 때만 진입
             yield {

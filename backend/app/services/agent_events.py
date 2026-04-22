@@ -11,10 +11,13 @@ AgentEventType = Literal[
     "thinking",
     "tool_use",
     "message_delta",
+    "reset_current_bubble",
     "cell_created",
     "cell_code_updated",
     "cell_executed",
     "cell_memo_updated",
+    "chart_quality",
+    "todos_updated",
     "ask_user",
     "complete",
     "error",
@@ -24,10 +27,13 @@ ALL_EVENT_TYPES: tuple[str, ...] = (
     "thinking",
     "tool_use",
     "message_delta",
+    "reset_current_bubble",
     "cell_created",
     "cell_code_updated",
     "cell_executed",
     "cell_memo_updated",
+    "chart_quality",
+    "todos_updated",
     "ask_user",
     "complete",
     "error",
@@ -84,6 +90,23 @@ class AskUserEvent(TypedDict):
     options: list[str]
 
 
+class ChartQualityEvent(TypedDict, total=False):
+    type: Literal["chart_quality"]
+    cell_id: str
+    passed: bool
+    summary: str
+    issues: list[str]
+
+
+class TodosUpdatedEvent(TypedDict):
+    type: Literal["todos_updated"]
+    todos: list[dict]
+
+
+class ResetCurrentBubbleEvent(TypedDict):
+    type: Literal["reset_current_bubble"]
+
+
 class CompleteEvent(TypedDict):
     type: Literal["complete"]
     created_cell_ids: list[str]
@@ -99,10 +122,13 @@ AgentEvent = Union[
     ThinkingEvent,
     ToolUseEvent,
     MessageDeltaEvent,
+    ResetCurrentBubbleEvent,
     CellCreatedEvent,
     CellCodeUpdatedEvent,
     CellExecutedEvent,
     CellMemoUpdatedEvent,
+    ChartQualityEvent,
+    TodosUpdatedEvent,
     AskUserEvent,
     CompleteEvent,
     ErrorEvent,

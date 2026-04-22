@@ -289,6 +289,120 @@ CORE_TOOLS: list[dict] = [
             "required": ["question"],
         },
     },
+    {
+        "name": "query_data",
+        "description": (
+            "Run an ad-hoc SELECT query against Snowflake WITHOUT creating a notebook cell. "
+            "Use this to quickly verify assumptions, check value distributions, test join conditions, "
+            "or sanity-check data before writing a real analysis cell. "
+            "All tables referenced MUST be in the selected marts whitelist. "
+            "Max 100 rows — attach `LIMIT` to your SQL. "
+            "This is your 'scratch pad' — prefer it over creating throwaway cells."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "sql": {
+                    "type": "string",
+                    "description": (
+                        "SELECT-only SQL. Must reference only selected marts. Keep it short and targeted. "
+                        "Results are capped at 100 rows — always include LIMIT."
+                    ),
+                },
+                "purpose": {
+                    "type": "string",
+                    "description": "One-line Korean note on WHY you are running this (logged in agent history).",
+                },
+            },
+            "required": ["sql", "purpose"],
+        },
+    },
+    {
+        "name": "analyze_output",
+        "description": (
+            "Run automatic statistical analysis on an already-executed SQL or Python cell's DataFrame output. "
+            "Returns describe() stats, top/bottom N by each numeric column, NULL counts, high-cardinality columns, "
+            "and outlier flags (IQR-based). Use this to extract insights from large tables without manually "
+            "eyeballing rows — much more reliable than reading the first 10 rows. "
+            "Prefer this over writing manual describe/value_counts Python cells for simple inspection."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "cell_id": {
+                    "type": "string",
+                    "description": "ID of a cell whose output is a table/DataFrame",
+                },
+                "focus_column": {
+                    "type": "string",
+                    "description": "Optional — numeric column to focus top/bottom/outlier analysis on (default: all numeric).",
+                },
+                "top_n": {
+                    "type": "integer",
+                    "description": "Number of top/bottom rows to return per numeric column (default 5, max 20).",
+                },
+            },
+            "required": ["cell_id"],
+        },
+    },
+    {
+        "name": "list_available_marts",
+        "description": (
+            "List ALL data marts available in the warehouse (not just currently selected). "
+            "Returns keys + one-line descriptions so you can intelligently suggest which marts to add "
+            "when the currently selected marts are insufficient. "
+            "Use this BEFORE calling `request_marts` so your suggested_mart_keywords are accurate and specific. "
+            "Does NOT grant access — user must still add marts via the UI."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "filter_keyword": {
+                    "type": "string",
+                    "description": "Optional — filter marts whose key or description contains this keyword (case-insensitive).",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "todo_write",
+        "description": (
+            "Manage a lightweight TODO list for the current analysis session. "
+            "Call this when the task has 3+ sub-steps so the user can see progress transparently. "
+            "Replace the entire list each call — include ALL items (pending + in-progress + completed) to keep state consistent. "
+            "Mark one item as `in_progress` at a time, flip to `completed` right after finishing it. "
+            "Do NOT use for trivial single-step requests."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "todos": {
+                    "type": "array",
+                    "description": "Complete replacement list of analysis steps.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "content": {
+                                "type": "string",
+                                "description": "Imperative Korean description of the step (e.g. '매장별 매출 집계 SQL 작성').",
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": ["pending", "in_progress", "completed"],
+                            },
+                            "active_form": {
+                                "type": "string",
+                                "description": "Present-continuous Korean label for in_progress state (e.g. '매장별 매출 집계하는 중').",
+                            },
+                        },
+                        "required": ["content", "status"],
+                    },
+                },
+            },
+            "required": ["todos"],
+        },
+    },
 ]
 
 

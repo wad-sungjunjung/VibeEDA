@@ -8,7 +8,12 @@ from typing import AsyncGenerator
 from google import genai
 from google.genai import types
 
-from .claude_agent import _execute_tool, _build_system_prompt, NotebookState
+from .claude_agent import (
+    _execute_tool,
+    _build_system_prompt,
+    NotebookState,
+    PARALLEL_SAFE_TOOLS,
+)
 from . import agent_skills, agent_tools
 
 GENERATE_TIMEOUT_SEC = 300  # Gemini 단일 호출 타임아웃 (5분)
@@ -245,15 +250,35 @@ async def run_agent_stream_gemini(
 
             tool_response_parts = []
             skill_reminders: list[str] = []
-            for idx, p in enumerate(func_call_parts):
+
+            # 병렬 안전한 읽기 전용 툴만 한 턴에 호출됐으면 asyncio.gather 로 병렬 실행
+            fc_args_list: list[tuple[str, dict]] = []
+            for p in func_call_parts:
                 fc = p.function_call
                 args = dict(fc.args) if fc.args else {}
+                fc_args_list.append((fc.name, args))
                 yield {"type": "tool_use", "tool": fc.name, "input": args}
                 if fc.name in agent_skills.ASK_USER_LIKE_TOOLS:
                     ask_user_called = True
 
-                result, sse_events = await _execute_tool(fc.name, args, notebook_state)
+            all_parallel_safe = all(n in PARALLEL_SAFE_TOOLS for n, _ in fc_args_list)
+            if all_parallel_safe and len(fc_args_list) > 1:
+                exec_results = await asyncio.gather(
+                    *[_execute_tool(n, a, notebook_state) for n, a in fc_args_list],
+                    return_exceptions=True,
+                )
+                results_list = []
+                for res in exec_results:
+                    if isinstance(res, Exception):
+                        results_list.append(({"error": "tool_exception", "message": str(res)}, []))
+                    else:
+                        results_list.append(res)
+            else:
+                results_list = []
+                for n, a in fc_args_list:
+                    results_list.append(await _execute_tool(n, a, notebook_state))
 
+            for idx, ((name, args), (result, sse_events)) in enumerate(zip(fc_args_list, results_list)):
                 for event in sse_events:
                     yield event
                     if event["type"] == "cell_created":
@@ -262,17 +287,17 @@ async def run_agent_stream_gemini(
                         updated_cell_ids.append(event["cell_id"])
 
                 skill_reminders.extend(
-                    agent_skills.collect_post_hook_reminders(fc.name, args, result, notebook_state)
+                    agent_skills.collect_post_hook_reminders(name, args, result, notebook_state)
                 )
 
                 payload = dict(result) if isinstance(result, dict) else {"result": result}
                 image_b64 = payload.pop("image_png_base64", None)
-                combined_reminders = list(reminder_msgs) + skill_reminders if idx == len(func_call_parts) - 1 else []
+                combined_reminders = list(reminder_msgs) + skill_reminders if idx == len(fc_args_list) - 1 else []
                 if combined_reminders:
                     payload["_system_reminder"] = " / ".join(combined_reminders)
 
                 tool_response_parts.append(
-                    types.Part.from_function_response(name=fc.name, response=payload)
+                    types.Part.from_function_response(name=name, response=payload)
                 )
                 if image_b64:
                     try:
