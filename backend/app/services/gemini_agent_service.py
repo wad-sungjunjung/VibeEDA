@@ -9,135 +9,16 @@ from google import genai
 from google.genai import types
 
 from .claude_agent import _execute_tool, _build_system_prompt, NotebookState
-from . import agent_skills
+from . import agent_skills, agent_tools
 
 GENERATE_TIMEOUT_SEC = 300  # Gemini 단일 호출 타임아웃 (5분)
 REPEAT_CALL_LIMIT = 3      # 동일 tool+input 반복 허용 횟수
 
 logger = logging.getLogger(__name__)
 
-# ─── Gemini 함수 선언 (Claude TOOLS와 동일한 스펙) ──────────────────────────
+# ─── Gemini 함수 선언 (agent_tools 모듈에서 Claude 스펙 자동 변환) ────────────
 
-_FUNC_DECLARATIONS = [
-    {
-        "name": "read_notebook_context",
-        "description": "Read the current state of all cells in the notebook, including code, execution status, and output summary.",
-        "parameters": {"type": "OBJECT", "properties": {}},
-    },
-    {
-        "name": "create_cell",
-        "description": "Create a new cell in the notebook with initial code.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "cell_type": {"type": "STRING", "enum": ["sql", "python", "markdown"]},
-                "name": {"type": "STRING"},
-                "code": {"type": "STRING"},
-                "after_cell_id": {"type": "STRING"},
-            },
-            "required": ["cell_type", "code"],
-        },
-    },
-    {
-        "name": "update_cell_code",
-        "description": "Update the code of an existing cell.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "cell_id": {"type": "STRING"},
-                "code": {"type": "STRING"},
-            },
-            "required": ["cell_id", "code"],
-        },
-    },
-    {
-        "name": "execute_cell",
-        "description": "Execute a cell against the real Snowflake DB or Python kernel and get its actual output.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {"cell_id": {"type": "STRING"}},
-            "required": ["cell_id"],
-        },
-    },
-    {
-        "name": "read_cell_output",
-        "description": "Read the output of an already-executed cell.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {"cell_id": {"type": "STRING"}},
-            "required": ["cell_id"],
-        },
-    },
-    {
-        "name": "get_mart_schema",
-        "description": "Get column schema of a mart. Call before writing SQL.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {"mart_key": {"type": "STRING"}},
-            "required": ["mart_key"],
-        },
-    },
-    {
-        "name": "preview_mart",
-        "description": "Fetch top N rows from a mart without creating a cell.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "mart_key": {"type": "STRING"},
-                "limit": {"type": "INTEGER"},
-            },
-            "required": ["mart_key"],
-        },
-    },
-    {
-        "name": "profile_mart",
-        "description": "Profile a mart: row count, NULL ratio, distinct, numeric stats.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {"mart_key": {"type": "STRING"}},
-            "required": ["mart_key"],
-        },
-    },
-    {
-        "name": "get_category_values",
-        "description": (
-            "Fetch distinct values of a category-like column (up to 100). "
-            "Use for non-_status/_type columns; _status/_type already injected in system prompt."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "mart_key": {"type": "STRING"},
-                "column": {"type": "STRING"},
-            },
-            "required": ["mart_key", "column"],
-        },
-    },
-    {
-        "name": "write_cell_memo",
-        "description": "Record insight about a cell's output into its memo (2~5줄 한국어).",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "cell_id": {"type": "STRING"},
-                "memo": {"type": "STRING"},
-            },
-            "required": ["cell_id", "memo"],
-        },
-    },
-    {
-        "name": "ask_user",
-        "description": "Ask user for clarification. Stop calling tools after this.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "question": {"type": "STRING"},
-                "options": {"type": "ARRAY", "items": {"type": "STRING"}},
-            },
-            "required": ["question"],
-        },
-    },
-]
+_FUNC_DECLARATIONS = agent_tools.gemini_function_declarations([])
 
 _GEMINI_TOOL = types.Tool(
     function_declarations=[*_FUNC_DECLARATIONS, *agent_skills.SKILL_TOOLS_GEMINI]  # type: ignore[arg-type]
@@ -213,6 +94,7 @@ async def run_agent_stream_gemini(
                                 tools=[_GEMINI_TOOL],
                                 temperature=0.2,
                                 max_output_tokens=32000,
+                                thinking_config=types.ThinkingConfig(include_thoughts=False),
                             ),
                         ),
                         timeout=GENERATE_TIMEOUT_SEC,
@@ -232,7 +114,12 @@ async def run_agent_stream_gemini(
                 candidate = response.candidates[0]
                 parts = (candidate.content.parts if candidate.content else None) or []
 
-                text_parts = [p for p in parts if getattr(p, "text", None)]
+                # Gemini 3 계열은 추론 흔적(`thought=True`)을 텍스트 파트로 함께 돌려주는데,
+                # 이건 내부 사고로 표시용이 아니라서 사용자에게 노출되면 안 된다.
+                text_parts = [
+                    p for p in parts
+                    if getattr(p, "text", None) and not getattr(p, "thought", False)
+                ]
                 func_call_parts = [p for p in parts if getattr(p, "function_call", None)]
                 text_total = sum(len(getattr(p, "text", "") or "") for p in text_parts)
 

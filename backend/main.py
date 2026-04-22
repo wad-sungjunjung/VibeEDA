@@ -27,6 +27,23 @@ app.add_middleware(
 )
 
 
+# 요청 스코프 노트북 파일 캐시 — 한 요청 내에서 동일 .ipynb 를 여러 번 읽지 않도록.
+# ContextVar 기반이라 async task 경계를 안전하게 넘고, 요청 종료 시 자동 해제된다.
+#
+# 장시간 SSE 스트리밍 엔드포인트는 캐시에서 제외 — 스트림이 수 분간 지속되는 동안
+# 다른 요청(수동 셀 편집·실행 등)이 같은 .ipynb 를 써도 캐시가 stale 되어
+# 스트림 쪽 write 가 그걸 덮어쓸 수 있기 때문.
+_NO_CACHE_PATHS = {"/v1/agent/stream", "/v1/vibe", "/v1/reports/stream"}
+
+
+@app.middleware("http")
+async def _notebook_cache_scope(request, call_next):
+    if request.url.path in _NO_CACHE_PATHS:
+        return await call_next(request)
+    with notebook_store.request_cache_scope():
+        return await call_next(request)
+
+
 @app.on_event("startup")
 async def startup():
     _ensure_dir()

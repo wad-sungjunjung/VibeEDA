@@ -1,11 +1,20 @@
 import { useState, useEffect } from 'react'
 import { FileText, X, ChevronDown } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useModelStore, REPORT_MODELS } from '@/store/modelStore'
 import { cn } from '@/lib/utils'
 
 export default function ReportModal() {
-  const { showReportModal, cells, analysisDescription, setShowReportModal, generateReport } = useAppStore()
+  const { showReportModal, cells, analysisDescription, setShowReportModal, generateReport } = useAppStore(
+    useShallow((s) => ({
+      showReportModal: s.showReportModal,
+      cells: s.cells,
+      analysisDescription: s.analysisDescription,
+      setShowReportModal: s.setShowReportModal,
+      generateReport: s.generateReport,
+    }))
+  )
   const { reportModel, setReportModel } = useModelStore()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [goal, setGoal] = useState('')

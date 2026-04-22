@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useAppStore } from '@/store/useAppStore'
+import { useShallow } from 'zustand/react/shallow'
 
 interface Props {
   onClose: () => void
@@ -19,7 +20,13 @@ const FRONTEND_ORIGIN = window.location.origin
 
 export default function ConnectionModal({ onClose }: Props) {
   const store = useConnectionStore()
-  const { refreshMarts, martsLoading, martCatalog } = useAppStore()
+  const { refreshMarts, martsLoading, martCatalog } = useAppStore(
+    useShallow((s) => ({
+      refreshMarts: s.refreshMarts,
+      martsLoading: s.martsLoading,
+      martCatalog: s.martCatalog,
+    }))
+  )
 
   const [activeTab, setActiveTab] = useState<Tab>('snowflake')
 

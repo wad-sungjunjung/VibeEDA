@@ -1,11 +1,14 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
-import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle, Maximize2, Minimize2, Sparkles } from 'lucide-react'
+import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle, Maximize2, Minimize2, Sparkles, Grid3x3 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useModelStore, VIBE_MODELS } from '@/store/modelStore'
 import type { Cell, CellPanelTab } from '@/types'
 import { cn, loadCellUi, saveCellUi, sanitizeCellNameInput, toSnakeCase } from '@/lib/utils'
 import CellOutput from './CellOutput'
 import CodeEditor from './CodeEditor'
+import SheetEditor, { type SheetEditorHandle } from './SheetEditor'
+import { vibeSheet } from '@/lib/api'
 import { suggestCellName } from '@/lib/api'
 
 interface Props {
@@ -17,7 +20,9 @@ const TYPE_STYLES: Record<string, string> = {
   sql: 'bg-sql-bg text-sql-text',
   python: 'bg-python-bg text-python-text',
   markdown: 'bg-markdown-bg text-markdown-text',
+  sheet: 'bg-sheet-bg text-sheet-text',
 }
+const isNonExecutable = (t: string) => t === 'markdown' || t === 'sheet'
 
 export default function CellContainer({ cell }: Props) {
   const {
@@ -42,7 +47,29 @@ export default function CellContainer({ cell }: Props) {
     notebookAreaHeight,
     fullscreenCellId,
     setFullscreenCellId,
-  } = useAppStore()
+  } = useAppStore(useShallow((s) => ({
+    activeCellId: s.activeCellId,
+    setActiveCellId: s.setActiveCellId,
+    deleteCell: s.deleteCell,
+    updateCellCode: s.updateCellCode,
+    updateCellName: s.updateCellName,
+    setCellTab: s.setCellTab,
+    setSplitTab: s.setSplitTab,
+    toggleCellSplitMode: s.toggleCellSplitMode,
+    setCellSplitDir: s.setCellSplitDir,
+    updateCellMemo: s.updateCellMemo,
+    cycleCellTypeById: s.cycleCellTypeById,
+    executeCell: s.executeCell,
+    executingCells: s.executingCells,
+    vibingCells: s.vibingCells,
+    updateCellChatInput: s.updateCellChatInput,
+    submitVibe: s.submitVibe,
+    cancelVibe: s.cancelVibe,
+    cells: s.cells,
+    notebookAreaHeight: s.notebookAreaHeight,
+    fullscreenCellId: s.fullscreenCellId,
+    setFullscreenCellId: s.setFullscreenCellId,
+  })))
 
   const { vibeModel, setVibeModel } = useModelStore()
 
@@ -54,6 +81,17 @@ export default function CellContainer({ cell }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const splitContainerRef = useRef<HTMLDivElement>(null)
   const leftColRef = useRef<HTMLDivElement>(null)
+  const sheetRef = useRef<SheetEditorHandle>(null)
+  const [sheetVibing, setSheetVibing] = useState(false)
+  const [gridlinesHidden, setGridlinesHidden] = useState(false)
+  // 저장된 스냅샷의 격자선 상태를 UI 상태와 동기화 (마운트/전환 직후)
+  useEffect(() => {
+    if (cell.type !== 'sheet') return
+    const t = window.setTimeout(() => {
+      setGridlinesHidden(sheetRef.current?.areGridlinesHidden() ?? false)
+    }, 200)
+    return () => window.clearTimeout(t)
+  }, [cell.type, cell.id])
   const [splitRatio, setSplitRatio] = useState(() => loadCellUi(cell.id).splitRatio ?? 50)
   const [vSplitRatio, setVSplitRatio] = useState(() => loadCellUi(cell.id).vSplitRatio ?? 50)
   // 사용자가 직접 드래그로 조정한 패널 높이. 기본값은 360px.
@@ -139,15 +177,22 @@ export default function CellContainer({ cell }: Props) {
     const onResize = () => setViewportH(window.innerHeight)
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // 편집 가능한 요소에 포커스가 있으면 그 쪽 기본 동작(편집 취소 등)에 양보
+        const active = document.activeElement as HTMLElement | null
+        const tag = (active?.tagName || '').toLowerCase()
+        if (tag === 'input' || tag === 'textarea') return
+        if (active?.getAttribute?.('contenteditable') === 'true') return
+        if (active?.closest?.('[contenteditable="true"]')) return
         e.stopPropagation()
         setFullscreenCellId(null)
       }
     }
     window.addEventListener('resize', onResize)
-    document.addEventListener('keydown', onKey, true)
+    // capture:false (bubble) — SheetEditor 가 먼저 capture 에서 Esc 를 처리할 기회
+    document.addEventListener('keydown', onKey, false)
     return () => {
       window.removeEventListener('resize', onResize)
-      document.removeEventListener('keydown', onKey, true)
+      document.removeEventListener('keydown', onKey, false)
     }
   }, [fullscreen, setFullscreenCellId])
 
@@ -167,11 +212,39 @@ export default function CellContainer({ cell }: Props) {
     }
   }, [naming, cell.id, cell.code, cell.type, updateCellName])
 
+  const notebookId = useAppStore((s) => s.notebookId)
+  const submitSheetVibe = useCallback(async (message: string) => {
+    if (!message.trim() || sheetVibing) return
+    const handle = sheetRef.current
+    if (!handle) return
+    setSheetVibing(true)
+    updateCellChatInput(cell.id, '')
+    try {
+      const selection = handle.getSelection()
+      const { data, origin } = handle.getDataRegion()
+      const res = await vibeSheet({
+        cell_id: cell.id,
+        message,
+        selection,
+        data_region: data,
+        data_origin: origin,
+        notebook_id: notebookId,
+      })
+      if (res.patches?.length) handle.applyPatches(res.patches)
+      if (res.explanation) console.info('[sheet-vibe]', res.explanation)
+    } catch (err) {
+      console.error('[sheet-vibe] failed', err)
+      alert(`시트 바이브 실패: ${err}`)
+    } finally {
+      setSheetVibing(false)
+    }
+  }, [cell.id, sheetVibing, updateCellChatInput, notebookId])
+
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement | null
     if (!target) return
     // 편집/상호작용 요소에서는 더블클릭을 기본 동작(텍스트 선택·커서 배치)에 양보
-    if (target.closest('input, textarea, button, select, [contenteditable="true"], .cm-editor, .monaco-editor, [role="separator"]')) return
+    if (target.closest('input, textarea, button, select, [contenteditable="true"], .cm-editor, .monaco-editor, [role="separator"], canvas')) return
     e.preventDefault()
     setActiveCellId(cell.id)
     setFullscreen((f) => !f)
@@ -289,9 +362,14 @@ export default function CellContainer({ cell }: Props) {
     if (cell.chatInput) el.focus()
   }, [cell.chatInput, isActive])
 
-  const badgeLabel = cell.type === 'markdown' ? 'MD' : cell.type === 'python' ? 'PY' : cell.type.toUpperCase()
+  const badgeLabel =
+    cell.type === 'markdown' ? 'MD'
+    : cell.type === 'python' ? 'PY'
+    : cell.type === 'sheet' ? 'SHEET'
+    : cell.type.toUpperCase()
+  const isSheetCell = cell.type === 'sheet'
   const cycleIndex = TYPE_CYCLE_ORDER.indexOf(cell.type as typeof TYPE_CYCLE_ORDER[number])
-  const nextType = TYPE_CYCLE_ORDER[(cycleIndex + 1) % TYPE_CYCLE_ORDER.length]
+  const nextType = cycleIndex >= 0 ? TYPE_CYCLE_ORDER[(cycleIndex + 1) % TYPE_CYCLE_ORDER.length] : cell.type
 
   const renderTabBar = (activeTab: CellPanelTab, onTab: (t: CellPanelTab) => void) => (
     <div className="flex items-center border-b border-border-subtle mb-1.5">
@@ -308,7 +386,7 @@ export default function CellContainer({ cell }: Props) {
           {t === 'output' && <BarChart3 size={11} />}
           {t === 'memo' && <FileText size={11} />}
           {t === 'input' ? '입력' : t === 'output' ? '출력' : '메모'}
-          {t === 'output' && cell.executed && cell.type !== 'markdown' && (
+          {t === 'output' && cell.executed && !isNonExecutable(cell.type) && (
             <span className="w-1.5 h-1.5 rounded-full ml-0.5 bg-success" />
           )}
         </button>
@@ -319,6 +397,21 @@ export default function CellContainer({ cell }: Props) {
   const renderPanel = (tab: CellPanelTab, fixedHeight?: number, stretch?: boolean) => {
     if (tab === 'input') {
       const isMarkdown = cell.type === 'markdown'
+      const isSheet = cell.type === 'sheet'
+      if (isSheet) {
+        return (
+          <div className={cn('relative rounded-md overflow-hidden', stretch && 'h-full flex flex-col')}>
+            <SheetEditor
+              ref={sheetRef}
+              value={cell.code}
+              onChange={(v) => updateCellCode(cell.id, v)}
+              height={stretch ? '100%' : (fixedHeight ?? 480)}
+              readOnly={isVibing || sheetVibing}
+              showFooter={fsRenderActive}
+            />
+          </div>
+        )
+      }
       return (
         <div
           className={cn(
@@ -331,7 +424,7 @@ export default function CellContainer({ cell }: Props) {
             type={cell.type}
             value={cell.code}
             onChange={(v) => updateCellCode(cell.id, v)}
-            onRun={cell.type !== 'markdown' ? () => executeCell(cell.id) : undefined}
+            onRun={!isNonExecutable(cell.type) ? () => executeCell(cell.id) : undefined}
             fixedHeight={stretch ? undefined : fixedHeight}
             readOnly={isVibing}
           />
@@ -425,12 +518,18 @@ export default function CellContainer({ cell }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono text-text-disabled shrink-0">[{cellIndex}]</span>
           <button
-            title={`클릭하여 셀 타입 변경 (→ ${nextType.toUpperCase()})`}
-            onClick={(e) => { e.stopPropagation(); cycleCellTypeById(cell.id) }}
+            title={isSheetCell ? '시트 셀은 타입 전환 불가' : `클릭하여 셀 타입 변경 (→ ${nextType.toUpperCase()})`}
+            onClick={(e) => { e.stopPropagation(); if (!isSheetCell) cycleCellTypeById(cell.id) }}
+            disabled={isSheetCell}
             className={cn(
-              'text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide hover:opacity-80 hover:scale-105 transition-all cursor-pointer shrink-0',
-              TYPE_STYLES[cell.type]
+              'text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide transition-all shrink-0',
+              isSheetCell ? 'cursor-default' : 'cursor-pointer hover:opacity-80 hover:scale-105',
+              !isSheetCell && TYPE_STYLES[cell.type]
             )}
+            style={isSheetCell ? {
+              backgroundColor: 'rgb(var(--color-sheet-bg))',
+              color: 'rgb(var(--color-sheet-text))',
+            } : undefined}
           >
             {badgeLabel}
           </button>
@@ -472,7 +571,7 @@ export default function CellContainer({ cell }: Props) {
         <div className="flex items-center gap-1">
           {/* Hover actions */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {cell.type !== 'markdown' && (
+            {!isNonExecutable(cell.type) && (
               <button
                 title={isExecuting ? '실행 중...' : 'Ctrl+Enter로도 실행'}
                 disabled={isExecuting}
@@ -480,6 +579,22 @@ export default function CellContainer({ cell }: Props) {
                 className="p-1.5 rounded text-text-secondary transition-colors disabled:cursor-not-allowed enabled:hover:text-primary enabled:hover:bg-primary-light"
               >
                 {isExecuting ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+              </button>
+            )}
+            {isSheetCell && (
+              <button
+                title={gridlinesHidden ? '격자선 표시' : '격자선 숨김'}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const nextHidden = sheetRef.current?.toggleGridlines() ?? false
+                  setGridlinesHidden(nextHidden)
+                }}
+                className={cn(
+                  'p-1.5 rounded transition-colors hover:bg-primary-light',
+                  gridlinesHidden ? 'text-text-disabled' : 'text-text-secondary hover:text-primary'
+                )}
+              >
+                <Grid3x3 size={14} />
               </button>
             )}
             <button
@@ -499,7 +614,10 @@ export default function CellContainer({ cell }: Props) {
           </div>
 
           {/* Layout mode toggle */}
-          <div className="flex items-center rounded overflow-hidden ml-1 border border-border-subtle">
+          <div className={cn(
+            'flex items-center rounded overflow-hidden ml-1 border border-border-subtle',
+            isSheetCell && 'hidden'
+          )}>
             <button
               title="기본"
               onClick={(e) => { e.stopPropagation(); if (cell.splitMode) toggleCellSplitMode(cell.id) }}
@@ -535,12 +653,26 @@ export default function CellContainer({ cell }: Props) {
       </div>
 
       {/* Content */}
-      <div className="px-4 py-2">
+      <div className="px-4 pt-2 pb-0">
         {(() => {
           const CELL_HEADER = 40
-          const CONTENT_PAD = 16
-          const VIBE_CHAT = isActive ? (fsRenderActive ? 120 : 128) : 24
-          const SAFETY = 24
+          const CONTENT_PAD = 8 // pt-2 pb-0 → 상단 8px 만
+          const VIBE_CHAT = isActive ? (fsRenderActive ? 116 : 104) : 24
+          const SAFETY = 16
+          // Sheet 셀: 탭바/분할 없이 입력(스프레드시트)만 렌더
+          // 전체화면에선 뷰포트를 꽉 채우고, 기본 상태에선 사용자가 조정한 panelHeight 사용
+          if (cell.type === 'sheet') {
+            const viewportTotal = Math.max(viewportH - CELL_HEADER - CONTENT_PAD - VIBE_CHAT - SAFETY, 200)
+            const sheetHeight = fsRenderActive ? viewportTotal : panelHeight
+            return (
+              <>
+                <div style={{ height: sheetHeight, overflow: 'hidden' }}>
+                  {renderPanel('input', sheetHeight, true)}
+                </div>
+                {!fsRenderActive && <PanelResizeHandle onMouseDown={handlePanelResizeMouseDown} />}
+              </>
+            )
+          }
           // fullscreen 은 NotebookArea + CellAddBar(≈56px) 영역을 차지하므로 높이가 조금 더 큼
           // fullscreen 은 viewport 전체(단, 우측 사이드바 제외)를 차지
           const areaHeight = fsRenderActive ? viewportH : notebookAreaHeight
@@ -664,15 +796,29 @@ export default function CellContainer({ cell }: Props) {
         </div>
       )}
 
-      {/* Vibe chat (active cell only) */}
-      {isActive && (
+      {/* Vibe chat (active cell only) — sheet 셀은 별도 핸들러 사용 */}
+      {isActive && (() => {
+        const isSheet = cell.type === 'sheet'
+        const effectiveVibing = isSheet ? sheetVibing : isVibing
+        const submit = isSheet
+          ? () => submitSheetVibe(cell.chatInput)
+          : () => submitVibe(cell.id, cell.chatInput)
+        const placeholder = isSheet
+          ? '시트를 수정해보세요 (Ctrl+Enter) — 예: 선택 영역 합계 아래 셀에'
+          : cell.type === 'sql'
+            ? '쿼리를 수정해보세요 (Ctrl+Enter 전송) — 예: 시도별로 group by 해줘'
+            : cell.type === 'python'
+              ? '코드를 수정해보세요 (Ctrl+Enter 전송) — 예: pie 차트로 바꿔줘'
+              : '문서를 수정해보세요 (Ctrl+Enter 전송)'
+        const busyLabel = isSheet ? '시트 업데이트 중' : '코드 생성 중'
+        return (
         <div
           className={cn(
-            'relative mt-3 mx-4 rounded-2xl',
-            fsRenderActive ? 'mb-2' : 'mb-4',
-            !isVibing && 'bg-surface border border-border-subtle shadow-sm'
+            'relative mx-4 rounded-2xl',
+            fsRenderActive ? 'mt-3 mb-2' : 'mt-0 mb-2',
+            !effectiveVibing && 'bg-surface border border-border-subtle shadow-sm'
           )}
-          style={isVibing ? {
+          style={effectiveVibing ? {
             border: '1.5px solid transparent',
             backgroundImage: 'linear-gradient(rgb(var(--color-surface)),rgb(var(--color-surface))), linear-gradient(90deg,#D95C3F,#f0883e,#fbbf24,#f0883e,#D95C3F)',
             backgroundOrigin: 'border-box',
@@ -684,25 +830,29 @@ export default function CellContainer({ cell }: Props) {
           onClick={(e) => e.stopPropagation()}
         >
           {/* 뒤 텍스트 가리기 + 상태 표시 */}
-          {isVibing && (
+          {effectiveVibing && (
             <>
               <div className="absolute inset-0 rounded-2xl bg-surface z-[30]" />
               <div className="absolute inset-0 z-[40] flex flex-col items-center justify-center gap-1 pointer-events-none">
                 <div className="flex items-center gap-1.5 text-primary-hover">
                   <Loader2 size={13} className="animate-spin" />
-                  <span className="text-[12px] font-semibold">코드 생성 중</span>
+                  <span className="text-[12px] font-semibold">{busyLabel}</span>
                 </div>
-                <span className="font-mono text-[11px] text-primary-hover/60">
-                  {(vibeElapsed / 10).toFixed(1)}s
-                </span>
+                {!isSheet && (
+                  <span className="font-mono text-[11px] text-primary-hover/60">
+                    {(vibeElapsed / 10).toFixed(1)}s
+                  </span>
+                )}
               </div>
-              <button
-                title="생성 중지"
-                onClick={(e) => { e.stopPropagation(); cancelVibe(cell.id) }}
-                className="absolute top-1/2 right-3 -translate-y-1/2 z-[50] flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors bg-primary-light text-primary-hover border border-primary-border"
-              >
-                <StopCircle size={12} />중지
-              </button>
+              {!isSheet && (
+                <button
+                  title="생성 중지"
+                  onClick={(e) => { e.stopPropagation(); cancelVibe(cell.id) }}
+                  className="absolute top-1/2 right-3 -translate-y-1/2 z-[50] flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors bg-primary-light text-primary-hover border border-primary-border"
+                >
+                  <StopCircle size={12} />중지
+                </button>
+              )}
             </>
           )}
 
@@ -718,14 +868,8 @@ export default function CellContainer({ cell }: Props) {
               position: 'relative',
               zIndex: 10,
             }}
-            placeholder={
-              cell.type === 'sql'
-                ? '쿼리를 수정해보세요 (Ctrl+Enter 전송) — 예: 시도별로 group by 해줘'
-                : cell.type === 'python'
-                ? '코드를 수정해보세요 (Ctrl+Enter 전송) — 예: pie 차트로 바꿔줘'
-                : '문서를 수정해보세요 (Ctrl+Enter 전송)'
-            }
-            disabled={isVibing}
+            placeholder={placeholder}
+            disabled={effectiveVibing}
             value={cell.chatInput}
             onChange={(e) => {
               updateCellChatInput(cell.id, e.target.value)
@@ -735,8 +879,8 @@ export default function CellContainer({ cell }: Props) {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault()
-                if (!isVibing && cell.chatInput.trim()) {
-                  submitVibe(cell.id, cell.chatInput)
+                if (!effectiveVibing && cell.chatInput.trim()) {
+                  submit()
                   e.currentTarget.style.height = '44px'
                 }
               }
@@ -745,11 +889,11 @@ export default function CellContainer({ cell }: Props) {
           <div className="absolute right-3 bottom-2 w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ zIndex: 10 }}>
             <button
               title="바이브 전송"
-              disabled={isVibing || !cell.chatInput.trim()}
-              onClick={() => submitVibe(cell.id, cell.chatInput)}
+              disabled={effectiveVibing || !cell.chatInput.trim()}
+              onClick={() => submit()}
               className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:cursor-not-allowed text-white',
-                cell.chatInput.trim() && !isVibing ? 'bg-primary' : 'bg-border-subtle'
+                cell.chatInput.trim() && !effectiveVibing ? 'bg-primary' : 'bg-border-subtle'
               )}
             >
               <ArrowUp size={16} strokeWidth={2.5} />
@@ -761,7 +905,7 @@ export default function CellContainer({ cell }: Props) {
                 value={vibeModel}
                 onChange={(e) => setVibeModel(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                disabled={isVibing}
+                disabled={effectiveVibing}
                 className="appearance-none text-[10px] font-medium text-text-disabled bg-transparent border-none pl-0 pr-4 py-0 cursor-pointer hover:text-text-secondary outline-none transition-colors disabled:cursor-not-allowed"
               >
                 {VIBE_MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
@@ -770,7 +914,8 @@ export default function CellContainer({ cell }: Props) {
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

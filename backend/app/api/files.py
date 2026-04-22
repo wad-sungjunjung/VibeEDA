@@ -9,8 +9,9 @@
 from __future__ import annotations
 
 import shutil
+import re
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 
 from ..services import notebook_store
@@ -18,6 +19,20 @@ from ..services import file_profile_cache
 
 
 router = APIRouter()
+
+# 업로드 허용 확장자 (분석 관련 포맷만 — .py/.sh 같은 실행 스크립트는 제외)
+_UPLOAD_ALLOWED_EXTS = {
+    ".csv", ".tsv", ".xlsx", ".xls", ".parquet",
+    ".json", ".txt", ".md",
+}
+_UPLOAD_MAX_BYTES = 100 * 1024 * 1024  # 100 MB
+_SAFE_FILENAME_RE = re.compile(r"[\x00-\x1f<>:\"/\\|?*]")
+
+
+def _sanitize_filename(name: str) -> str:
+    name = _SAFE_FILENAME_RE.sub("_", name.strip())
+    name = name.lstrip(".").replace("..", "_")
+    return name[:200] or "upload"
 
 _EXCLUDE_NAMES = {"__pycache__", ".vibe_config.json", ".DS_Store"}
 _MAX_DEPTH = 6
@@ -263,6 +278,112 @@ def profile_file(body: ProfileBody):
 def profile_rescan():
     """루트 전체 재스캔 + 필요시 재프로파일."""
     return file_profile_cache.scan_and_profile_root()
+
+
+class DeleteFileBody(BaseModel):
+    path: str
+
+
+@router.post("/files/delete")
+def delete_file(body: DeleteFileBody):
+    """업로드된 일반 파일(csv/xlsx/parquet/md 등) 삭제.
+    .ipynb / reports 는 별도 경로(DELETE /notebooks/{id}, /reports/{id}) 사용 — 여기서는 거부."""
+    p = _resolve_inside_root(body.path)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="file not found")
+    if not p.is_file():
+        raise HTTPException(status_code=400, detail="not a file")
+    if p.suffix.lower() == ".ipynb":
+        raise HTTPException(status_code=400, detail=".ipynb 는 분석 삭제 메뉴로 제거해주세요")
+    try:
+        p.unlink()
+        # 프로파일 캐시에서도 제거
+        try:
+            file_profile_cache.clear_cache(str(p))
+        except Exception:
+            pass
+    except OSError as e:
+        raise HTTPException(status_code=400, detail=f"삭제 실패: {e}")
+    return {"ok": True}
+
+
+@router.post("/files/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    dst_dir: str = Form(default=""),
+    overwrite: bool = Form(default=False),
+):
+    """외부 파일(csv/xlsx/parquet/tsv/json/txt/md) 업로드.
+    dst_dir 가 비어 있으면 NOTEBOOKS_DIR 루트에 저장. 저장 후 분석 포맷은 바로 프로파일링.
+    """
+    raw_name = file.filename or "upload"
+    safe_name = _sanitize_filename(raw_name)
+    ext = Path(safe_name).suffix.lower()
+    if ext not in _UPLOAD_ALLOWED_EXTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"허용되지 않은 확장자: {ext or '(없음)'} — 허용: {', '.join(sorted(_UPLOAD_ALLOWED_EXTS))}",
+        )
+
+    target_dir = (
+        _resolve_inside_root(dst_dir) if dst_dir
+        else notebook_store.NOTEBOOKS_DIR.resolve()
+    )
+    if not target_dir.exists() or not target_dir.is_dir():
+        raise HTTPException(status_code=400, detail="dst_dir not a directory")
+
+    target = target_dir / safe_name
+    if target.exists() and not overwrite:
+        # 같은 이름이 있으면 자동 증가 — name (1).csv, name (2).csv ...
+        stem, suffix = Path(safe_name).stem, Path(safe_name).suffix
+        n = 1
+        while True:
+            cand = target_dir / f"{stem} ({n}){suffix}"
+            if not cand.exists():
+                target = cand
+                break
+            n += 1
+            if n > 999:
+                raise HTTPException(status_code=409, detail="too many duplicates")
+
+    # 스트리밍 저장 + 크기 상한 감시
+    total = 0
+    try:
+        with target.open("wb") as out:
+            while True:
+                chunk = await file.read(1 << 20)  # 1 MB
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > _UPLOAD_MAX_BYTES:
+                    out.close()
+                    target.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"파일이 너무 큽니다 (상한 {_UPLOAD_MAX_BYTES // (1024*1024)} MB)",
+                    )
+                out.write(chunk)
+    except HTTPException:
+        raise
+    except Exception as e:
+        target.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"업로드 실패: {e}")
+
+    # 분석 가능 포맷은 즉시 프로파일링 (실패해도 업로드 자체는 성공으로 반환)
+    profile = None
+    if ext in {".csv", ".tsv", ".xlsx", ".xls", ".parquet"}:
+        try:
+            profile = file_profile_cache.profile_file(target)
+        except Exception as e:
+            profile = {"error": str(e)}
+
+    return {
+        "ok": True,
+        "path": str(target),
+        "name": target.name,
+        "size": total,
+        "profile": profile,
+    }
 
 
 @router.post("/files/move")

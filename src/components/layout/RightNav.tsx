@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Layers, Compass, Telescope, Database, MessageSquare, RotateCcw, User, GripVertical, Search, X, Check, Copy, Trash2, ChevronDown, ChevronRight, SquarePen, Pencil } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
+import { useShallow } from 'zustand/react/shallow'
 import { cn } from '@/lib/utils'
 
 const MIN_SECTION_PCT = 10
@@ -39,7 +40,32 @@ export default function RightNav() {
     setCellEditOrigin,
     deleteCell,
     cellActiveEntryId,
-  } = useAppStore()
+  } = useAppStore(useShallow((s) => ({
+    cells: s.cells,
+    activeCellId: s.activeCellId,
+    selectedMarts: s.selectedMarts,
+    martCatalog: s.martCatalog,
+    agentMode: s.agentMode,
+    agentChatHistory: s.agentChatHistory,
+    agentSessions: s.agentSessions,
+    agentSessionTitle: s.agentSessionTitle,
+    currentSessionCreatedAtMs: s.currentSessionCreatedAtMs,
+    currentSessionId: s.currentSessionId,
+    collapsedSessionIds: s.collapsedSessionIds,
+    toggleSessionCollapsed: s.toggleSessionCollapsed,
+    newAgentSession: s.newAgentSession,
+    resumeAgentSession: s.resumeAgentSession,
+    deleteAgentSession: s.deleteAgentSession,
+    setActiveCellId: s.setActiveCellId,
+    rollbackCell: s.rollbackCell,
+    deleteChatEntry: s.deleteChatEntry,
+    toggleCellHistory: s.toggleCellHistory,
+    reorderCells: s.reorderCells,
+    updateCellChatInput: s.updateCellChatInput,
+    setCellEditOrigin: s.setCellEditOrigin,
+    deleteCell: s.deleteCell,
+    cellActiveEntryId: s.cellActiveEntryId,
+  })))
 
 
   type SessionMenu = { kind: 'session'; id: string; x: number; y: number }
@@ -343,13 +369,20 @@ export default function RightNav() {
                     />
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
                       <span className="text-[10px] text-text-disabled font-mono shrink-0">[{idx + 1}]</span>
-                      <span className={cn(
-                        'text-[9px] font-bold px-1 py-0.5 rounded uppercase tracking-wide shrink-0',
-                        cell.type === 'sql' ? 'bg-sql-bg text-sql-text' :
-                        cell.type === 'python' ? 'bg-python-bg text-python-text' :
-                        'bg-markdown-bg text-markdown-text'
-                      )}>
-                        {cell.type === 'markdown' ? 'MD' : cell.type === 'python' ? 'PY' : cell.type.toUpperCase()}
+                      <span
+                        className={cn(
+                          'text-[9px] font-bold px-1 py-0.5 rounded uppercase tracking-wide shrink-0',
+                          cell.type === 'sql' ? 'bg-sql-bg text-sql-text' :
+                          cell.type === 'python' ? 'bg-python-bg text-python-text' :
+                          cell.type === 'sheet' ? '' :
+                          'bg-markdown-bg text-markdown-text'
+                        )}
+                        style={cell.type === 'sheet' ? {
+                          backgroundColor: 'rgb(var(--color-sheet-bg))',
+                          color: 'rgb(var(--color-sheet-text))',
+                        } : undefined}
+                      >
+                        {cell.type === 'markdown' ? 'MD' : cell.type === 'python' ? 'PY' : cell.type === 'sheet' ? 'SHEET' : cell.type.toUpperCase()}
                       </span>
                       <span className="text-[12px] font-mono font-semibold text-text-primary truncate flex-1">{cell.name}</span>
                       <div className="flex items-center gap-1 shrink-0">

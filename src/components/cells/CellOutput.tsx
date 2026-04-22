@@ -83,6 +83,14 @@ export default function CellOutput({ cell }: Props) {
     return <MarkdownOutput content={cell.code} />
   }
 
+  if (cell.type === 'sheet') {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[240px] text-[12px] text-text-disabled rounded-md border border-border bg-border-subtle">
+        스프레드시트 셀은 출력이 없습니다 — 입력 탭에서 편집하세요
+      </div>
+    )
+  }
+
   if (!cell.executed || !cell.output) {
     return (
       <div className="flex items-center justify-center h-full min-h-[360px] text-[12px] text-text-disabled rounded-md border border-border bg-border-subtle">

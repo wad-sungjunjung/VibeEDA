@@ -1,9 +1,16 @@
 import { useRef, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
+import { useShallow } from 'zustand/react/shallow'
 import CellContainer from './CellContainer'
 
 export default function NotebookArea() {
-  const { cells, activeCellId, setNotebookAreaHeight } = useAppStore()
+  const { cells, activeCellId, setNotebookAreaHeight } = useAppStore(
+    useShallow((s) => ({
+      cells: s.cells,
+      activeCellId: s.activeCellId,
+      setNotebookAreaHeight: s.setNotebookAreaHeight,
+    }))
+  )
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

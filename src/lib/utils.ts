@@ -42,12 +42,19 @@ export function sanitizeCellNameInput(name: string): string {
 }
 
 export function cycleCellType(current: CellType): CellType {
+  // sheet 은 순환에서 제외 — sheet↔다른 타입 전환 불가
+  if (current === 'sheet') return 'sheet'
   const order: CellType[] = ['sql', 'python', 'markdown']
-  return order[(order.indexOf(current) + 1) % order.length]
+  const idx = order.indexOf(current)
+  return order[(idx + 1) % order.length]
 }
 
 export function defaultCellName(type: CellType, existingNames: string[]): string {
-  const prefix = type === 'sql' ? 'query' : type === 'python' ? 'code' : 'note'
+  const prefix =
+    type === 'sql' ? 'query'
+    : type === 'python' ? 'code'
+    : type === 'sheet' ? 'sheet'
+    : 'note'
   let n = existingNames.filter((name) => name.startsWith(prefix)).length + 1
   while (existingNames.includes(`${prefix}_${n}`)) n++
   return `${prefix}_${n}`
@@ -127,6 +134,8 @@ export function toolStatusLabel(tool: string, input?: Record<string, unknown>): 
       if (typeof passed === 'boolean') return passed ? '차트 퀄리티 통과' : '차트 퀄리티 재작업'
       return '차트 퀄리티 검토 중'
     }
+    case 'create_sheet_cell': return '시트 셀 생성 중'
+    case 'update_sheet_cell': return '시트 편집 중'
     case 'ask_user': return '질문 준비 중'
     default: return `${tool} 실행 중`
   }

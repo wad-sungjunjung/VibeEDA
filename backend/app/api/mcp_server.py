@@ -145,6 +145,57 @@ async def list_tools() -> list[Tool]:
                 "required": ["mart_key"],
             },
         ),
+        Tool(
+            name="create_sheet_cell",
+            description=(
+                "스프레드시트(sheet) 셀 생성. 값/수식 패치 배열로 초기화. "
+                "range 는 A1 표기(단일 셀), value 가 '=' 로 시작하면 수식. "
+                "예: patches=[{range:'A1',value:'매출'},{range:'B10',value:'=SUM(B2:B9)'}]"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "notebook_id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "after_id": {"type": "string"},
+                    "patches": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "range": {"type": "string"},
+                                "value": {},
+                            },
+                            "required": ["range", "value"],
+                        },
+                    },
+                },
+                "required": ["notebook_id", "patches"],
+            },
+        ),
+        Tool(
+            name="update_sheet_cell",
+            description="기존 시트 셀에 패치 적용 (덮어쓰기).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "notebook_id": {"type": "string"},
+                    "cell_id": {"type": "string"},
+                    "patches": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "range": {"type": "string"},
+                                "value": {},
+                            },
+                            "required": ["range", "value"],
+                        },
+                    },
+                },
+                "required": ["notebook_id", "cell_id", "patches"],
+            },
+        ),
     ]
 
 
@@ -216,6 +267,35 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 arguments["notebook_id"], arguments["cell_id"], memo=arguments["memo"]
             )
             return text(result)
+
+        elif name == "create_sheet_cell":
+            from ..services import sheet_snapshot
+            patches = arguments.get("patches") or []
+            code, skipped = sheet_snapshot.build_snapshot(patches)
+            cell_name = arguments.get("name") or f"sheet_cell"
+            result = notebook_store.create_cell(
+                nb_id=arguments["notebook_id"],
+                cell_type="sheet",
+                name=cell_name,
+                code=code,
+                after_id=arguments.get("after_id"),
+                agent_generated=True,
+            )
+            return text({**result, "applied_patches": len(patches) - len(skipped), "skipped_ranges": skipped})
+
+        elif name == "update_sheet_cell":
+            from ..services import sheet_snapshot
+            nb = notebook_store.get_notebook(arguments["notebook_id"])
+            cell = next((c for c in nb["cells"] if c["id"] == arguments["cell_id"]), None)
+            if not cell:
+                return text({"error": "Cell not found"})
+            if cell.get("type") != "sheet":
+                return text({"error": f"Cell is not a sheet (type={cell.get('type')})"})
+            new_code, skipped = sheet_snapshot.patch_existing(cell.get("code") or "", arguments.get("patches") or [])
+            result = notebook_store.update_cell(
+                arguments["notebook_id"], arguments["cell_id"], code=new_code
+            )
+            return text({**result, "applied_patches": len(arguments.get("patches") or []) - len(skipped), "skipped_ranges": skipped})
 
     except Exception as e:
         return text({"error": str(e)})

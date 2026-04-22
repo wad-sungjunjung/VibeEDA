@@ -1,6 +1,7 @@
 import { FileText, X, Copy, Check, Sparkles, Download, AlertTriangle, Loader2, CheckCircle2, Circle, Save } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
+import { useShallow } from 'zustand/react/shallow'
 import Markdown from '@/components/common/Markdown'
 import { API_BASE_URL } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -27,7 +28,21 @@ export default function ReportResult() {
     reportSaving,
     saveCurrentReport,
     closeCurrentReport,
-  } = useAppStore()
+  } = useAppStore(useShallow((s) => ({
+    showReport: s.showReport,
+    reportContent: s.reportContent,
+    reportTitle: s.reportTitle,
+    reportError: s.reportError,
+    generatingReport: s.generatingReport,
+    currentReportId: s.currentReportId,
+    reportStages: s.reportStages,
+    reportStartedAt: s.reportStartedAt,
+    reportProcessingNotes: s.reportProcessingNotes,
+    reportIsDraft: s.reportIsDraft,
+    reportSaving: s.reportSaving,
+    saveCurrentReport: s.saveCurrentReport,
+    closeCurrentReport: s.closeCurrentReport,
+  })))
   const [copied, setCopied] = useState(false)
   const [elapsed, setElapsed] = useState(0)
 

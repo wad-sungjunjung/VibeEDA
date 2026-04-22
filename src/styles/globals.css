@@ -37,10 +37,12 @@
   /* cell types */
   --color-sql-bg: 232 228 216;
   --color-sql-text: 92 74 30;
-  --color-python-bg: 230 237 224;
-  --color-python-text: 61 82 38;
+  --color-python-bg: 214 228 245;
+  --color-python-text: 32 70 132;
   --color-markdown-bg: 234 228 223;
   --color-markdown-text: 74 60 46;
+  --color-sheet-bg: 198 231 206;
+  --color-sheet-text: 20 108 60;
 
   /* status */
   --color-success: 101 163 13;
@@ -95,10 +97,12 @@
   /* cell types — 배경 뉴트럴화에 맞춰 채도 낮춤·명도 조정 */
   --color-sql-bg: 52 48 30;
   --color-sql-text: 212 195 130;
-  --color-python-bg: 34 48 30;
-  --color-python-text: 174 205 144;
+  --color-python-bg: 28 42 60;
+  --color-python-text: 148 184 230;
   --color-markdown-bg: 46 43 40;
   --color-markdown-text: 205 192 175;
+  --color-sheet-bg: 28 62 40;
+  --color-sheet-text: 150 215 175;
 
   /* status */
   --color-success: 132 204 22;

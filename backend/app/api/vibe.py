@@ -1,7 +1,7 @@
 """Vibe Chat — Gemini API 스트리밍으로 셀 코드 수정"""
 import json
 import logging
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Header
 
@@ -15,6 +15,7 @@ from ..services import category_cache
 from ..services.kernel import get_dataframe_summaries
 from ..services.gemini_service import stream_vibe_chat as stream_vibe_gemini
 from ..services.claude_vibe_service import stream_vibe_chat_claude as stream_vibe_claude
+from ..services.sheet_vibe_service import vibe_sheet as vibe_sheet_run
 
 router = APIRouter()
 
@@ -96,3 +97,36 @@ async def vibe_endpoint(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ─── Sheet Vibe ────────────────────────────────────────────────────────────
+
+class SheetVibeRequest(BaseModel):
+    cell_id: str
+    message: str
+    selection: Optional[str] = None
+    data_region: list[list[Any]] = []
+    data_origin: str = "A1"
+    notebook_id: Optional[str] = None
+
+
+@router.post("/vibe/sheet")
+async def vibe_sheet_endpoint(
+    req: SheetVibeRequest,
+    x_gemini_key: str = Header(default="", alias="X-Gemini-Key"),
+    x_anthropic_key: str = Header(default="", alias="X-Anthropic-Key"),
+    x_vibe_model: str = Header(default="", alias="X-Vibe-Model"),
+):
+    model = x_vibe_model or settings.default_vibe_model
+    use_claude = model.startswith("claude-")
+    api_key = (x_anthropic_key or settings.anthropic_api_key) if use_claude else (x_gemini_key or settings.gemini_api_key)
+    result = await vibe_sheet_run(
+        use_claude=use_claude,
+        api_key=api_key,
+        model=model,
+        message=req.message,
+        selection=req.selection,
+        data_region=req.data_region,
+        data_origin=req.data_origin,
+    )
+    return result

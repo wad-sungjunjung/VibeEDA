@@ -1,6 +1,6 @@
 // ─── Cell ──────────────────────────────────────────────────────────────────
 
-export type CellType = 'sql' | 'python' | 'markdown'
+export type CellType = 'sql' | 'python' | 'markdown' | 'sheet'
 export type CellPanelTab = 'input' | 'output' | 'memo'
 export type CellTab = CellPanelTab
 

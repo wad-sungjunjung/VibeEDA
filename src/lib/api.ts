@@ -287,6 +287,38 @@ export async function streamVibeChat(
   await readSSEStream(response, onEvent)
 }
 
+// ─── Sheet Vibe ───────────────────────────────────────────────────────────────
+
+export interface SheetPatch {
+  range: string
+  value: string | number | boolean
+}
+
+export interface SheetVibeRequest {
+  cell_id: string
+  message: string
+  selection?: string | null
+  data_region: (string | number | boolean | null)[][]
+  data_origin: string
+  notebook_id?: string | null
+}
+
+export interface SheetVibeResponse {
+  patches: SheetPatch[]
+  explanation: string
+}
+
+export async function vibeSheet(req: SheetVibeRequest, signal?: AbortSignal): Promise<SheetVibeResponse> {
+  const res = await fetch(`${API_BASE}/vibe/sheet`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getLLMHeaders() },
+    body: JSON.stringify(req),
+    signal,
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  return (await res.json()) as SheetVibeResponse
+}
+
 // ─── Agent stream ─────────────────────────────────────────────────────────────
 
 export interface AgentCellSnapshot {
@@ -477,3 +509,24 @@ export const moveEntry = (src: string, dstDir: string) =>
     method: 'POST',
     body: JSON.stringify({ src, dst_dir: dstDir }),
   })
+
+export const deleteFile = (path: string) =>
+  apiFetch<{ ok: boolean }>('/files/delete', {
+    method: 'POST',
+    body: JSON.stringify({ path }),
+  })
+
+export async function uploadFile(file: File, dstDir: string = ''): Promise<{
+  ok: boolean; path: string; name: string; size: number; profile: unknown
+}> {
+  const form = new FormData()
+  form.append('file', file)
+  if (dstDir) form.append('dst_dir', dstDir)
+  const res = await fetch(`${API_BASE}/files/upload`, { method: 'POST', body: form })
+  if (!res.ok) {
+    let detail = ''
+    try { detail = (await res.json()).detail ?? '' } catch {}
+    throw new Error(detail || `업로드 실패 (HTTP ${res.status})`)
+  }
+  return res.json()
+}

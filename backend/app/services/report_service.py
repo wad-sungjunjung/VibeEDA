@@ -557,129 +557,142 @@ def _build_writing_user_prompt(
 
 # ─── LLM 호출 ────────────────────────────────────────────────────────────────
 
-def _build_image_content_blocks_claude(evidence: list[dict]) -> list[dict]:
-    blocks: list[dict] = []
-    for e in evidence:
-        if e.get("image_png_b64"):
-            blocks.append({"type": "text", "text": f"[차트 이미지 — 셀 `{e['name']}`]"})
-            blocks.append({
-                "type": "image",
-                "source": {"type": "base64", "media_type": "image/png", "data": e["image_png_b64"]},
-            })
-    return blocks
+# ─── LLM 프로바이더 추상화 ──────────────────────────────────────────────────
+# Claude/Gemini 공통 인터페이스: call_text (단발) + stream (writing pass).
+# evidence 이미지 블록 구성 방식이 SDK마다 다르므로 서브클래스에서만 처리.
 
 
-def _build_image_parts_gemini(evidence: list[dict]) -> list:
-    parts: list = []
-    for e in evidence:
-        if e.get("image_png_b64"):
-            try:
-                img_bytes = base64.b64decode(e["image_png_b64"])
-                parts.append(genai_types.Part.from_text(text=f"[차트 이미지 — 셀 `{e['name']}`]"))
-                parts.append(genai_types.Part.from_bytes(data=img_bytes, mime_type="image/png"))
-            except Exception as ex:
-                logger.warning("gemini image decode failed for cell %s: %s", e.get("name"), ex)
-    return parts
+class _ReportLLM:
+    """리포트 생성용 LLM 프로바이더 공통 인터페이스."""
+
+    def __init__(self, api_key: str, model: str):
+        self.api_key = api_key
+        self.model = model
+
+    async def call_text(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        evidence: list[dict],
+        *,
+        max_tokens: int = 8000,
+        response_mime_type: Optional[str] = None,
+    ) -> str:
+        raise NotImplementedError
+
+    async def stream(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        evidence: list[dict],
+    ) -> AsyncGenerator[str, None]:
+        raise NotImplementedError
+        yield  # make this an async generator for type checkers
 
 
-async def _call_claude_text(
-    api_key: str,
-    model: str,
-    system_prompt: str,
-    user_prompt: str,
-    evidence: list[dict],
-    max_tokens: int = 8000,
-) -> str:
-    """Non-stream 단발 호출 — outline JSON 생성용."""
-    client = anthropic.AsyncAnthropic(api_key=api_key)
-    content: list[dict] = [{"type": "text", "text": user_prompt}]
-    content.extend(_build_image_content_blocks_claude(evidence))
-    resp = await client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": content}],
-    )
-    # concatenate text blocks
-    out: list[str] = []
-    for b in resp.content:
-        if getattr(b, "type", None) == "text":
-            out.append(b.text)
-    return "".join(out)
+class _ClaudeReportLLM(_ReportLLM):
+    @staticmethod
+    def _image_blocks(evidence: list[dict]) -> list[dict]:
+        blocks: list[dict] = []
+        for e in evidence:
+            if e.get("image_png_b64"):
+                blocks.append({"type": "text", "text": f"[차트 이미지 — 셀 `{e['name']}`]"})
+                blocks.append({
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": "image/png", "data": e["image_png_b64"]},
+                })
+        return blocks
+
+    def _content(self, user_prompt: str, evidence: list[dict]) -> list[dict]:
+        content: list[dict] = [{"type": "text", "text": user_prompt}]
+        content.extend(self._image_blocks(evidence))
+        return content
+
+    async def call_text(
+        self, system_prompt, user_prompt, evidence, *, max_tokens=8000, response_mime_type=None,
+    ) -> str:
+        # response_mime_type은 Gemini 전용 — Claude에서는 무시 (outline 프롬프트가 이미 JSON 강제)
+        client = anthropic.AsyncAnthropic(api_key=self.api_key)
+        resp = await client.messages.create(
+            model=self.model,
+            max_tokens=max_tokens,
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": self._content(user_prompt, evidence)}],
+        )
+        return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+
+    async def stream(self, system_prompt, user_prompt, evidence) -> AsyncGenerator[str, None]:
+        client = anthropic.AsyncAnthropic(api_key=self.api_key)
+        async with client.messages.stream(
+            model=self.model,
+            max_tokens=32000,
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": self._content(user_prompt, evidence)}],
+        ) as stream:
+            async for event in stream:
+                if event.type == "content_block_delta" and event.delta.type == "text_delta":
+                    yield event.delta.text
 
 
-async def _call_gemini_text(
-    api_key: str,
-    model: str,
-    system_prompt: str,
-    user_prompt: str,
-    evidence: list[dict],
-    max_tokens: int = 8000,
-    response_mime_type: Optional[str] = None,
-) -> str:
-    client = genai.Client(api_key=api_key)
-    parts: list = [genai_types.Part.from_text(text=user_prompt)]
-    parts.extend(_build_image_parts_gemini(evidence))
-    contents = [genai_types.Content(role="user", parts=parts)]
-    cfg_kwargs: dict = {
-        "system_instruction": system_prompt,
-        "temperature": 0.2,
-        "max_output_tokens": max_tokens,
-    }
-    if response_mime_type:
-        cfg_kwargs["response_mime_type"] = response_mime_type
-    resp = await client.aio.models.generate_content(
-        model=model,
-        contents=contents,
-        config=genai_types.GenerateContentConfig(**cfg_kwargs),
-    )
-    return getattr(resp, "text", "") or ""
+class _GeminiReportLLM(_ReportLLM):
+    @staticmethod
+    def _image_parts(evidence: list[dict]) -> list:
+        parts: list = []
+        for e in evidence:
+            if e.get("image_png_b64"):
+                try:
+                    img_bytes = base64.b64decode(e["image_png_b64"])
+                    parts.append(genai_types.Part.from_text(text=f"[차트 이미지 — 셀 `{e['name']}`]"))
+                    parts.append(genai_types.Part.from_bytes(data=img_bytes, mime_type="image/png"))
+                except Exception as ex:
+                    logger.warning("gemini image decode failed for cell %s: %s", e.get("name"), ex)
+        return parts
+
+    def _contents(self, user_prompt: str, evidence: list[dict]) -> list:
+        parts: list = [genai_types.Part.from_text(text=user_prompt)]
+        parts.extend(self._image_parts(evidence))
+        return [genai_types.Content(role="user", parts=parts)]
+
+    async def call_text(
+        self, system_prompt, user_prompt, evidence, *, max_tokens=8000, response_mime_type=None,
+    ) -> str:
+        client = genai.Client(api_key=self.api_key)
+        cfg_kwargs: dict = {
+            "system_instruction": system_prompt,
+            "temperature": 0.2,
+            "max_output_tokens": max_tokens,
+            "thinking_config": genai_types.ThinkingConfig(include_thoughts=False),
+        }
+        if response_mime_type:
+            cfg_kwargs["response_mime_type"] = response_mime_type
+        resp = await client.aio.models.generate_content(
+            model=self.model,
+            contents=self._contents(user_prompt, evidence),
+            config=genai_types.GenerateContentConfig(**cfg_kwargs),
+        )
+        return getattr(resp, "text", "") or ""
+
+    async def stream(self, system_prompt, user_prompt, evidence) -> AsyncGenerator[str, None]:
+        client = genai.Client(api_key=self.api_key)
+        async for chunk in await client.aio.models.generate_content_stream(
+            model=self.model,
+            contents=self._contents(user_prompt, evidence),
+            config=genai_types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.3,
+                max_output_tokens=32000,
+                thinking_config=genai_types.ThinkingConfig(include_thoughts=False),
+            ),
+        ):
+            text = getattr(chunk, "text", None)
+            if text:
+                yield text
 
 
-async def _stream_claude(
-    api_key: str,
-    model: str,
-    system_prompt: str,
-    user_prompt: str,
-    evidence: list[dict],
-) -> AsyncGenerator[str, None]:
-    client = anthropic.AsyncAnthropic(api_key=api_key)
-    content: list[dict] = [{"type": "text", "text": user_prompt}]
-    content.extend(_build_image_content_blocks_claude(evidence))
-    async with client.messages.stream(
-        model=model,
-        max_tokens=32000,
-        system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": content}],
-    ) as stream:
-        async for event in stream:
-            if event.type == "content_block_delta" and event.delta.type == "text_delta":
-                yield event.delta.text
-
-
-async def _stream_gemini(
-    api_key: str,
-    model: str,
-    system_prompt: str,
-    user_prompt: str,
-    evidence: list[dict],
-) -> AsyncGenerator[str, None]:
-    client = genai.Client(api_key=api_key)
-    parts: list = [genai_types.Part.from_text(text=user_prompt)]
-    parts.extend(_build_image_parts_gemini(evidence))
-    contents = [genai_types.Content(role="user", parts=parts)]
-    async for chunk in await client.aio.models.generate_content_stream(
-        model=model,
-        contents=contents,
-        config=genai_types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            temperature=0.3,
-            max_output_tokens=32000,
-        ),
-    ):
-        text = getattr(chunk, "text", None)
-        if text:
-            yield text
+def _get_report_llm(api_key: str, model: str) -> _ReportLLM:
+    if model.startswith("gemini-"):
+        return _GeminiReportLLM(api_key, model)
+    return _ClaudeReportLLM(api_key, model)
 
 
 # ─── Outline 파싱 / 검증 ─────────────────────────────────────────────────────
@@ -976,12 +989,10 @@ def delete_draft(report_id: str) -> bool:
 
 async def _run_outline_pass(
     *,
-    api_key: str,
-    model: str,
+    llm: _ReportLLM,
     context: dict,
     evidence: list[dict],
     goal: str,
-    is_gemini: bool,
 ) -> Optional[dict]:
     """2회까지 시도 — 차트 커버리지 확보 못하면 마지막 결과 그대로 반환."""
     system_prompt = _build_outline_system_prompt()
@@ -989,15 +1000,10 @@ async def _run_outline_pass(
     last_outline: Optional[dict] = None
     for attempt in range(2):
         user_prompt = _build_outline_user_prompt(context, evidence, goal, missing_hint)
-        if is_gemini:
-            text = await _call_gemini_text(
-                api_key, model, system_prompt, user_prompt, evidence,
-                max_tokens=8000, response_mime_type="application/json",
-            )
-        else:
-            text = await _call_claude_text(
-                api_key, model, system_prompt, user_prompt, evidence, max_tokens=8000,
-            )
+        text = await llm.call_text(
+            system_prompt, user_prompt, evidence,
+            max_tokens=8000, response_mime_type="application/json",
+        )
         outline = _parse_outline_json(text)
         if not outline:
             logger.warning("outline parse failed on attempt %d", attempt + 1)
@@ -1039,14 +1045,13 @@ async def run_report_stream(
         "label": f"셀 {len(evidence)}개 · 차트 {chart_count}개 수집 완료",
     }
 
-    is_gemini = model.startswith("gemini-")
+    llm = _get_report_llm(api_key, model)
 
     # ── Pass 1: Outline ──────────────────────────────────────────────────
     yield {"type": "stage", "stage": "outlining", "label": "리포트 개요 설계"}
     try:
         outline = await _run_outline_pass(
-            api_key=api_key, model=model, context=context,
-            evidence=evidence, goal=goal, is_gemini=is_gemini,
+            llm=llm, context=context, evidence=evidence, goal=goal,
         )
     except anthropic.APIStatusError as e:
         yield {"type": "error", "message": f"Claude API 오류(outline): {e.message}"}
@@ -1073,12 +1078,11 @@ async def run_report_stream(
     # ── Pass 2: Writing ──────────────────────────────────────────────────
     writing_system = _build_writing_system_prompt()
     writing_user = _build_writing_user_prompt(context, evidence, goal, outline)
-    stream_fn = _stream_gemini if is_gemini else _stream_claude
 
     yield {"type": "stage", "stage": "writing", "label": "리포트 작성 중"}
     buffer: list[str] = []
     try:
-        async for delta in stream_fn(api_key, model, writing_system, writing_user, evidence):
+        async for delta in llm.stream(writing_system, writing_user, evidence):
             buffer.append(delta)
             yield {"type": "delta", "content": delta}
     except anthropic.APIStatusError as e:

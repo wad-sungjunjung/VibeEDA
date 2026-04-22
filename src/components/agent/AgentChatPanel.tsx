@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { Telescope, X, User, ArrowUp, Plus, FileCode, Search, SquarePen, ChevronDown, ChevronRight, Loader2, Wrench, FileCode2, PlayCircle, StickyNote, AlertTriangle, StopCircle } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useModelStore, AGENT_MODELS, getModelContextWindow } from '@/store/modelStore'
 import { useConnectionStore } from '@/store/connectionStore'
 import { cn } from '@/lib/utils'
@@ -30,7 +31,21 @@ export default function AgentChatPanel() {
     cancelAgent,
     toggleAgentRefCell,
     newAgentSession,
-  } = useAppStore()
+  } = useAppStore(useShallow((s) => ({
+    cells: s.cells,
+    agentChatHistory: s.agentChatHistory,
+    agentChatInput: s.agentChatInput,
+    agentRefCells: s.agentRefCells,
+    agentLoading: s.agentLoading,
+    agentStartedAtMs: s.agentStartedAtMs,
+    agentStatus: s.agentStatus,
+    toggleAgentMode: s.toggleAgentMode,
+    setAgentChatInput: s.setAgentChatInput,
+    submitAgentMessage: s.submitAgentMessage,
+    cancelAgent: s.cancelAgent,
+    toggleAgentRefCell: s.toggleAgentRefCell,
+    newAgentSession: s.newAgentSession,
+  })))
 
   // 에이전트 실행 경과 시간 — 스토어의 시작 시각을 기준으로 현재 시각에서 빼서 계산.
   // 컴포넌트 mount/unmount와 무관하게 올바른 경과 시간이 표시됨.
@@ -186,11 +201,11 @@ export default function AgentChatPanel() {
 
   return (
     <div
-      className="fixed bottom-6 rounded-2xl shadow-2xl border border-border flex flex-col z-30"
+      className="fixed bottom-6 rounded-2xl shadow-2xl border border-border flex flex-col z-[115]"
       style={{ left: 240, right: 268, maxHeight: 'calc(100vh - 96px)', backgroundColor: 'rgb(var(--color-surface))' }}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border-subtle bg-bg-output">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border-subtle bg-bg-output rounded-t-2xl">
         <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shrink-0">
           <Telescope size={14} className="text-white" strokeWidth={2} />
         </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ChevronDown, ChevronRight, Pin, FileSearch, FileText, Search, X, Database, Check, Sparkles, Plus, Layers, ChevronLeft, ChevronUp, Play, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
+import { useShallow } from 'zustand/react/shallow'
 import { scoreMarts, searchMarts } from '@/data/marts'
 import { recommendMarts, type MartRecommendation } from '@/lib/api'
 import type { MartMeta } from '@/types'
@@ -40,7 +41,25 @@ export default function TopMetaHeader() {
     executeAllCells,
     executingCells,
     cells,
-  } = useAppStore()
+  } = useAppStore(useShallow((s) => ({
+    analysisTheme: s.analysisTheme,
+    analysisDescription: s.analysisDescription,
+    metaCollapsed: s.metaCollapsed,
+    selectedMarts: s.selectedMarts,
+    martSearchQuery: s.martSearchQuery,
+    martInfoExpanded: s.martInfoExpanded,
+    martCatalog: s.martCatalog,
+    setAnalysisTheme: s.setAnalysisTheme,
+    setAnalysisDescription: s.setAnalysisDescription,
+    setMetaCollapsed: s.setMetaCollapsed,
+    addMart: s.addMart,
+    removeMart: s.removeMart,
+    setMartSearchQuery: s.setMartSearchQuery,
+    setShowReportModal: s.setShowReportModal,
+    executeAllCells: s.executeAllCells,
+    executingCells: s.executingCells,
+    cells: s.cells,
+  })))
 
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set(['fact', 'dim']))
   const [martPage, setMartPage] = useState(0)

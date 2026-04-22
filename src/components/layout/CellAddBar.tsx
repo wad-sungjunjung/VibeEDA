@@ -1,15 +1,19 @@
 import { Plus } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
+import { useShallow } from 'zustand/react/shallow'
 import type { CellType } from '@/types'
 
 const CELL_TYPES: { type: CellType; label: string }[] = [
   { type: 'sql', label: 'SQL' },
   { type: 'python', label: 'Python' },
   { type: 'markdown', label: 'Markdown' },
+  { type: 'sheet', label: 'Sheet' },
 ]
 
 export default function CellAddBar() {
-  const { addCell, activeCellId } = useAppStore()
+  const { addCell, activeCellId } = useAppStore(
+    useShallow((s) => ({ addCell: s.addCell, activeCellId: s.activeCellId }))
+  )
 
   return (
     <div className="h-cell-bar border-t border-border-subtle bg-bg-pane flex items-center justify-center gap-4 px-4 shrink-0 font-sans">

@@ -1,3 +1,4 @@
+import ast
 import traceback
 from typing import Any
 
@@ -267,7 +268,22 @@ def run_python(notebook_id: str, cell_name: str, code: str) -> dict:
     pre_snapshot = {k: id(v) for k, v in ns.items()}
     translated = _translate_shell_magics(code)
     try:
-        exec(translated, exec_ns)  # noqa: S102
+        # Jupyter 호환: 마지막 문이 표현식이면 그 값을 cell_name 으로 바인딩해
+        # 테이블/차트 렌더러가 자동으로 픽업하도록 한다.
+        last_expr_value: Any = None
+        has_last_expr = False
+        try:
+            tree = ast.parse(translated, mode="exec")
+        except SyntaxError:
+            tree = None
+        if tree is not None and tree.body and isinstance(tree.body[-1], ast.Expr):
+            last = tree.body[-1]
+            body = tree.body[:-1]
+            exec(compile(ast.Module(body=body, type_ignores=[]), "<cell>", "exec"), exec_ns)  # noqa: S102
+            last_expr_value = eval(compile(ast.Expression(body=last.value), "<cell>", "eval"), exec_ns)  # noqa: S307
+            has_last_expr = True
+        else:
+            exec(translated, exec_ns)  # noqa: S102
         touched_keys: set[str] = set()
         for k, v in exec_ns.items():
             if k in ("print", "__builtins__"):
@@ -275,6 +291,9 @@ def run_python(notebook_id: str, cell_name: str, code: str) -> dict:
             if k not in pre_snapshot or pre_snapshot[k] != id(v):
                 touched_keys.add(k)
             ns[k] = v
+        if has_last_expr and last_expr_value is not None:
+            ns[cell_name] = last_expr_value
+            touched_keys.add(cell_name)
         stdout = "".join(output_lines)
         return _to_cell_output(ns, cell_name, stdout, touched_keys)
     except Exception:

@@ -79,8 +79,11 @@ function flushDebouncedForCell(cellId: string) {
 
 // ─── DB row → Cell converter ─────────────────────────────────────────────────
 
-function defaultCellUi(_type: CellType) {
-  // 모든 셀 기본 레이아웃: 좌우 분할, 좌=입력, 우=출력
+function defaultCellUi(type: CellType) {
+  // sheet 셀은 단일 패널(입력=스프레드시트)이 기본. 그 외는 좌우 분할.
+  if (type === 'sheet') {
+    return { splitMode: false, splitDir: 'h' as const, activeTab: 'input' as const, leftTab: 'input' as const, rightTab: 'output' as const }
+  }
   return { splitMode: true, splitDir: 'h' as const, activeTab: 'input' as const, leftTab: 'input' as const, rightTab: 'output' as const }
 }
 
@@ -470,7 +473,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const { notebookId, histories } = get()
     if (notebookId) {
       set({ histories: histories.map((h) => h.id === notebookId ? { ...h, title: v } : h) })
-      debounced(`theme-${notebookId}`, () => updateNotebook(notebookId, { title: v }))
+      // 제목 변경은 서버에서 .ipynb 파일명을 rename 한다. 응답 후 filesTree 를 다시 fetch 해서
+      // 사이드바 경로 목록이 stale 상태로 남지 않게 한다 — stale path 로 POST /files/move 호출 시 404 방지.
+      debounced(`theme-${notebookId}`, async () => {
+        try {
+          await updateNotebook(notebookId, { title: v })
+          await get().fetchFilesTree()
+        } catch {}
+      })
     }
   },
 
@@ -652,7 +662,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       activeTab: defUi.activeTab,
       leftTab: defUi.leftTab,
       rightTab: defUi.rightTab,
-      executed: type === 'markdown',
+      executed: type === 'markdown' || type === 'sheet',
       executedAt: null,
       output: null,
       chatInput: '',
@@ -794,11 +804,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
   cycleCellTypeById: async (id) => {
     const current = get().cells.find((c) => c.id === id)
     if (!current) return
+    // sheet 셀은 타입 전환 불가(고정)
+    if (current.type === 'sheet') return
     const newType = cycleCellType(current.type)
+    if (newType === current.type) return
     set((s) => ({
       cells: s.cells.map((c) =>
         c.id === id
-          ? { ...c, type: newType, executed: newType === 'markdown' }
+          ? { ...c, type: newType, executed: newType === 'markdown' || newType === 'sheet' }
           : c
       ),
     }))
@@ -861,7 +874,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   executeAllCells: async () => {
     const { cells } = get()
     const toRun = [...cells]
-      .filter((c) => c.type !== 'markdown')
+      .filter((c) => c.type !== 'markdown' && c.type !== 'sheet')
       .sort((a, b) => a.ordering - b.ordering)
     for (const cell of toRun) {
       await get().executeCell(cell.id)

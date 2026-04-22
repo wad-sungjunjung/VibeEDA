@@ -56,6 +56,7 @@ export default {
         sql: { bg: c('sql-bg'), text: c('sql-text') },
         python: { bg: c('python-bg'), text: c('python-text') },
         markdown: { bg: c('markdown-bg'), text: c('markdown-text') },
+        sheet: { bg: c('sheet-bg'), text: c('sheet-text') },
 
         // Status
         success: c('success'),

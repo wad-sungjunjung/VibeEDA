@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { Telescope, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
+import { useShallow } from 'zustand/react/shallow'
 import { cn } from '@/lib/utils'
 
 export default function AgentFAB() {
-  const { agentMode, agentLoading, agentStatus, agentChatHistory, toggleAgentMode } = useAppStore()
+  const { agentMode, agentLoading, agentStatus, agentChatHistory, toggleAgentMode } = useAppStore(
+    useShallow((s) => ({
+      agentMode: s.agentMode,
+      agentLoading: s.agentLoading,
+      agentStatus: s.agentStatus,
+      agentChatHistory: s.agentChatHistory,
+      toggleAgentMode: s.toggleAgentMode,
+    }))
+  )
   const [doneBubble, setDoneBubble] = useState<string | null>(null)
   const [showCheck, setShowCheck] = useState(false)
   const prevLoadingRef = useRef(false)
@@ -55,7 +64,7 @@ export default function AgentFAB() {
   const liveAssistantText = liveAssistantMsg?.content?.trim() || null
 
   return (
-    <div className="fixed bottom-6 right-6 z-40">
+    <div className="fixed bottom-6 right-6 z-[120]">
       {(doneBubble || liveStatus || liveAssistantText) && !agentMode && (
         <div
           className="absolute bottom-16 right-0 bg-surface border border-border rounded-2xl shadow-lg px-4 py-3 animate-fade-in"

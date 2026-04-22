@@ -23,12 +23,14 @@ import {
   FileArchive,
   HardDrive,
   RefreshCw,
+  Upload,
   Check,
   Sun,
   Moon,
 } from 'lucide-react'
 import type { FileNode } from '@/lib/api'
 import { useAppStore } from '@/store/useAppStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useModelStore } from '@/store/modelStore'
 import { cn } from '@/lib/utils'
@@ -63,7 +65,30 @@ export default function LeftSidebar() {
     filesRoot,
     filesLoading,
     fetchFilesTree,
-  } = useAppStore()
+  } = useAppStore(useShallow((s) => ({
+    histories: s.histories,
+    folders: s.folders,
+    historyMenuOpen: s.historyMenuOpen,
+    historyMenuView: s.historyMenuView,
+    addFolder: s.addFolder,
+    deleteFolder: s.deleteFolder,
+    toggleFolder: s.toggleFolder,
+    duplicateHistory: s.duplicateHistory,
+    deleteHistory: s.deleteHistory,
+    moveHistory: s.moveHistory,
+    setHistoryMenuOpen: s.setHistoryMenuOpen,
+    setHistoryMenuView: s.setHistoryMenuView,
+    newAnalysis: s.newAnalysis,
+    loadAnalysis: s.loadAnalysis,
+    reports: s.reports,
+    openReport: s.openReport,
+    removeReport: s.removeReport,
+    currentReportId: s.currentReportId,
+    filesTree: s.filesTree,
+    filesRoot: s.filesRoot,
+    filesLoading: s.filesLoading,
+    fetchFilesTree: s.fetchFilesTree,
+  })))
 
   const sfUser = useConnectionStore((s) => s.sfUser)
   const displayName = sfUser ? sfUser.split('@')[0] : '하우'
@@ -410,7 +435,13 @@ function HistoryItemRow({
                     await api.moveEntry(notebookPath, rootPath)
                     onRefresh()
                   } catch (e) {
-                    alert(`이동 실패: ${(e as Error).message}`)
+                    onRefresh()  // stale 경로로 실패했을 수 있으니 트리 새로고침
+                    const msg = (e as Error).message || ''
+                    if (msg.includes('src not found')) {
+                      alert('경로가 변경됐어요 (최근에 제목을 바꾸셨나요?). 사이드바를 새로고침했으니 다시 시도해주세요.')
+                    } else {
+                      alert(`이동 실패: ${msg}`)
+                    }
                   } finally {
                     onMenuClose()
                   }
@@ -433,7 +464,13 @@ function HistoryItemRow({
                       await api.moveEntry(notebookPath, f.path)
                       onRefresh()
                     } catch (e) {
-                      alert(`이동 실패: ${(e as Error).message}`)
+                      onRefresh()  // stale 경로로 실패했을 수 있으니 트리 새로고침
+                      const msg = (e as Error).message || ''
+                      if (msg.includes('src not found')) {
+                        alert('경로가 변경됐어요 (최근에 제목을 바꾸셨나요?). 사이드바를 새로고침했으니 다시 시도해주세요.')
+                      } else {
+                        alert(`이동 실패: ${msg}`)
+                      }
                     } finally {
                       onMenuClose()
                     }
@@ -500,8 +537,87 @@ function UnifiedFolderSection({
   const [expanded, setExpanded] = useState(true)
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<{ok: string[]; fail: string[]; dstLabel: string} | null>(null)
+  const [rootDragOver, setRootDragOver] = useState(false)
   const submittingRef = useRef(false)
-  const { fetchFilesTree } = useAppStore()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const fetchFilesTree = useAppStore((s) => s.fetchFilesTree)
+
+  async function handleRootDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setRootDragOver(false)
+    // 외부 파일 드롭 → 루트에 업로드
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await handleUpload(e.dataTransfer.files, '')
+      return
+    }
+    // 내부 드래그 → 루트로 이동
+    const srcPath = e.dataTransfer.getData('application/x-vibe-path')
+    if (!srcPath) return
+    const srcParent = srcPath.substring(0, srcPath.lastIndexOf('/'))
+    if (srcParent === root) return
+    try {
+      const api = await import('@/lib/api')
+      await api.moveEntry(srcPath, root)
+      await fetchFilesTree()
+    } catch (err) {
+      alert(`이동 실패: ${(err as Error).message}`)
+      await fetchFilesTree()
+    }
+  }
+
+  async function handleUpload(fileList: FileList | null, dstDir: string = '') {
+    // FileList 는 <input> 을 참조하는 라이브 객체라 input.value='' 로 reset 되면 비어진다.
+    // 첫 await 이전에 plain array 로 스냅샷을 떠야 함 (onChange 의 다음 라인이 input 을 reset 함).
+    const files = fileList ? Array.from(fileList) : []
+    if (files.length === 0) return
+    setUploading(true)
+    setUploadStatus(null)
+    if (statusTimerRef.current) clearTimeout(statusTimerRef.current)
+    const api = await import('@/lib/api')
+    const ok: string[] = []
+    const fail: string[] = []
+    try {
+      for (const f of files) {
+        try {
+          const r = await api.uploadFile(f, dstDir)
+          ok.push(r.name)
+        } catch (e) {
+          fail.push(`${f.name}: ${(e as Error).message}`)
+        }
+      }
+      await fetchFilesTree().catch(() => {})
+    } finally {
+      setUploading(false)
+    }
+    if (ok.length === 0 && fail.length === 0) return
+    const dstLabel = dstDir ? (dstDir.split('/').pop() || '폴더') : '루트'
+    setUploadStatus({ ok, fail, dstLabel })
+    statusTimerRef.current = setTimeout(() => setUploadStatus(null), 4000)
+  }
+
+  // FileTreeNode(자식) 의 폴더 업로드 결과도 여기 배너로 받아 표시
+  useEffect(() => {
+    function onUploadStatus(e: Event) {
+      const detail = (e as CustomEvent<{ok: string[]; fail: string[]; dstLabel: string}>).detail
+      if (!detail) return
+      if (statusTimerRef.current) clearTimeout(statusTimerRef.current)
+      setUploadStatus(detail)
+      statusTimerRef.current = setTimeout(() => setUploadStatus(null), 4000)
+    }
+    function onUploadStart() { setUploading(true) }
+    function onUploadEnd() { setUploading(false) }
+    window.addEventListener('vibe:upload-status', onUploadStatus)
+    window.addEventListener('vibe:upload-start', onUploadStart)
+    window.addEventListener('vibe:upload-end', onUploadEnd)
+    return () => {
+      window.removeEventListener('vibe:upload-status', onUploadStatus)
+      window.removeEventListener('vibe:upload-start', onUploadStart)
+      window.removeEventListener('vibe:upload-end', onUploadEnd)
+    }
+  }, [])
 
   async function createRootFolder() {
     // 동기 guard — React state 는 비동기라 중복 호출 막으려면 ref 필요
@@ -543,6 +659,32 @@ function UnifiedFolderSection({
           폴더
         </button>
         <div className="flex items-center gap-0.5">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".csv,.tsv,.xlsx,.xls,.parquet,.json,.txt,.md"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              void handleUpload(e.target.files, '')
+              if (fileInputRef.current) fileInputRef.current.value = ''
+            }}
+          />
+          <button
+            type="button"
+            title="파일 업로드 (csv, xlsx, parquet, tsv, json 등)"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (uploading) return
+              fileInputRef.current?.click()
+            }}
+            className={cn(
+              'p-1 text-text-tertiary hover:text-primary hover:bg-primary-light rounded transition-colors',
+              uploading && 'opacity-50 cursor-wait',
+            )}
+          >
+            <Upload size={14} className={cn(uploading && 'animate-pulse')} />
+          </button>
           <button
             title="새 폴더"
             onClick={() => setAdding(true)}
@@ -562,6 +704,37 @@ function UnifiedFolderSection({
           </button>
         </div>
       </div>
+      {uploading && (
+        <div className="mx-3 mb-2 px-2 py-1.5 text-[11px] text-primary-hover bg-primary-pale border border-primary-border rounded flex items-center gap-1.5">
+          <Upload size={11} className="animate-pulse" />
+          업로드 중…
+        </div>
+      )}
+      {uploadStatus && !uploading && (uploadStatus.ok.length > 0 || uploadStatus.fail.length > 0) && (
+        <div className={cn(
+          'mx-3 mb-2 px-2 py-1.5 text-[11px] rounded border flex flex-col gap-0.5',
+          uploadStatus.fail.length === 0
+            ? 'text-success bg-success-bg border-success/30'
+            : 'text-warning-text bg-warning-bg border-warning/30',
+        )}>
+          {uploadStatus.ok.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Check size={11} className="shrink-0" />
+              <span className="truncate" title={uploadStatus.ok.join(', ')}>
+                {uploadStatus.ok.length}개 파일 → <b>{uploadStatus.dstLabel}</b>
+              </span>
+            </div>
+          )}
+          {uploadStatus.fail.length > 0 && (
+            <div className="flex items-start gap-1.5">
+              <X size={11} className="shrink-0 mt-0.5" />
+              <span className="truncate" title={uploadStatus.fail.join('\n')}>
+                {uploadStatus.fail.length}개 실패
+              </span>
+            </div>
+          )}
+        </div>
+      )}
       {adding && (
         <div className="mx-3 mb-2 flex items-center gap-1 bg-surface border border-border rounded px-2 py-1 shrink-0">
           <Folder size={12} className="text-text-tertiary shrink-0" />
@@ -584,7 +757,16 @@ function UnifiedFolderSection({
         </div>
       )}
       {expanded && (
-        <div className="px-2 pb-2 flex-1 overflow-y-auto hide-scrollbar min-h-0">
+        <div
+          className={cn(
+            'px-2 pb-2 flex-1 overflow-y-auto hide-scrollbar min-h-0 transition-colors',
+            rootDragOver && 'bg-primary-pale ring-1 ring-primary rounded',
+          )}
+          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = e.dataTransfer.types.includes('Files') ? 'copy' : 'move' }}
+          onDragEnter={(e) => { e.preventDefault(); setRootDragOver(true) }}
+          onDragLeave={(e) => { if (e.currentTarget === e.target) setRootDragOver(false) }}
+          onDrop={(e) => void handleRootDrop(e)}
+        >
           {tree.length === 0 && !loading && (
             <div className="px-2 py-1 text-[11px] text-text-disabled italic">
               비어있음 — 우측 상단 + 로 폴더 생성
@@ -622,8 +804,86 @@ function FileTreeNode({
 }) {
   const [open, setOpen] = useState(depth < 1)
   const [copied, setCopied] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const [fileMenuOpen, setFileMenuOpen] = useState(false)
+  const [fileMenuPos, setFileMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const indent = 4 + depth * 10
-  const { fetchFilesTree } = useAppStore()
+  const fetchFilesTree = useAppStore((s) => s.fetchFilesTree)
+  const folderFileInputRef = useRef<HTMLInputElement>(null)
+
+  async function deleteThisFile() {
+    if (!confirm(`파일 "${node.name}" 을 삭제할까요?`)) return
+    try {
+      const api = await import('@/lib/api')
+      await api.deleteFile(node.path)
+      await fetchFilesTree()
+    } catch (e) {
+      alert(`파일 삭제 실패: ${(e as Error).message}`)
+    }
+  }
+
+  // ── 드롭 처리 (폴더 노드에만 적용) ─────────────────────────────────────
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+    if (node.type !== 'folder') return
+
+    // 1) 외부 파일 드롭 → 업로드
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await uploadToFolder(e.dataTransfer.files)
+      return
+    }
+
+    // 2) 내부 드래그(기존 파일) → 이동
+    const srcPath = e.dataTransfer.getData('application/x-vibe-path')
+    if (!srcPath || srcPath === node.path) return
+    // 자기 자신(부모)에게 드롭하는 건 무의미
+    // 또한 부모 경로가 동일하면 이미 그 폴더 안에 있는 것
+    const srcParent = srcPath.substring(0, srcPath.lastIndexOf('/'))
+    if (srcParent === node.path) return
+
+    try {
+      const api = await import('@/lib/api')
+      await api.moveEntry(srcPath, node.path)
+      setOpen(true)
+      await fetchFilesTree()
+    } catch (err) {
+      alert(`이동 실패: ${(err as Error).message}`)
+      await fetchFilesTree()
+    }
+  }
+
+  async function uploadToFolder(fileList: FileList | null) {
+    // FileList 는 <input> 을 참조하는 라이브 객체 — input.value='' 시 비워지므로 await 이전에 배열 스냅샷 필수.
+    const files = fileList ? Array.from(fileList) : []
+    if (files.length === 0) return
+    setUploading(true)
+    window.dispatchEvent(new Event('vibe:upload-start'))
+    const api = await import('@/lib/api')
+    const ok: string[] = []
+    const fail: string[] = []
+    try {
+      for (const f of files) {
+        try {
+          const r = await api.uploadFile(f, node.path)
+          ok.push(r.name)
+        } catch (e) {
+          fail.push(`${f.name}: ${(e as Error).message}`)
+        }
+      }
+      setOpen(true)
+      await fetchFilesTree().catch(() => {})
+    } finally {
+      setUploading(false)
+      window.dispatchEvent(new Event('vibe:upload-end'))
+    }
+    if (ok.length === 0 && fail.length === 0) return
+    window.dispatchEvent(new CustomEvent('vibe:upload-status', {
+      detail: { ok, fail, dstLabel: node.name },
+    }))
+  }
 
   async function copyPath() {
     try {
@@ -651,9 +911,16 @@ function FileTreeNode({
     return (
       <div>
         <div
-          className="group flex items-center gap-1 py-0.5 rounded hover:bg-surface cursor-pointer"
+          className={cn(
+            'group flex items-center gap-1 py-0.5 rounded cursor-pointer transition-colors',
+            dragOver ? 'bg-primary-light ring-1 ring-primary' : 'hover:bg-surface',
+          )}
           style={{ paddingLeft: indent }}
           onClick={() => setOpen((v) => !v)}
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = e.dataTransfer.types.includes('Files') ? 'copy' : 'move' }}
+          onDragEnter={(e) => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(false) }}
+          onDrop={(e) => void handleDrop(e)}
           title={node.path}
         >
           {open ? (
@@ -667,6 +934,32 @@ function FileTreeNode({
             <Folder size={12} className="text-text-secondary shrink-0" />
           )}
           <span className="text-[12px] text-text-secondary truncate flex-1">{node.name}</span>
+          <input
+            ref={folderFileInputRef}
+            type="file"
+            multiple
+            accept=".csv,.tsv,.xlsx,.xls,.parquet,.json,.txt,.md"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              void uploadToFolder(e.target.files)
+              if (folderFileInputRef.current) folderFileInputRef.current.value = ''
+            }}
+          />
+          <button
+            type="button"
+            title={uploading ? '업로드 중…' : '이 폴더에 파일 업로드'}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (uploading) return
+              folderFileInputRef.current?.click()
+            }}
+            className={cn(
+              'opacity-0 group-hover:opacity-100 p-0.5 text-text-tertiary hover:text-primary transition-opacity shrink-0',
+              uploading && 'opacity-100 cursor-wait',
+            )}
+          >
+            <Upload size={11} className={cn(uploading && 'animate-pulse')} />
+          </button>
           <button
             title={copied ? '복사됨' : '경로 복사'}
             onClick={(e) => { e.stopPropagation(); void copyPath() }}
@@ -728,6 +1021,11 @@ function FileTreeNode({
 
   return (
     <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('application/x-vibe-path', node.path)
+        e.dataTransfer.effectAllowed = 'move'
+      }}
       className={cn(
         'group flex items-center gap-1 py-0.5 rounded cursor-pointer',
         isActive ? 'bg-surface border border-primary-border' : 'hover:bg-surface',
@@ -750,6 +1048,36 @@ function FileTreeNode({
       >
         {copied ? <Check size={11} className="text-success" /> : <Copy size={11} />}
       </button>
+      {node.kind === 'file' && (
+        <button
+          title="더보기"
+          onClick={(e) => {
+            e.stopPropagation()
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            setFileMenuPos({ x: r.right - 120, y: r.bottom + 2 })
+            setFileMenuOpen((v) => !v)
+          }}
+          className="opacity-0 group-hover:opacity-100 p-0.5 text-text-tertiary hover:text-text-secondary transition-opacity shrink-0"
+        >
+          <MoreHorizontal size={11} />
+        </button>
+      )}
+      {fileMenuOpen && createPortal(
+        <div
+          className="fixed z-[9999] bg-surface border border-border rounded-md shadow-lg py-1 min-w-[120px]"
+          style={{ left: fileMenuPos.x, top: fileMenuPos.y }}
+          onMouseLeave={() => setFileMenuOpen(false)}
+        >
+          <button
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-danger hover:bg-danger-bg"
+            onClick={(e) => { e.stopPropagation(); setFileMenuOpen(false); void deleteThisFile() }}
+          >
+            <Trash2 size={12} />
+            삭제
+          </button>
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }

@@ -1,19 +1,16 @@
 """Vibe Chat — Claude API 스트리밍으로 셀 코드 수정 (Gemini 버전과 동일한 프롬프트)"""
-import re
 from typing import AsyncGenerator, Optional
 
 import anthropic
 
-from .gemini_service import (
-    _build_sql_system,
-    _build_python_system,
-    _clean_code,
-    _lowercase_sql,
+from .vibe_prompts import (
+    build_sql_system,
+    build_python_system,
+    build_markdown_system,
+    build_user_prompt,
+    clean_code,
+    lowercase_sql,
 )
-
-
-def _build_sql_prompt(current_code: str, message: str) -> str:
-    return f"[현재 코드]\n{current_code}\n\n[요청]\n{message}"
 
 
 async def stream_vibe_chat_claude(
@@ -35,17 +32,13 @@ async def stream_vibe_chat_claude(
     client = anthropic.AsyncAnthropic(api_key=api_key)
 
     if cell_type == "sql":
-        system = _build_sql_system(analysis_theme, mart_metadata)
-        prompt = _build_sql_prompt(current_code, message)
+        system = build_sql_system(analysis_theme, mart_metadata)
     elif cell_type == "python":
-        system = _build_python_system(analysis_theme, df_summaries or {}, cell_above_name)
-        prompt = f"[현재 코드]\n{current_code}\n\n[요청]\n{message}"
+        system = build_python_system(analysis_theme, df_summaries or {}, cell_above_name)
     else:
-        system = (
-            f"You are a markdown writing assistant. Analysis theme: {analysis_theme}.\n"
-            "Output: ONLY the markdown content."
-        )
-        prompt = f"[현재 내용]\n{current_code}\n\n[요청]\n{message}"
+        system = build_markdown_system(analysis_theme)
+
+    prompt = build_user_prompt(current_code, message)
 
     accumulated = ""
     try:
@@ -65,9 +58,9 @@ async def stream_vibe_chat_claude(
         yield {"type": "error", "message": f"오류: {str(e)}"}
         return
 
-    clean = _clean_code(accumulated)
+    clean = clean_code(accumulated)
     if cell_type == "sql":
-        clean = _lowercase_sql(clean)
+        clean = lowercase_sql(clean)
     yield {
         "type": "complete",
         "full_code": clean,
