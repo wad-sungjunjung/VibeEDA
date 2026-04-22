@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Plot from 'react-plotly.js'
 import { Copy, Check } from 'lucide-react'
 import type { Cell } from '@/types'
@@ -94,57 +94,12 @@ export default function CellOutput({ cell }: Props) {
   const { output } = cell
 
   if (output.type === 'table' && output.columns && output.rows) {
-    const cols = output.columns
-    const rows = output.rows
     return (
-      <div className="relative overflow-hidden group/output flex flex-col h-full">
-        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
-          <CopyButton
-            label="표 복사"
-            onCopy={() => navigator.clipboard.writeText(tableToTSV(cols, rows))}
-          />
-        </div>
-        <div className="overflow-x-auto overflow-y-auto hide-scrollbar flex-1 min-h-0">
-          <table className="w-full text-[12px]">
-            <thead className="sticky top-0 bg-chip">
-              <tr>
-                {cols.map((col, i) => (
-                  <th
-                    key={col.name}
-                    className={cn(
-                      'text-left py-2 font-semibold text-text-secondary border-b border-border-subtle',
-                      i === 0 ? 'pl-5 pr-4' : i === cols.length - 1 ? 'pl-4 pr-5' : 'px-4'
-                    )}
-                  >
-                    {col.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, ri) => (
-                <tr key={ri} className="hover:bg-chip/60 border-b border-border-subtle last:border-0">
-                  {row.map((cell, ci) => (
-                    <td
-                      key={ci}
-                      className={cn(
-                        'py-1.5 text-text-primary',
-                        ci === 0 ? 'pl-5 pr-4' : ci === row.length - 1 ? 'pl-4 pr-5' : 'px-4',
-                        typeof cell === 'number' ? 'text-right tabular-nums' : ''
-                      )}
-                    >
-                      {typeof cell === 'number' ? formatNumber(cell) : String(cell ?? '')}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="sticky bottom-0 bg-chip border-t border-border-subtle px-4 py-1.5 text-[11px] text-text-disabled">
-          {output.rowCount} rows × {cols.length} columns
-        </div>
-      </div>
+      <TableOutput
+        cols={output.columns}
+        rows={output.rows}
+        rowCount={output.rowCount ?? output.rows.length}
+      />
     )
   }
 
@@ -157,7 +112,7 @@ export default function CellOutput({ cell }: Props) {
     const natH = typeof baseLayout.height === 'number' && baseLayout.height > 0 ? baseLayout.height : 400
     return (
       <div className="relative group/output h-full overflow-auto flex items-center justify-center">
-        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
+        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity">
           <CopyButton
             label="이미지 복사"
             onCopy={() => copyPlotAsImage(plotDivRef.current?.querySelector('.js-plotly-plot') as HTMLElement | null)}
@@ -197,7 +152,7 @@ export default function CellOutput({ cell }: Props) {
     const text = output.content
     return (
       <div className="relative group/output h-full overflow-auto bg-surface">
-        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
+        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity">
           <CopyButton label="텍스트 복사" onCopy={() => navigator.clipboard.writeText(text)} />
         </div>
         <pre className="px-4 py-3 text-[12px] text-text-primary font-mono whitespace-pre-wrap leading-relaxed">
@@ -211,7 +166,7 @@ export default function CellOutput({ cell }: Props) {
     const msg = output.message ?? ''
     return (
       <div className="relative group/output h-full overflow-auto">
-        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
+        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity">
           <CopyButton label="오류 복사" onCopy={() => navigator.clipboard.writeText(msg)} />
         </div>
         <pre className="bg-danger-bg px-4 py-3 text-[12px] text-danger font-mono whitespace-pre-wrap leading-relaxed h-full">
@@ -224,6 +179,200 @@ export default function CellOutput({ cell }: Props) {
   return null
 }
 
+function TableOutput({
+  cols,
+  rows,
+  rowCount,
+}: {
+  cols: { name: string }[]
+  rows: unknown[][]
+  rowCount: number
+}) {
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const headerRowRef = useRef<HTMLTableRowElement | null>(null)
+  const [frozenCount, setFrozenCount] = useState(1)
+  const [widths, setWidths] = useState<number[]>([])
+  const [scrollLeft, setScrollLeft] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [dragX, setDragX] = useState<number | null>(null)
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const row = headerRowRef.current
+      if (!row) return
+      const ths = Array.from(row.children) as HTMLElement[]
+      setWidths(ths.map((th) => th.getBoundingClientRect().width))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    if (scrollRef.current) ro.observe(scrollRef.current)
+    if (headerRowRef.current) ro.observe(headerRowRef.current)
+    return () => ro.disconnect()
+  }, [cols, rows])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onScroll = () => setScrollLeft(el.scrollLeft)
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const leftOffsets = useMemo(() => {
+    const out: number[] = [0]
+    for (let i = 0; i < widths.length; i++) out.push(out[i] + widths[i])
+    return out
+  }, [widths])
+
+  const frozenWidth = leftOffsets[Math.min(frozenCount, widths.length)] ?? 0
+
+  useEffect(() => {
+    if (!dragging) return
+    const onMove = (e: MouseEvent) => {
+      const el = scrollRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const x = Math.max(0, e.clientX - rect.left + el.scrollLeft)
+      setDragX(x)
+    }
+    const onUp = () => {
+      setDragging(false)
+      setDragX((cur) => {
+        if (cur == null) return null
+        let best = 0
+        let bestDist = Infinity
+        for (let i = 0; i <= widths.length; i++) {
+          const d = Math.abs(leftOffsets[i] - cur)
+          if (d < bestDist) {
+            bestDist = d
+            best = i
+          }
+        }
+        setFrozenCount(best)
+        return null
+      })
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [dragging, leftOffsets, widths.length])
+
+  const canDrag = cols.length > 0 && widths.length === cols.length
+
+  return (
+    <div className="relative overflow-hidden group/output flex flex-col h-full">
+      <div className="absolute top-1.5 right-1.5 z-30 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <CopyButton
+          label="표 복사"
+          onCopy={() => navigator.clipboard.writeText(tableToTSV(cols, rows))}
+        />
+      </div>
+      <div
+        ref={scrollRef}
+        className={cn(
+          'overflow-x-auto overflow-y-auto hide-scrollbar flex-1 min-h-0 relative',
+          dragging && 'select-none'
+        )}
+      >
+        <table className="w-full text-[12px] border-separate border-spacing-0">
+          <thead>
+            <tr ref={headerRowRef}>
+              {cols.map((col, i) => {
+                const frozen = i < frozenCount
+                const isBoundary = frozen && i === frozenCount - 1
+                return (
+                  <th
+                    key={col.name}
+                    style={frozen ? { left: leftOffsets[i] } : undefined}
+                    className={cn(
+                      'text-left py-2 font-semibold text-text-secondary border-b border-border-subtle bg-chip sticky top-0',
+                      i === 0 ? 'pl-5 pr-4' : i === cols.length - 1 ? 'pl-4 pr-5' : 'px-4',
+                      frozen ? 'sticky z-20' : 'z-10',
+                      isBoundary && 'border-r border-border-subtle'
+                    )}
+                  >
+                    {col.name}
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri} className="group/row">
+                {row.map((c, ci) => {
+                  const frozen = ci < frozenCount
+                  const isBoundary = frozen && ci === frozenCount - 1
+                  return (
+                    <td
+                      key={ci}
+                      style={frozen ? { left: leftOffsets[ci] } : undefined}
+                      className={cn(
+                        'py-1.5 text-text-primary border-b border-border-subtle group-last/row:border-0 transition-colors',
+                        ci === 0 ? 'pl-5 pr-4' : ci === row.length - 1 ? 'pl-4 pr-5' : 'px-4',
+                        frozen
+                          ? 'sticky z-10 bg-bg-pane group-hover/row:bg-chip'
+                          : 'group-hover/row:bg-chip/60',
+                        isBoundary && 'border-r border-border-subtle',
+                        typeof c === 'number' ? 'text-right tabular-nums' : ''
+                      )}
+                    >
+                      {typeof c === 'number' ? formatNumber(c) : String(c ?? '')}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {canDrag && (
+          <div
+            role="separator"
+            aria-label="고정 열 경계 드래그"
+            title="드래그하여 고정 열 변경"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              const el = scrollRef.current
+              if (!el) return
+              const rect = el.getBoundingClientRect()
+              setDragX(e.clientX - rect.left + el.scrollLeft)
+              setDragging(true)
+            }}
+            className={cn(
+              'absolute top-0 bottom-0 w-[9px] cursor-col-resize z-30 group/bar',
+              dragging && 'pointer-events-none'
+            )}
+            style={{ left: Math.max(0, frozenWidth + scrollLeft - 4) }}
+          >
+            <div
+              className={cn(
+                'absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] transition-colors',
+                frozenCount === 0
+                  ? 'bg-transparent group-hover/bar:bg-primary/60'
+                  : 'bg-border-subtle group-hover/bar:bg-primary'
+              )}
+            />
+          </div>
+        )}
+
+        {dragging && dragX != null && (
+          <div
+            className="absolute top-0 bottom-0 w-[2px] bg-primary z-40 pointer-events-none"
+            style={{ left: dragX }}
+          />
+        )}
+      </div>
+      <div className="sticky bottom-0 bg-chip border-t border-border-subtle px-4 py-1.5 text-[11px] text-text-disabled">
+        {rowCount} rows × {cols.length} columns
+      </div>
+    </div>
+  )
+}
+
 function MarkdownOutput({ content }: { content: string }) {
   if (!content.trim()) {
     return (
@@ -232,7 +381,7 @@ function MarkdownOutput({ content }: { content: string }) {
   }
   return (
     <div className="relative group/output h-full overflow-y-auto overflow-x-hidden">
-      <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 transition-opacity">
+      <div className="absolute top-1.5 right-1.5 z-10 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <CopyButton label="마크다운 복사" onCopy={() => navigator.clipboard.writeText(content)} />
       </div>
       <div className="pl-7 pr-9 py-4 break-words min-w-0">

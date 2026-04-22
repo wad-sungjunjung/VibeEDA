@@ -113,6 +113,20 @@ async function apiFetch<T>(
   return res.json() as Promise<T>
 }
 
+export async function suggestCellName(code: string, type: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/cells/suggest-name`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getLLMHeaders() },
+    body: JSON.stringify({ code, type }),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`suggest-name ${res.status}: ${text}`)
+  }
+  const data = (await res.json()) as { name: string }
+  return data.name
+}
+
 // ─── SSE reader ───────────────────────────────────────────────────────────────
 
 async function readSSEStream<T>(

@@ -1,11 +1,12 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
-import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle } from 'lucide-react'
+import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle, Maximize2, Minimize2, Sparkles } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useModelStore, VIBE_MODELS } from '@/store/modelStore'
 import type { Cell, CellPanelTab } from '@/types'
 import { cn, loadCellUi, saveCellUi, sanitizeCellNameInput, toSnakeCase } from '@/lib/utils'
 import CellOutput from './CellOutput'
 import CodeEditor from './CodeEditor'
+import { suggestCellName } from '@/lib/api'
 
 interface Props {
   cell: Cell
@@ -39,6 +40,8 @@ export default function CellContainer({ cell }: Props) {
     cancelVibe,
     cells,
     notebookAreaHeight,
+    fullscreenCellId,
+    setFullscreenCellId,
   } = useAppStore()
 
   const { vibeModel, setVibeModel } = useModelStore()
@@ -64,6 +67,114 @@ export default function CellContainer({ cell }: Props) {
   useEffect(() => { saveCellUi(cell.id, { splitMode: cell.splitMode, splitDir: cell.splitDir }) }, [cell.id, cell.splitMode, cell.splitDir])
   const [elapsedSecs, setElapsedSecs] = useState(0)
   const [vibeElapsed, setVibeElapsed] = useState(0) // 0.1s 단위
+  const fullscreen = fullscreenCellId === cell.id
+  // 애니메이션을 위해 `fullscreen` 해제 시에도 잠시 DOM을 유지 (exit 애니메이션용)
+  const [fsVisible, setFsVisible] = useState(fullscreen)
+  // 애니메이션 종류: null = 없음, grow-in/out = 진입·완전해제, slide-* = 셀간 전환
+  const [fsAnim, setFsAnim] = useState<null | 'grow-in' | 'grow-out' | 'slide-in-up' | 'slide-in-down' | 'slide-out-up' | 'slide-out-down'>(
+    fullscreen ? 'grow-in' : null
+  )
+  // 직전 fullscreenCellId 를 추적해 전환 방향 계산
+  const prevFullscreenIdRef = useRef<string | null>(fullscreenCellId)
+
+  useEffect(() => {
+    const prev = prevFullscreenIdRef.current
+    const curr = fullscreenCellId
+    const myId = cell.id
+    prevFullscreenIdRef.current = curr
+
+    if (curr === myId && prev !== myId) {
+      // 내가 fullscreen 이 됨
+      setFsVisible(true)
+      if (prev && prev !== myId) {
+        // 다른 셀에서 전환: 인덱스 방향에 따라 상/하 슬라이드
+        // 아래 셀로 이동(myIdx > prevIdx) → 새 셀은 아래에서 올라옴
+        const prevIdx = cells.findIndex((c) => c.id === prev)
+        const myIdx = cells.findIndex((c) => c.id === myId)
+        setFsAnim(myIdx > prevIdx ? 'slide-in-down' : 'slide-in-up')
+      } else {
+        // 최초 진입: grow
+        setFsAnim('grow-in')
+      }
+      return
+    }
+
+    if (curr !== myId && prev === myId) {
+      // 내가 fullscreen 에서 벗어남
+      if (curr) {
+        // 다른 셀에 넘어감 → 반대 방향으로 빠짐
+        // 아래 셀로 이동(currIdx > myIdx) → 이전 셀은 위로 빠짐
+        const currIdx = cells.findIndex((c) => c.id === curr)
+        const myIdx = cells.findIndex((c) => c.id === myId)
+        setFsAnim(currIdx > myIdx ? 'slide-out-up' : 'slide-out-down')
+      } else {
+        // 완전 해제 → grow-out
+        setFsAnim('grow-out')
+      }
+      // 퇴장 애니메이션 지속시간과 맞춤 (grow-out 200ms / slide-out 240ms)
+      const exitDuration = curr ? 240 : 200
+      const t = window.setTimeout(() => {
+        setFsVisible(false)
+        setFsAnim(null)
+      }, exitDuration)
+      return () => window.clearTimeout(t)
+    }
+  }, [fullscreenCellId, cell.id, cells])
+
+  const fsRenderActive = fullscreen || fsVisible // DOM 에 fullscreen 스타일로 렌더할지
+  const fsAnimClass = fsAnim ? `cell-fs-${fsAnim}` : ''
+  const isExitingPhase = fsAnim === 'grow-out' || fsAnim === 'slide-out-up' || fsAnim === 'slide-out-down'
+  const setFullscreen = useCallback(
+    (next: boolean | ((prev: boolean) => boolean)) => {
+      const resolved = typeof next === 'function' ? next(fullscreen) : next
+      setFullscreenCellId(resolved ? cell.id : null)
+    },
+    [cell.id, fullscreen, setFullscreenCellId]
+  )
+  const [viewportH, setViewportH] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : 800))
+
+  useEffect(() => {
+    if (!fullscreen) return
+    setViewportH(window.innerHeight)
+    const onResize = () => setViewportH(window.innerHeight)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        setFullscreenCellId(null)
+      }
+    }
+    window.addEventListener('resize', onResize)
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      document.removeEventListener('keydown', onKey, true)
+    }
+  }, [fullscreen, setFullscreenCellId])
+
+  const [naming, setNaming] = useState(false)
+  const handleSuggestName = useCallback(async () => {
+    if (naming) return
+    const code = (cell.code || '').trim()
+    if (!code) return
+    setNaming(true)
+    try {
+      const name = await suggestCellName(code, cell.type)
+      if (name) updateCellName(cell.id, name)
+    } catch (e) {
+      console.error('네이밍 실패:', e)
+    } finally {
+      setNaming(false)
+    }
+  }, [naming, cell.id, cell.code, cell.type, updateCellName])
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement | null
+    if (!target) return
+    if (target.closest('input, textarea, button, select, [contenteditable="true"], .cm-editor, [role="separator"]')) return
+    e.preventDefault()
+    setActiveCellId(cell.id)
+    setFullscreen((f) => !f)
+  }, [cell.id, setActiveCellId])
 
   useEffect(() => {
     if (!isExecuting) { setElapsedSecs(0); return }
@@ -276,12 +387,22 @@ export default function CellContainer({ cell }: Props) {
     <div
       id={cell.id}
       className={cn(
-        'border-b border-border-subtle transition-colors',
-        isActive
+        'transition-colors',
+        fsRenderActive
+          ? cn(
+              'fixed top-0 left-0 bottom-0 bg-bg-page overflow-auto',
+              isExitingPhase ? 'z-[99]' : 'z-[100]',
+              fsAnimClass
+            )
+          : 'border-b border-border-subtle',
+        !fsRenderActive && (isActive
           ? 'bg-primary-light/60 dark:bg-primary-light/30'
-          : 'hover:bg-primary-light/15 dark:hover:bg-primary-light/10',
+          : 'hover:bg-primary-light/15 dark:hover:bg-primary-light/10'),
       )}
+      style={fsRenderActive ? { right: 'var(--right-nav-width, 256px)' } : undefined}
       onClick={() => setActiveCellId(cell.id)}
+      onDoubleClick={handleDoubleClick}
+      title={!fullscreen && isActive ? '더블클릭하여 전체화면' : undefined}
     >
       {/* Cell header */}
       <div className="group flex items-center justify-between px-4 py-2">
@@ -307,6 +428,14 @@ export default function CellContainer({ cell }: Props) {
             title="영문 소문자 + 숫자 + 언더스코어(snake_case)만 허용"
             pattern="[a-z_][a-z0-9_]*"
           />
+          <button
+            title="코드 기반으로 셀 이름 자동 생성"
+            disabled={naming || !cell.code?.trim()}
+            onClick={(e) => { e.stopPropagation(); handleSuggestName() }}
+            className="p-1 rounded text-text-disabled transition-colors enabled:hover:text-primary enabled:hover:bg-primary-light disabled:cursor-not-allowed shrink-0"
+          >
+            {naming ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+          </button>
           {/* Execution status */}
           {isExecuting && (
             <span className="text-[10px] font-mono flex items-center gap-0.5 shrink-0 text-warning">
@@ -337,6 +466,13 @@ export default function CellContainer({ cell }: Props) {
                 {isExecuting ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
               </button>
             )}
+            <button
+              title={fullscreen ? '전체화면 해제 (Esc)' : '전체화면 (더블클릭)'}
+              onClick={(e) => { e.stopPropagation(); setActiveCellId(cell.id); setFullscreen((f) => !f) }}
+              className="p-1.5 rounded text-text-secondary hover:text-primary hover:bg-primary-light transition-colors"
+            >
+              {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
             <button
               title="삭제"
               onClick={(e) => { e.stopPropagation(); deleteCell(cell.id) }}
@@ -387,9 +523,12 @@ export default function CellContainer({ cell }: Props) {
         {(() => {
           const CELL_HEADER = 40
           const CONTENT_PAD = 16
-          const VIBE_CHAT = isActive ? 128 : 24
+          const VIBE_CHAT = isActive ? (fsRenderActive ? 120 : 128) : 24
           const SAFETY = 24
-          const V_TOTAL = Math.max(notebookAreaHeight - CELL_HEADER - CONTENT_PAD - VIBE_CHAT - SAFETY, 200)
+          // fullscreen 은 NotebookArea + CellAddBar(≈56px) 영역을 차지하므로 높이가 조금 더 큼
+          // fullscreen 은 viewport 전체(단, 우측 사이드바 제외)를 차지
+          const areaHeight = fsRenderActive ? viewportH : notebookAreaHeight
+          const V_TOTAL = Math.max(areaHeight - CELL_HEADER - CONTENT_PAD - VIBE_CHAT - SAFETY, 200)
           const TAB_BAR = 30
           const panelMaxHeight = Math.max(V_TOTAL - TAB_BAR, 200)
           // 차트 출력 셀은 Plotly layout.height(없으면 400)에 크롬 여백을 더해 자동 확장.
@@ -403,34 +542,40 @@ export default function CellContainer({ cell }: Props) {
           })()
           // 사용자가 드래그로 직접 조정한 적이 있으면 그 값을 그대로 씀.
           // 아직 조정한 적이 없으면 차트 자연 높이로 초기 확장.
-          const effectiveHeight = userResizedRef.current
-            ? panelHeight
-            : (chartPreferredHeight ?? panelHeight)
+          const effectiveHeight = fsRenderActive
+            ? V_TOTAL
+            : userResizedRef.current
+              ? panelHeight
+              : (chartPreferredHeight ?? panelHeight)
           if (cell.splitMode && cell.splitDir === 'v') {
             const DIVIDER = 10
-            const topPx = Math.round((V_TOTAL - DIVIDER) * vSplitRatio / 100)
-            const bottomPx = V_TOTAL - DIVIDER - topPx
+            const vTotal = effectiveHeight
+            const topPx = Math.round((vTotal - DIVIDER) * vSplitRatio / 100)
+            const bottomPx = vTotal - DIVIDER - topPx
             const topContent = Math.max(topPx - TAB_BAR, 60)
             const bottomContent = Math.max(bottomPx - TAB_BAR, 60)
             return (
-              <div ref={splitContainerRef} style={{ height: V_TOTAL }}>
-                <div style={{ height: topPx, overflow: 'hidden' }}>
-                  {renderTabBar(cell.leftTab, (t) => setSplitTab(cell.id, 'left', t))}
-                  {renderPanel(cell.leftTab, topContent)}
+              <>
+                <div ref={splitContainerRef} style={{ height: vTotal }}>
+                  <div style={{ height: topPx, overflow: 'hidden' }}>
+                    {renderTabBar(cell.leftTab, (t) => setSplitTab(cell.id, 'left', t))}
+                    {renderPanel(cell.leftTab, topContent)}
+                  </div>
+                  <div
+                    className="flex items-center justify-center cursor-row-resize group/div"
+                    style={{ height: DIVIDER }}
+                    onMouseDown={handleVDividerMouseDown}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="h-px w-full rounded-full transition-colors bg-border-subtle group-hover/div:bg-primary" />
+                  </div>
+                  <div style={{ height: bottomPx, overflow: 'hidden' }}>
+                    {renderTabBar(cell.rightTab, (t) => setSplitTab(cell.id, 'right', t))}
+                    {renderPanel(cell.rightTab, bottomContent)}
+                  </div>
                 </div>
-                <div
-                  className="flex items-center justify-center cursor-row-resize group/div"
-                  style={{ height: DIVIDER }}
-                  onMouseDown={handleVDividerMouseDown}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="h-px w-full rounded-full transition-colors bg-border-subtle group-hover/div:bg-primary" />
-                </div>
-                <div style={{ height: bottomPx, overflow: 'hidden' }}>
-                  {renderTabBar(cell.rightTab, (t) => setSplitTab(cell.id, 'right', t))}
-                  {renderPanel(cell.rightTab, bottomContent)}
-                </div>
-              </div>
+                <PanelResizeHandle onMouseDown={handlePanelResizeMouseDown} />
+              </>
             )
           }
           if (cell.splitMode) {
@@ -507,7 +652,8 @@ export default function CellContainer({ cell }: Props) {
       {isActive && (
         <div
           className={cn(
-            'relative mt-3 mx-4 mb-4 rounded-2xl',
+            'relative mt-3 mx-4 rounded-2xl',
+            fsRenderActive ? 'mb-2' : 'mb-4',
             !isVibing && 'bg-surface border border-border-subtle shadow-sm'
           )}
           style={isVibing ? {
@@ -549,7 +695,13 @@ export default function CellContainer({ cell }: Props) {
             ref={inputRef}
             data-vibe-chat-for={cell.id}
             className="w-full bg-transparent text-sm text-text-primary placeholder-text-tertiary focus:outline-none resize-none leading-relaxed overflow-hidden rounded-2xl"
-            style={{ minHeight: '56px', height: '56px', padding: '10px 48px 28px 16px', position: 'relative', zIndex: 10 }}
+            style={{
+              minHeight: fsRenderActive ? '88px' : '56px',
+              height: fsRenderActive ? '88px' : '56px',
+              padding: '10px 48px 28px 16px',
+              position: 'relative',
+              zIndex: 10,
+            }}
             placeholder={
               cell.type === 'sql'
                 ? '쿼리를 수정해보세요 (Ctrl+Enter 전송) — 예: 시도별로 group by 해줘'

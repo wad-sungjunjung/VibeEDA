@@ -277,6 +277,8 @@ interface AppStore {
   vibingCells: Set<string>
   activeCellId: string | null
   setActiveCellId: (id: string | null) => void
+  fullscreenCellId: string | null
+  setFullscreenCellId: (id: string | null) => void
   newAnalysis: () => Promise<void>
   loadAnalysis: (id: string) => void
   addCell: (type: CellType, afterId?: string | null) => void
@@ -513,10 +515,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
   executingCells: new Set<string>(),
   vibingCells: new Set<string>(),
   activeCellId: null,
+  fullscreenCellId: null,
+
+  setFullscreenCellId: (id) => set({ fullscreenCellId: id }),
 
   setActiveCellId: (id) =>
     set((s) => ({
       activeCellId: id,
+      // 전체화면 중에 활성 셀이 바뀌면 전체화면 대상도 따라 이동.
+      // (id가 null이면 전체화면 유지 — 명시적으로 setFullscreenCellId(null) 호출 필요)
+      fullscreenCellId: s.fullscreenCellId && id ? id : s.fullscreenCellId,
       cells:
         id && id !== s.activeCellId
           ? s.cells.map((c) =>
@@ -593,6 +601,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           ...histories.map((h) => ({ ...h, isCurrent: false })),
         ],
       })
+      await get().fetchFilesTree()
     } catch (err) {
       console.error('newAnalysis failed:', err)
       set({

@@ -153,6 +153,71 @@
   100% { background-position: 0% 50%; }
 }
 
+/* ── 셀 전체화면 공통 이징 변수 ──
+   - in: ease-out-expo 계열 (빠르게 나와서 부드럽게 안착)
+   - out: ease-in-cubic 계열 (천천히 시작해 빠르게 사라짐)
+*/
+.cell-fs-grow-in,
+.cell-fs-grow-out,
+.cell-fs-slide-in-down,
+.cell-fs-slide-in-up,
+.cell-fs-slide-out-up,
+.cell-fs-slide-out-down {
+  will-change: transform, opacity, filter;
+  backface-visibility: hidden;
+}
+
+/* ── 진입/퇴장: 셀이 커지는 느낌 — 살짝의 blur + scale ── */
+@keyframes cell-fs-grow-in {
+  0%   { opacity: 0; transform: scale(0.92); filter: blur(2px); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1);    filter: blur(0);   }
+}
+@keyframes cell-fs-grow-out {
+  0%   { opacity: 1; transform: scale(1);    filter: blur(0);   }
+  100% { opacity: 0; transform: scale(0.94); filter: blur(2px); }
+}
+.cell-fs-grow-in  { animation: cell-fs-grow-in  300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.cell-fs-grow-out { animation: cell-fs-grow-out 200ms cubic-bezier(0.55, 0, 0.68, 0.2) both; pointer-events: none; }
+
+/* ── 네비게이션 전환: 상하 슬라이드 + 깊이감(scale 0.985) + 빠른 opacity 선행 ── */
+@keyframes cell-fs-slide-in-down {  /* 아래쪽 셀로 이동: 새 셀이 아래에서 올라옴 */
+  0%   { opacity: 0; transform: translateY(44px) scale(0.985); }
+  50%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0)    scale(1);     }
+}
+@keyframes cell-fs-slide-in-up {    /* 위쪽 셀로 이동 */
+  0%   { opacity: 0; transform: translateY(-44px) scale(0.985); }
+  50%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0)     scale(1);     }
+}
+@keyframes cell-fs-slide-out-up {   /* 아래쪽 셀로 이동: 이전 셀은 위로 빠짐 */
+  0%   { opacity: 1; transform: translateY(0)     scale(1);     }
+  60%  { opacity: 0; }
+  100% { opacity: 0; transform: translateY(-28px) scale(0.985); }
+}
+@keyframes cell-fs-slide-out-down { /* 위쪽 셀로 이동 */
+  0%   { opacity: 1; transform: translateY(0)    scale(1);     }
+  60%  { opacity: 0; }
+  100% { opacity: 0; transform: translateY(28px) scale(0.985); }
+}
+.cell-fs-slide-in-down  { animation: cell-fs-slide-in-down  320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.cell-fs-slide-in-up    { animation: cell-fs-slide-in-up    320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.cell-fs-slide-out-up   { animation: cell-fs-slide-out-up   240ms cubic-bezier(0.55, 0, 0.68, 0.2) both; pointer-events: none; }
+.cell-fs-slide-out-down { animation: cell-fs-slide-out-down 240ms cubic-bezier(0.55, 0, 0.68, 0.2) both; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cell-fs-grow-in,
+  .cell-fs-grow-out,
+  .cell-fs-slide-in-down,
+  .cell-fs-slide-in-up,
+  .cell-fs-slide-out-up,
+  .cell-fs-slide-out-down {
+    animation-duration: 1ms !important;
+    animation-timing-function: linear !important;
+  }
+}
+
 /* ── 앱 기본 스크롤바 — 테마 변수로 구동 ── */
 ::-webkit-scrollbar {
   width: 5px;

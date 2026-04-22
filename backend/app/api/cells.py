@@ -1,12 +1,45 @@
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, field_validator
 
+from ..config import settings
 from ..services import notebook_store
-from ..services.naming import to_snake_case
+from ..services.naming import suggest_name_from_code, to_snake_case
 
 router = APIRouter()
+
+
+class SuggestNameRequest(BaseModel):
+    code: str
+    type: str = "cell"
+
+
+class SuggestNameResponse(BaseModel):
+    name: str
+
+
+@router.post("/cells/suggest-name", response_model=SuggestNameResponse)
+async def suggest_name(
+    body: SuggestNameRequest,
+    x_gemini_key: str = Header(default="", alias="X-Gemini-Key"),
+    x_anthropic_key: str = Header(default="", alias="X-Anthropic-Key"),
+):
+    gemini_key = x_gemini_key or settings.gemini_api_key
+    anthropic_key = x_anthropic_key or settings.anthropic_api_key
+    try:
+        name = await suggest_name_from_code(
+            code=body.code,
+            cell_type=body.type,
+            gemini_api_key=gemini_key,
+            anthropic_api_key=anthropic_key,
+            fallback=body.type or "cell",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"네이밍 실패: {e}")
+    return SuggestNameResponse(name=name)
 
 
 class CellCreate(BaseModel):

@@ -110,6 +110,13 @@ export default function RightNav() {
   }
 
   const [sidebarWidth, setSidebarWidth] = useState(256)
+  // 전체화면 셀이 우측 사이드바 폭을 알 수 있도록 CSS 변수로 노출
+  useEffect(() => {
+    document.documentElement.style.setProperty('--right-nav-width', `${sidebarWidth}px`)
+    return () => {
+      document.documentElement.style.setProperty('--right-nav-width', '256px')
+    }
+  }, [sidebarWidth])
   // heights[0]=data%, heights[1]=nav%, heights[2]=agent%
   const [sections, setSections] = useState([20, 42, 38])
 

@@ -35,6 +35,8 @@ import { cn } from '@/lib/utils'
 import ModelSettingsModal from '@/components/common/ModelSettingsModal'
 import ConnectionModal from '@/components/common/ConnectionModal'
 import ShortcutsModal from '@/components/common/ShortcutsModal'
+import FeaturesModal from '@/components/common/FeaturesModal'
+import UserGuideModal from '@/components/common/UserGuideModal'
 import catchtableIcon from '@/assets/catchtable-icon.png'
 
 export default function LeftSidebar() {
@@ -73,6 +75,8 @@ export default function LeftSidebar() {
   const [showModelSettings, setShowModelSettings] = useState(false)
   const [showConnection, setShowConnection] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showFeatures, setShowFeatures] = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
 
   useEffect(() => {
     function onClose() {
@@ -224,6 +228,18 @@ export default function LeftSidebar() {
         >
           단축키
         </button>
+        <button
+          onClick={() => setShowFeatures(true)}
+          className="w-full text-left px-2 py-1.5 text-[12px] text-text-secondary hover:bg-primary-light hover:text-primary rounded transition-colors"
+        >
+          편의 기능
+        </button>
+        <button
+          onClick={() => setShowGuide(true)}
+          className="w-full text-left px-2 py-1.5 text-[12px] text-text-secondary hover:bg-primary-light hover:text-primary rounded transition-colors"
+        >
+          사용 가이드
+        </button>
       </div>
 
       {/* Profile */}
@@ -249,6 +265,12 @@ export default function LeftSidebar() {
       )}
       {showShortcuts && (
         <ShortcutsModal onClose={() => setShowShortcuts(false)} />
+      )}
+      {showFeatures && (
+        <FeaturesModal onClose={() => setShowFeatures(false)} />
+      )}
+      {showGuide && (
+        <UserGuideModal onClose={() => setShowGuide(false)} />
       )}
     </aside>
   )
