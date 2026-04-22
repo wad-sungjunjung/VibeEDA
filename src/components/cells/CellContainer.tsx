@@ -170,8 +170,20 @@ export default function CellContainer({ cell }: Props) {
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement | null
     if (!target) return
-    if (target.closest('input, textarea, button, select, [contenteditable="true"], .cm-editor, [role="separator"]')) return
+    // 편집/상호작용 요소에서는 더블클릭을 기본 동작(텍스트 선택·커서 배치)에 양보
+    if (target.closest('input, textarea, button, select, [contenteditable="true"], .cm-editor, .monaco-editor, [role="separator"]')) return
     e.preventDefault()
+    setActiveCellId(cell.id)
+    setFullscreen((f) => !f)
+  }, [cell.id, setActiveCellId])
+
+  // 헤더 전용 핸들러: 에디터가 셀의 대부분을 덮는 경우에도 헤더에서 항상 전체화면 토글 가능
+  const handleHeaderDoubleClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement | null
+    if (!target) return
+    if (target.closest('input, select')) return // 이름 input 의 더블클릭 선택은 유지
+    e.preventDefault()
+    e.stopPropagation()
     setActiveCellId(cell.id)
     setFullscreen((f) => !f)
   }, [cell.id, setActiveCellId])
@@ -390,7 +402,7 @@ export default function CellContainer({ cell }: Props) {
         'transition-colors',
         fsRenderActive
           ? cn(
-              'fixed top-0 left-0 bottom-0 bg-bg-page overflow-auto',
+              'fixed inset-0 bg-bg-page overflow-auto',
               isExitingPhase ? 'z-[99]' : 'z-[100]',
               fsAnimClass
             )
@@ -399,13 +411,17 @@ export default function CellContainer({ cell }: Props) {
           ? 'bg-primary-light/60 dark:bg-primary-light/30'
           : 'hover:bg-primary-light/15 dark:hover:bg-primary-light/10'),
       )}
-      style={fsRenderActive ? { right: 'var(--right-nav-width, 256px)' } : undefined}
+      style={fsRenderActive ? { paddingRight: 'var(--right-nav-width, 256px)' } : undefined}
       onClick={() => setActiveCellId(cell.id)}
       onDoubleClick={handleDoubleClick}
       title={!fullscreen && isActive ? '더블클릭하여 전체화면' : undefined}
     >
       {/* Cell header */}
-      <div className="group flex items-center justify-between px-4 py-2">
+      <div
+        className="group flex items-center justify-between px-4 py-2"
+        onDoubleClick={handleHeaderDoubleClick}
+        title={fullscreen ? '더블클릭하여 전체화면 해제' : '더블클릭하여 전체화면'}
+      >
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono text-text-disabled shrink-0">[{cellIndex}]</span>
           <button

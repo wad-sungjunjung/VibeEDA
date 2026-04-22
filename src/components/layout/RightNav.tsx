@@ -184,7 +184,7 @@ export default function RightNav() {
   return (
     <aside
       ref={asideRef}
-      className="h-full flex flex-col bg-bg-pane shrink-0 overflow-hidden relative"
+      className="h-full flex flex-col bg-bg-pane shrink-0 overflow-hidden relative z-[110]"
       style={{ width: sidebarWidth, paddingLeft: '16px' }}
     >
       {/* Width drag handle — left edge */}

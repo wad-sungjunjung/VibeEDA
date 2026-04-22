@@ -136,6 +136,9 @@ export default function App() {
         )}
       </div>
 
+      {/* 전체화면 중 RightNav 윗부분(TopMetaHeader 우측 영역)도 사이드바 배경으로 덮기 */}
+      <FullscreenRightStrip />
+
       {/* Floating elements */}
       {notebookId !== null && <AgentFAB />}
       {agentMode && <AgentChatPanel />}
@@ -147,5 +150,16 @@ export default function App() {
       <ReportModal />
       <ReportResult />
     </div>
+  )
+}
+
+function FullscreenRightStrip() {
+  const fullscreenCellId = useAppStore((s) => s.fullscreenCellId)
+  if (!fullscreenCellId) return null
+  return (
+    <div
+      className="fixed top-0 right-0 h-header bg-bg-pane z-[110] pointer-events-none border-b border-border-subtle"
+      style={{ width: 'var(--right-nav-width, 256px)' }}
+    />
   )
 }
