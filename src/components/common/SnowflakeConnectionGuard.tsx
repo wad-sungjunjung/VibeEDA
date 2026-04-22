@@ -72,7 +72,7 @@ export default function SnowflakeConnectionGuard() {
   const isRetrying = phase === 'retrying'
 
   return (
-    <div className="fixed top-4 right-4 z-[60] animate-fade-in">
+    <div className="fixed top-4 right-4 z-[200] animate-fade-in">
       <div
         role="alert"
         className="flex items-start gap-2.5 bg-surface border border-danger/30 rounded-xl shadow-lg px-4 py-3 w-[300px]"

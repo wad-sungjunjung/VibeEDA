@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
+import { useRef, useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle, Maximize2, Minimize2, Sparkles, Grid3x3 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -7,7 +7,8 @@ import type { Cell, CellPanelTab } from '@/types'
 import { cn, loadCellUi, saveCellUi, sanitizeCellNameInput, toSnakeCase } from '@/lib/utils'
 import CellOutput from './CellOutput'
 import CodeEditor from './CodeEditor'
-import SheetEditor, { type SheetEditorHandle } from './SheetEditor'
+import type { SheetEditorHandle } from './SheetEditor'
+const SheetEditor = lazy(() => import('./SheetEditor'))
 import { vibeSheet } from '@/lib/api'
 import { suggestCellName } from '@/lib/api'
 
@@ -401,14 +402,16 @@ export default function CellContainer({ cell }: Props) {
       if (isSheet) {
         return (
           <div className={cn('relative rounded-md overflow-hidden', stretch && 'h-full flex flex-col')}>
-            <SheetEditor
-              ref={sheetRef}
-              value={cell.code}
-              onChange={(v) => updateCellCode(cell.id, v)}
-              height={stretch ? '100%' : (fixedHeight ?? 480)}
-              readOnly={isVibing || sheetVibing}
-              showFooter={fsRenderActive}
-            />
+            <Suspense fallback={<div className="flex items-center justify-center h-full min-h-[120px] text-text-tertiary text-sm"><span>로딩 중...</span></div>}>
+              <SheetEditor
+                ref={sheetRef}
+                value={cell.code}
+                onChange={(v) => updateCellCode(cell.id, v)}
+                height={stretch ? '100%' : (fixedHeight ?? 480)}
+                readOnly={isVibing || sheetVibing}
+                showFooter={fsRenderActive}
+              />
+            </Suspense>
           </div>
         )
       }

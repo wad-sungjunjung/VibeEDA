@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Stop-Process *)",
+      "PowerShell(Get-NetTCPConnection *)"
+    ]
+  }
+}
