@@ -294,8 +294,8 @@ const SheetEditor = forwardRef<SheetEditorHandle, Props>(function SheetEditor(
         return
       }
 
-      // ── 방향키 edge wrap-around 방지 ────────────────────────────────────────
-      if ((e.key === 'ArrowLeft' || e.key === 'ArrowUp') && !editing && !mod && !e.shiftKey && !e.altKey) {
+      // ── 방향키 edge wrap-around 방지 (4방향) ───────────────────────────────
+      if (['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(e.key) && !editing && !mod && !e.shiftKey && !e.altKey) {
         try {
           const sheet = univerAPI.getActiveWorkbook?.()?.getActiveSheet?.()
           if (!sheet) return
@@ -304,12 +304,12 @@ const SheetEditor = forwardRef<SheetEditorHandle, Props>(function SheetEditor(
           if (!range) return
           const r = range.getRange?.() ?? range._range
           if (!r) return
-          if (e.key === 'ArrowLeft' && r.startColumn === 0) {
-            e.preventDefault(); e.stopImmediatePropagation()
-          }
-          if (e.key === 'ArrowUp' && r.startRow === 0) {
-            e.preventDefault(); e.stopImmediatePropagation()
-          }
+          const maxCol = (sheet.getColumnCount?.() ?? 26) - 1
+          const maxRow = (sheet.getRowCount?.() ?? 100) - 1
+          if (e.key === 'ArrowLeft'  && r.startColumn === 0)       { e.preventDefault(); e.stopImmediatePropagation() }
+          if (e.key === 'ArrowUp'    && r.startRow === 0)           { e.preventDefault(); e.stopImmediatePropagation() }
+          if (e.key === 'ArrowRight' && r.endColumn >= maxCol)      { e.preventDefault(); e.stopImmediatePropagation() }
+          if (e.key === 'ArrowDown'  && r.endRow >= maxRow)         { e.preventDefault(); e.stopImmediatePropagation() }
         } catch {}
       }
     }
