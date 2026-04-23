@@ -47,7 +47,16 @@ def list_notebooks() -> list[dict]:
     from . import _core
     for p in sorted(paths, key=lambda x: x.stat().st_mtime, reverse=True):
         try:
-            nb = json.loads(p.read_text(encoding="utf-8"))
+            try:
+                text = p.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                # 파일에 비 UTF-8 바이트가 있는 경우 (corruption) — 손실 없이 읽기 시도
+                text = p.read_bytes().decode("utf-8", errors="ignore")
+            try:
+                nb = json.loads(text)
+            except json.JSONDecodeError:
+                # JSON 뒤에 쓰레기 데이터가 붙은 경우 (예: 파일 이중 기록) — 첫 JSON 객체만 파싱
+                nb, _ = json.JSONDecoder().raw_decode(text)
             vibe = nb.get("metadata", {}).get("vibe", {})
             nb_id = vibe.get("id")
             if not nb_id:

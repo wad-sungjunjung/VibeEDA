@@ -113,6 +113,9 @@ class NotebookState:
     skill_ctx: dict = field(default_factory=dict)
     # 에이전트가 셀을 만들거나 수정할 때, 해당 셀의 vibe chat history 에 기록할 원 사용자 메시지.
     user_message_latest: str = ""
+    # 이번 턴에 에이전트가 스트리밍한 내레이션 텍스트 — 셀 chat history 에 "이 셀이 왜 만들어졌는지"를 기록.
+    # create_cell/update_cell_code 호출 직전 단계에 run loop 가 전체 텍스트로 세팅한다.
+    current_turn_narration: str = ""
     # `check_chart_quality` 가 호출된 셀 id 모음 (차트 퀄리티 강제 가드용).
     chart_quality_checked: set = field(default_factory=set)
     # Explore-before-query 가드: 세션 내에서 이미 탐색(profile/preview/query_data/get_category_values)한 마트 키 모음.
@@ -180,6 +183,26 @@ def _format_output_for_claude(output: dict) -> str:
         return f"[오류]\n{output.get('message', '')}"
 
     return str(output)
+
+
+# ─── Cell chat-entry narration helper ─────────────────────────────────────────
+# 에이전트가 셀을 생성/수정할 때 셀별 chat_history 에 남길 한 줄짜리 user_msg 를 만든다.
+# 우선순위: (1) 이번 턴 내레이션 → (2) 원 사용자 요청 → (3) 짧은 기본 문구.
+_CELL_NARRATION_MAX_LEN = 400
+
+
+def _build_cell_chat_narration(state: "NotebookState", created: bool) -> str:
+    narration = (getattr(state, "current_turn_narration", "") or "").strip()
+    if narration:
+        # 한 셀이 여러 turn 에 걸쳐 생성되지 않도록, 지나치게 긴 문단은 앞부분만 사용.
+        if len(narration) > _CELL_NARRATION_MAX_LEN:
+            narration = narration[:_CELL_NARRATION_MAX_LEN].rstrip() + "…"
+        return narration
+    original_request = (getattr(state, "user_message_latest", "") or "").strip()
+    action = "에이전트가 이 셀을 생성했습니다." if created else "에이전트가 이 셀을 수정했습니다."
+    if original_request:
+        return f"{action} (요청: {original_request})"
+    return action
 
 
 # ─── Tool execution ───────────────────────────────────────────────────────────
@@ -269,16 +292,19 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
             state.cells.append(new_cell)
 
         # 에이전트가 만든 셀도 vibe chat history 에 남겨, 셀별 대화 이력에서 조회 가능하게 함.
+        # user_msg = 이번 턴 내레이션 (셀이 왜 만들어졌는지). 비어있으면 짧은 기본 문구로 폴백.
+        agent_user_msg = _build_cell_chat_narration(state, created=True)
         if state.notebook_id:
             try:
                 from . import notebook_store as _ns
                 _ns.add_chat_entry(
                     state.notebook_id,
                     cell_id,
-                    user_msg=(state.user_message_latest or "(에이전트 세션 요청)"),
-                    assistant_reply="(에이전트가 생성한 셀)",
+                    user_msg=agent_user_msg,
+                    assistant_reply="코드가 업데이트되었습니다. 아래 버튼으로 이 시점 코드를 확인하거나 되돌릴 수 있습니다.",
                     code_snapshot="",
                     code_result=code,
+                    agent_created=True,
                 )
             except Exception:
                 pass
@@ -290,6 +316,11 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
             "cell_name": name_val,
             "code": code,
             "after_cell_id": after_id,
+            "agent_chat_entry": {
+                "user": agent_user_msg,
+                "assistant": "코드가 업데이트되었습니다. 아래 버튼으로 이 시점 코드를 확인하거나 되돌릴 수 있습니다.",
+                "agent_created": True,
+            },
         }]
 
         # 모든 셀(SQL/Python)은 생성 즉시 자동 실행 — 에이전트가 실제 출력을 보고 다음 단계를 결정
@@ -331,20 +362,32 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
         old_code = cell.code
         cell.code = new_code
         # 에이전트 수정도 vibe chat history 에 기록 (이전 코드 스냅샷 포함)
+        agent_update_msg = _build_cell_chat_narration(state, created=False)
         if state.notebook_id:
             try:
                 from . import notebook_store as _ns
                 _ns.add_chat_entry(
                     state.notebook_id,
                     cell.id,
-                    user_msg=(state.user_message_latest or "(에이전트 세션 수정)"),
-                    assistant_reply="(에이전트가 수정한 셀)",
+                    user_msg=agent_update_msg,
+                    assistant_reply="코드가 업데이트되었습니다. 아래 버튼으로 이 시점 코드를 확인하거나 되돌릴 수 있습니다.",
                     code_snapshot=old_code,
                     code_result=new_code,
+                    agent_created=True,
                 )
             except Exception:
                 pass
-        events: list[dict] = [{"type": "cell_code_updated", "cell_id": cell.id, "code": cell.code}]
+        events: list[dict] = [{
+            "type": "cell_code_updated",
+            "cell_id": cell.id,
+            "code": cell.code,
+            "agent_chat_entry": {
+                "user": agent_update_msg,
+                "assistant": "코드가 업데이트되었습니다. 아래 버튼으로 이 시점 코드를 확인하거나 되돌릴 수 있습니다.",
+                "agent_created": True,
+                "code_snapshot": old_code,
+            },
+        }]
 
         # 코드 변경 후 즉시 재실행
         if cell.type in ("sql", "python") and state.notebook_id:
@@ -1483,6 +1526,9 @@ async def run_agent_stream(
 
             tool_results = []
             skill_reminders: list[str] = []
+
+            # 이번 턴의 내레이션을 state 에 실어, create_cell/update_cell_code 가 셀 chat history 의 user_msg 로 사용.
+            notebook_state.current_turn_narration = full_text.strip()
 
             # 모든 호출이 병렬 안전하면 asyncio.gather 로 한꺼번에 실행 — 탐색/프로파일 단계에서 왕복 수 절감.
             all_parallel_safe = all(tb.name in PARALLEL_SAFE_TOOLS for tb in tool_uses)

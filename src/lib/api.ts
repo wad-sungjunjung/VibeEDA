@@ -24,8 +24,8 @@ export type AgentEvent =
   | { type: 'tool_use'; tool: string; input: Record<string, unknown> }
   | { type: 'message_delta'; content: string }
   | { type: 'reset_current_bubble' }
-  | { type: 'cell_created'; cell_id: string; cell_type: CellType; cell_name: string; code: string; after_cell_id?: string | null }
-  | { type: 'cell_code_updated'; cell_id: string; code: string }
+  | { type: 'cell_created'; cell_id: string; cell_type: CellType; cell_name: string; code: string; after_cell_id?: string | null; agent_chat_entry?: AgentChatEntry }
+  | { type: 'cell_code_updated'; cell_id: string; code: string; agent_chat_entry?: AgentChatEntry }
   | { type: 'cell_executed'; cell_id: string; output?: import('@/types').CellOutput | null }
   | { type: 'cell_memo_updated'; cell_id: string; memo: string }
   | { type: 'chart_quality'; cell_id: string; passed: boolean; summary: string; issues: string[] }
@@ -53,6 +53,14 @@ export interface ChatEntryRow {
   code_snapshot: string
   code_result?: string
   created_at: string
+  agent_created?: boolean
+}
+
+export interface AgentChatEntry {
+  user: string
+  assistant: string
+  agent_created?: boolean
+  code_snapshot?: string
 }
 
 export interface CellRow {
@@ -348,12 +356,14 @@ export interface AgentRequest {
   notebook_id?: string | null
 }
 
-export async function generateAgentSessionTitle(question: string): Promise<string> {
+export async function generateAgentSessionTitle(question: string, response?: string): Promise<string> {
   try {
+    const body: { question: string; response?: string } = { question }
+    if (response && response.trim()) body.response = response
     const res = await fetch(`${API_BASE}/agent/title`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getLLMHeaders() },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify(body),
     })
     if (!res.ok) return ''
     const data = (await res.json()) as { ok: boolean; title: string }
@@ -376,6 +386,18 @@ export async function streamAgentMessage(
   })
   if (!response.ok) throw new Error(`API error: ${response.status}`)
   await readSSEStream(response, onEvent)
+}
+
+export async function archiveAgentHistory(notebookId: string): Promise<number> {
+  // 서버의 agent_history 를 비운다 — 프론트에서 세션을 localStorage 에 옮긴 뒤 호출.
+  try {
+    const res = await fetch(`${API_BASE}/notebooks/${notebookId}/agent/archive`, { method: 'POST' })
+    if (!res.ok) return 0
+    const data = (await res.json()) as { ok: boolean; cleared: number }
+    return data.ok ? data.cleared : 0
+  } catch {
+    return 0
+  }
 }
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
@@ -523,6 +545,9 @@ export const deleteFile = (path: string) =>
     method: 'POST',
     body: JSON.stringify({ path }),
   })
+
+export const openFolderInExplorer = () =>
+  apiFetch<{ ok: boolean; path: string }>('/files/open-folder', { method: 'POST' })
 
 export async function uploadFile(file: File, dstDir: string = ''): Promise<{
   ok: boolean; path: string; name: string; size: number; profile: unknown

@@ -11,6 +11,7 @@ export interface ChatEntry {
   timestamp: string
   codeSnapshot: string  // 요청 직전 (pre) 코드
   codeResult: string    // 요청 결과 (post) 코드
+  agentCreated?: boolean
 }
 
 export interface CellOutput {

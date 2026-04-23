@@ -41,7 +41,7 @@ _loaded_from_disk = False
 
 def _cache_path() -> Path:
     from . import notebook_store
-    return notebook_store.NOTEBOOKS_DIR / ".categories_cache.json"
+    return notebook_store.VIBE_DIR / "categories_cache.json"
 
 
 def _load_from_disk() -> None:

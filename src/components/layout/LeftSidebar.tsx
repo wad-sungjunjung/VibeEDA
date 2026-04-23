@@ -27,6 +27,7 @@ import {
   Check,
   Sun,
   Moon,
+  ExternalLink,
 } from 'lucide-react'
 import type { FileNode } from '@/lib/api'
 import { useAppStore } from '@/store/useAppStore'
@@ -36,9 +37,7 @@ import { useModelStore } from '@/store/modelStore'
 import { cn } from '@/lib/utils'
 import ModelSettingsModal from '@/components/common/ModelSettingsModal'
 import ConnectionModal from '@/components/common/ConnectionModal'
-import ShortcutsModal from '@/components/common/ShortcutsModal'
-import FeaturesModal from '@/components/common/FeaturesModal'
-import UserGuideModal from '@/components/common/UserGuideModal'
+import HelpModal from '@/components/common/HelpModal'
 import catchtableIcon from '@/assets/catchtable-icon.png'
 
 export default function LeftSidebar() {
@@ -99,15 +98,13 @@ export default function LeftSidebar() {
   const [folderInput, setFolderInput] = useState('')
   const [showModelSettings, setShowModelSettings] = useState(false)
   const [showConnection, setShowConnection] = useState(false)
-  const [showShortcuts, setShowShortcuts] = useState(false)
-  const [showFeatures, setShowFeatures] = useState(false)
-  const [showGuide, setShowGuide] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
 
   useEffect(() => {
     function onClose() {
       setShowModelSettings(false)
       setShowConnection(false)
-      setShowShortcuts(false)
+      setShowHelp(false)
       setAddingFolder(false)
       setHistoryMenuOpen(null)
     }
@@ -200,18 +197,18 @@ export default function LeftSidebar() {
           }
           walk(filesTree, null)
 
-          const rows = histories.filter((h) => nbInfo.has(h.id))
-          if (rows.length === 0) {
+          // nbInfo 에 없는 항목도 표시 — 이동 후 id_to_file 미갱신 등의 엣지케이스 대응
+          if (histories.length === 0) {
             return <div className="px-2 py-1 text-[11px] text-text-disabled italic">분석 없음</div>
           }
-          return rows.map((h) => {
-            const info = nbInfo.get(h.id)!
+          return histories.map((h) => {
+            const info = nbInfo.get(h.id) ?? null
             return (
               <HistoryItemRow
                 key={h.id}
                 item={h}
-                folderName={info.folderName}
-                notebookPath={info.path}
+                folderName={info?.folderName ?? null}
+                notebookPath={info?.path ?? ''}
                 rootPath={filesRoot}
                 rootFolders={rootFolders}
                 menuOpen={historyMenuOpen === h.id}
@@ -248,22 +245,10 @@ export default function LeftSidebar() {
           모델 설정
         </button>
         <button
-          onClick={() => setShowShortcuts(true)}
+          onClick={() => setShowHelp(true)}
           className="w-full text-left px-2 py-1.5 text-[12px] text-text-secondary hover:bg-primary-light hover:text-primary rounded transition-colors"
         >
-          단축키
-        </button>
-        <button
-          onClick={() => setShowFeatures(true)}
-          className="w-full text-left px-2 py-1.5 text-[12px] text-text-secondary hover:bg-primary-light hover:text-primary rounded transition-colors"
-        >
-          편의 기능
-        </button>
-        <button
-          onClick={() => setShowGuide(true)}
-          className="w-full text-left px-2 py-1.5 text-[12px] text-text-secondary hover:bg-primary-light hover:text-primary rounded transition-colors"
-        >
-          사용 가이드
+          도움말
         </button>
       </div>
 
@@ -288,14 +273,8 @@ export default function LeftSidebar() {
       {showConnection && (
         <ConnectionModal onClose={() => setShowConnection(false)} />
       )}
-      {showShortcuts && (
-        <ShortcutsModal onClose={() => setShowShortcuts(false)} />
-      )}
-      {showFeatures && (
-        <FeaturesModal onClose={() => setShowFeatures(false)} />
-      )}
-      {showGuide && (
-        <UserGuideModal onClose={() => setShowGuide(false)} />
+      {showHelp && (
+        <HelpModal onClose={() => setShowHelp(false)} />
       )}
     </aside>
   )
@@ -392,14 +371,16 @@ function HistoryItemRow({
         >
           {menuView === 'main' ? (
             <>
-              <button
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-chip"
-                onClick={() => onMenuView('move')}
-              >
-                <Folder size={12} />
-                이동
-                <ChevronRight size={10} className="ml-auto" />
-              </button>
+              {notebookPath && (
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-chip"
+                  onClick={() => onMenuView('move')}
+                >
+                  <Folder size={12} />
+                  이동
+                  <ChevronRight size={10} className="ml-auto" />
+                </button>
+              )}
               <button
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-chip"
                 onClick={onDuplicate}
@@ -684,6 +665,20 @@ function UnifiedFolderSection({
             )}
           >
             <Upload size={14} className={cn(uploading && 'animate-pulse')} />
+          </button>
+          <button
+            title="파일 탐색기에서 폴더 열기"
+            onClick={async () => {
+              try {
+                const api = await import('@/lib/api')
+                await api.openFolderInExplorer()
+              } catch (e) {
+                console.error('폴더 열기 실패:', e)
+              }
+            }}
+            className="p-1 text-text-tertiary hover:text-primary hover:bg-primary-light rounded transition-colors"
+          >
+            <ExternalLink size={12} />
           </button>
           <button
             title="새 폴더"

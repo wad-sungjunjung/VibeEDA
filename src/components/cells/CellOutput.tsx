@@ -381,8 +381,11 @@ function TableOutput({
   )
 }
 
+const PLAN_MARKER_RE = /<!--\s*vibe:analysis_plan\s*-->\s*/g
+
 function MarkdownOutput({ content }: { content: string }) {
-  if (!content.trim()) {
+  const cleaned = content.replace(PLAN_MARKER_RE, '')
+  if (!cleaned.trim()) {
     return (
       <div className="text-[12px] text-text-disabled italic">내용을 입력하세요</div>
     )
@@ -390,10 +393,10 @@ function MarkdownOutput({ content }: { content: string }) {
   return (
     <div className="relative group/output h-full overflow-y-auto overflow-x-hidden">
       <div className="absolute top-1.5 right-1.5 z-10 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity">
-        <CopyButton label="마크다운 복사" onCopy={() => navigator.clipboard.writeText(content)} />
+        <CopyButton label="마크다운 복사" onCopy={() => navigator.clipboard.writeText(cleaned)} />
       </div>
       <div className="pl-7 pr-9 py-4 break-words min-w-0">
-        <Markdown content={content} />
+        <Markdown content={cleaned} />
       </div>
     </div>
   )

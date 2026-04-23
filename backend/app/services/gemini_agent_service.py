@@ -251,6 +251,11 @@ async def run_agent_stream_gemini(
             tool_response_parts = []
             skill_reminders: list[str] = []
 
+            # 이번 턴 내레이션을 state 에 싣어, create_cell/update_cell_code 가 셀 chat history 의 user_msg 로 사용.
+            notebook_state.current_turn_narration = "\n".join(
+                (getattr(p, "text", "") or "").strip() for p in text_parts
+            ).strip()
+
             # 병렬 안전한 읽기 전용 툴만 한 턴에 호출됐으면 asyncio.gather 로 병렬 실행
             fc_args_list: list[tuple[str, dict]] = []
             for p in func_call_parts:

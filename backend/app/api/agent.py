@@ -182,14 +182,36 @@ async def agent_stream_endpoint(
     )
 
 
+@router.post("/notebooks/{notebook_id}/agent/archive")
+async def archive_agent_history(notebook_id: str):
+    """현재 에이전트 대화를 아카이브 처리 — agent_history 를 비운다.
+    프론트엔드가 세션을 localStorage 에 저장한 뒤 호출하면,
+    다음 로드 때 동일 메시지가 '현재 대화' 로 다시 올라오지 않는다."""
+    try:
+        cleared = notebook_store.clear_agent_history(notebook_id)
+        return {"ok": True, "cleared": cleared}
+    except FileNotFoundError:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Notebook not found")
+
+
 class TitleRequest(BaseModel):
     question: str
+    # 에이전트 응답(최종 요약) — 제공되면 질문+응답을 함께 요약해 더 정확한 제목 생성.
+    response: Optional[str] = None
 
 
 _TITLE_PROMPT = (
     "다음 데이터 분석 질문을 8~16자 사이의 한국어 제목으로 요약하세요. "
     "따옴표/마침표/이모지 없이 명사구로만 답하고, 제목 외의 어떤 텍스트도 출력하지 마세요.\n\n"
     "질문: {question}\n\n제목:"
+)
+
+_TITLE_PROMPT_WITH_RESPONSE = (
+    "다음 데이터 분석 세션의 '질문'과 '에이전트 응답'을 함께 보고, "
+    "실제로 수행된 작업 내용을 반영한 8~16자 한국어 제목을 뽑으세요. "
+    "따옴표/마침표/이모지 없이 명사구로만 답하고, 제목 외의 어떤 텍스트도 출력하지 마세요.\n\n"
+    "질문: {question}\n\n에이전트 응답: {response}\n\n제목:"
 )
 
 
@@ -212,7 +234,14 @@ async def agent_title_endpoint(
     if not question:
         return {"ok": False, "title": ""}
 
-    prompt = _TITLE_PROMPT.format(question=question[:400])
+    response_text = (req.response or "").strip()
+    if response_text:
+        # 응답이 길면 앞부분만 사용 — 제목은 요지 파악이 중요하고 토큰 낭비 방지.
+        prompt = _TITLE_PROMPT_WITH_RESPONSE.format(
+            question=question[:400], response=response_text[:1200]
+        )
+    else:
+        prompt = _TITLE_PROMPT.format(question=question[:400])
     vibe_model = x_vibe_model or settings.default_vibe_model
 
     try:

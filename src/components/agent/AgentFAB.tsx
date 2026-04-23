@@ -3,6 +3,7 @@ import { Telescope, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
 import { cn } from '@/lib/utils'
+import Markdown from '@/components/common/Markdown'
 
 export default function AgentFAB() {
   const { agentMode, agentLoading, agentStatus, agentChatHistory, toggleAgentMode } = useAppStore(
@@ -67,21 +68,27 @@ export default function AgentFAB() {
     <div className="fixed bottom-6 right-6 z-[120]">
       {(doneBubble || liveStatus || liveAssistantText) && !agentMode && (
         <div
-          className="absolute bottom-16 right-0 bg-surface border border-border rounded-2xl shadow-lg px-4 py-3 animate-fade-in"
-          style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)', width: 340, maxHeight: '60vh', overflowY: 'auto' }}
+          className="absolute bottom-16 right-0 bg-surface border border-border rounded-2xl shadow-lg px-5 py-4 animate-fade-in"
+          style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)', width: 380, maxHeight: '60vh', overflowY: 'auto' }}
         >
           {doneBubble ? (
-            <p className="text-[13.5px] text-text-primary leading-relaxed whitespace-pre-wrap break-keep">{doneBubble}</p>
+            <Markdown
+              content={doneBubble}
+              className="text-[14px] leading-[1.75] break-keep [&_p:first-child]:mt-0 [&_p:last-child]:mb-0"
+            />
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5">
               {liveStatus && (
-                <div className="flex items-center gap-1.5">
-                  <Loader2 size={13} className="animate-spin shrink-0 text-primary" />
+                <div className="flex items-center gap-2">
+                  <Loader2 size={14} className="animate-spin shrink-0 text-primary" />
                   <p className="text-[13px] font-semibold leading-relaxed whitespace-pre-wrap break-keep text-primary-hover">{liveStatus}</p>
                 </div>
               )}
               {liveAssistantText && (
-                <p className="text-[13.5px] text-text-primary leading-relaxed whitespace-pre-wrap break-keep">{liveAssistantText}</p>
+                <Markdown
+                  content={liveAssistantText}
+                  className="text-[14px] leading-[1.75] break-keep [&_p:first-child]:mt-0 [&_p:last-child]:mb-0"
+                />
               )}
             </div>
           )}

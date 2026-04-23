@@ -49,7 +49,9 @@ def init_skill_ctx(state: "NotebookState", initial_user_message: str) -> None:
 
 def _detect_existing_plan_cell(state: "NotebookState") -> Optional[str]:
     for c in state.cells:
-        if c.type == "markdown" and PLAN_MARKER in (c.code or ""):
+        if c.type == "markdown" and (
+            c.name == PLAN_CELL_NAME or PLAN_MARKER in (c.code or "")
+        ):
             return c.id
     return None
 
@@ -348,7 +350,7 @@ def check_pre_guard(tool_name: str, inp: dict, state: "NotebookState") -> Option
 # ─── Tool handlers for new skill tools ────────────────────────────────────────
 
 def _render_plan_markdown(scope: str, hypotheses: list[dict], out_of_scope: list[str]) -> str:
-    lines = [PLAN_MARKER, "", "# 📋 분석 플랜", ""]
+    lines = ["# 📋 분석 플랜", ""]
     if scope:
         lines += [f"**스코프**: {scope}", ""]
     lines += ["## 가설"]
@@ -373,19 +375,35 @@ def _render_plan_markdown(scope: str, hypotheses: list[dict], out_of_scope: list
     return "\n".join(lines)
 
 
+def _make_agent_chat_entry(state: "NotebookState", created: bool, code_snapshot: str = "") -> dict:
+    """SSE 이벤트에 포함할 agent_chat_entry 딕셔너리 생성.
+    user_msg 는 이번 턴의 내레이션(에이전트가 셀 생성 직전에 출력한 설명 텍스트)을 사용."""
+    from .claude_agent import _build_cell_chat_narration
+    user_msg = _build_cell_chat_narration(state, created=created)
+    return {
+        "user": user_msg,
+        "assistant": "코드가 업데이트되었습니다. 아래 버튼으로 이 시점 코드를 확인하거나 되돌릴 수 있습니다.",
+        "agent_created": True,
+        "code_snapshot": code_snapshot,
+    }
+
+
 def _log_agent_chat(state: "NotebookState", cell_id: str, old_code: str, new_code: str, created: bool) -> None:
     """에이전트 skill tool 로 만든/수정한 셀을 vibe chat_history 에 남긴다."""
     if not getattr(state, "notebook_id", ""):
         return
     try:
         from . import notebook_store as _ns
+        from .claude_agent import _build_cell_chat_narration
+        agent_msg = _build_cell_chat_narration(state, created=created)
         _ns.add_chat_entry(
             state.notebook_id,
             cell_id,
-            user_msg=(getattr(state, "user_message_latest", "") or "(에이전트 세션 요청)"),
-            assistant_reply="(에이전트가 생성한 셀)" if created else "(에이전트가 수정한 셀)",
+            user_msg=agent_msg,
+            assistant_reply="코드가 업데이트되었습니다. 아래 버튼으로 이 시점 코드를 확인하거나 되돌릴 수 있습니다.",
             code_snapshot=old_code,
             code_result=new_code,
+            agent_created=True,
         )
     except Exception:
         pass
@@ -422,7 +440,12 @@ def handle_skill_tool(
                 _log_agent_chat(state, existing_id, old_code, plan_md, created=False)
                 return (
                     {"success": True, "plan_cell_id": existing_id, "hypotheses_count": len(hypotheses), "replaced": True},
-                    [{"type": "cell_code_updated", "cell_id": existing_id, "code": plan_md}],
+                    [{
+                        "type": "cell_code_updated",
+                        "cell_id": existing_id,
+                        "code": plan_md,
+                        "agent_chat_entry": _make_agent_chat_entry(state, created=False, code_snapshot=old_code),
+                    }],
                 )
             # 끊어진 참조면 clear 후 새로 만듦
             ctx["plan_cell_id"] = None
@@ -441,6 +464,7 @@ def handle_skill_tool(
                 "cell_name": PLAN_CELL_NAME,
                 "code": plan_md,
                 "after_cell_id": None,
+                "agent_chat_entry": _make_agent_chat_entry(state, created=True),
             }],
         )
 
@@ -459,14 +483,18 @@ def handle_skill_tool(
         new_md = inp.get("new_plan_markdown", "")
         if not new_md.strip():
             return {"success": False, "error": "empty_plan", "message": "`new_plan_markdown` 이 비어 있습니다."}, []
-        if PLAN_MARKER not in new_md:
-            new_md = PLAN_MARKER + "\n\n" + new_md
+        new_md = new_md.replace(PLAN_MARKER, "").lstrip("\n")
         old_md = cell.code
         cell.code = new_md
         _log_agent_chat(state, plan_id, old_md, new_md, created=False)
         return (
             {"success": True, "plan_cell_id": plan_id},
-            [{"type": "cell_code_updated", "cell_id": plan_id, "code": new_md}],
+            [{
+                "type": "cell_code_updated",
+                "cell_id": plan_id,
+                "code": new_md,
+                "agent_chat_entry": _make_agent_chat_entry(state, created=False, code_snapshot=old_md),
+            }],
         )
 
     if tool_name == "request_marts":

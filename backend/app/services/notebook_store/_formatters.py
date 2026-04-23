@@ -32,6 +32,35 @@ def _make_output_block(output: dict) -> dict:
     }
 
 
+_LEGACY_AGENT_ASSISTANT_CREATE = "(에이전트가 생성한 셀)"
+_LEGACY_AGENT_ASSISTANT_UPDATE = "(에이전트가 수정한 셀)"
+_AGENT_ASSISTANT_REPLY = "코드가 업데이트되었습니다. 아래 버튼으로 이 시점 코드를 확인하거나 되돌릴 수 있습니다."
+
+
+def _maybe_migrate_legacy_agent_entry(user_msg: dict, asst_msg: dict) -> tuple[str, str, bool]:
+    """옛 포맷(assistant_reply 가 '(에이전트가 생성/수정한 셀)')을 에이전트 보이스로 변환.
+    반환: (표시용 user_message, 표시용 assistant_reply, agent_created 플래그)
+
+    저장된 데이터는 건드리지 않고, 조회 시점에만 새 포맷으로 렌더링한다.
+    프론트는 agent_created=True 엔트리에 '에이전트' 배지를 붙이므로 별도 보일러플레이트 없이
+    원 요청 텍스트만 그대로 보여준다. (Image #3 에서 모든 셀이 동일 문구로 보이던 문제 해결)"""
+    user_content = user_msg.get("content", "")
+    asst_content = asst_msg.get("content", "")
+    already_marked = bool(user_msg.get("agent_created"))
+    if already_marked:
+        return user_content, asst_content, True
+    is_legacy = asst_content in (_LEGACY_AGENT_ASSISTANT_CREATE, _LEGACY_AGENT_ASSISTANT_UPDATE)
+    if not is_legacy:
+        return user_content, asst_content, False
+    # 레거시 엔트리는 내레이션 텍스트가 없어 원 요청만 남음 — 보일러플레이트 없이 그대로 표시.
+    display_user = (user_content or "").strip() or (
+        "에이전트가 이 셀을 생성했습니다."
+        if asst_content == _LEGACY_AGENT_ASSISTANT_CREATE
+        else "에이전트가 이 셀을 수정했습니다."
+    )
+    return display_user, _AGENT_ASSISTANT_REPLY, True
+
+
 def _get_cell_chat_entries(vibe: dict, cell_id: str) -> list[dict]:
     """flat message pairs → ChatEntryRow list"""
     for entry in vibe.get("chat_history", []):
@@ -44,13 +73,15 @@ def _get_cell_chat_entries(vibe: dict, cell_id: str) -> list[dict]:
             user_msg = messages[i] if messages[i].get("role") == "user" else None
             asst_msg = messages[i + 1] if (i + 1 < len(messages) and messages[i + 1].get("role") == "assistant") else None
             if user_msg and asst_msg:
+                display_user, display_asst, agent_created = _maybe_migrate_legacy_agent_entry(user_msg, asst_msg)
                 result.append({
                     "id": f"{cell_id}-{i}",
-                    "user_message": user_msg.get("content", ""),
-                    "assistant_reply": asst_msg.get("content", ""),
+                    "user_message": display_user,
+                    "assistant_reply": display_asst,
                     "code_snapshot": user_msg.get("code_snapshot", ""),
                     "code_result": asst_msg.get("code_result", ""),
                     "created_at": user_msg.get("ts", datetime.now().isoformat()),
+                    "agent_created": agent_created,
                 })
                 i += 2
             else:

@@ -29,6 +29,7 @@ from ._history import (
     delete_chat_entry,
     truncate_chat_history,
     add_agent_message,
+    clear_agent_history,
 )
 
 # ── 폴더 ────────────────────────────────────────────────────────────────────

@@ -34,7 +34,7 @@ def _sanitize_filename(name: str) -> str:
     name = name.lstrip(".").replace("..", "_")
     return name[:200] or "upload"
 
-_EXCLUDE_NAMES = {"__pycache__", ".vibe_config.json", ".DS_Store"}
+_EXCLUDE_NAMES = {"__pycache__", ".vibe_config.json", ".DS_Store", ".vibe", ".categories_cache.json"}
 _MAX_DEPTH = 6
 _MAX_ENTRIES = 2000
 
@@ -386,6 +386,24 @@ async def upload_file(
     }
 
 
+@router.post("/files/open-folder")
+def open_folder():
+    import sys
+    import os
+    import subprocess
+    nd = str(notebook_store.NOTEBOOKS_DIR.resolve())
+    try:
+        if sys.platform == "win32":
+            subprocess.Popen(["explorer", nd], close_fds=True)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", nd])
+        else:
+            subprocess.Popen(["xdg-open", nd])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"ok": True, "path": nd}
+
+
 @router.post("/files/move")
 def move_entry(body: MoveBody):
     src = _resolve_inside_root(body.src)
@@ -398,4 +416,30 @@ def move_entry(body: MoveBody):
     if target.exists():
         raise HTTPException(status_code=409, detail="target already exists")
     shutil.move(str(src), str(target))
+    # .ipynb 이동 시 id_to_file 매핑을 새 위치로 업데이트해야 파일 트리에서 notebook_id 를 인식할 수 있음
+    if src.suffix.lower() == ".ipynb":
+        try:
+            root = notebook_store.NOTEBOOKS_DIR.resolve()
+            new_rel = str(target.resolve().relative_to(root).with_suffix(""))
+            cfg = notebook_store._read_config()
+            id_to_file = cfg.setdefault("id_to_file", {})
+            # 기존 항목 중 이 파일을 가리키는 id 를 찾아 새 경로로 교체
+            old_rel = str(src.resolve().relative_to(root).with_suffix(""))
+            for nb_id, fname in list(id_to_file.items()):
+                if fname == old_rel or Path(fname) == Path(old_rel):
+                    id_to_file[nb_id] = new_rel
+                    break
+            else:
+                # 등록되지 않은 경우: 새 파일의 vibe.id 를 읽어 등록
+                try:
+                    import json as _json
+                    nb = _json.loads(target.read_text(encoding="utf-8"))
+                    nb_id = nb.get("metadata", {}).get("vibe", {}).get("id")
+                    if nb_id:
+                        id_to_file[nb_id] = new_rel
+                except Exception:
+                    pass
+            notebook_store._write_config(cfg)
+        except Exception:
+            pass
     return {"ok": True, "path": str(target)}

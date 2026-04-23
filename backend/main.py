@@ -70,6 +70,25 @@ def healthz():
     return {"status": "ok"}
 
 
+@app.post("/v1/system/open-folder")
+def open_folder():
+    import sys
+    import os
+    import subprocess
+    from fastapi import HTTPException
+    nd = str(notebook_store.NOTEBOOKS_DIR.resolve())
+    try:
+        if sys.platform == "win32":
+            os.startfile(nd)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", nd])
+        else:
+            subprocess.Popen(["xdg-open", nd])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"ok": True, "path": nd}
+
+
 @app.get("/v1/system/info")
 def system_info():
     nd = notebook_store.NOTEBOOKS_DIR

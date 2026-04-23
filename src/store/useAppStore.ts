@@ -19,12 +19,15 @@ import {
   loadCellUi,
   loadAgentSessions,
   saveAgentSessions,
+  loadCurrentSessionMeta,
+  saveCurrentSessionMeta,
   toSnakeCase,
   toolStatusLabel,
 } from '@/lib/utils'
 import {
   streamVibeChat,
   streamAgentMessage,
+  archiveAgentHistory,
   generateAgentSessionTitle,
   getNotebooks,
   createNotebook,
@@ -121,6 +124,7 @@ function rowToCell(row: CellRow): Cell {
       // legacy 엔트리(code_result 없음): 다음 엔트리의 snapshot(=N+1 pre=N post).
       // 마지막 엔트리이면서 code_result 비어있으면 현재 row.code로 폴백.
       codeResult: e.code_result ?? (i < arr.length - 1 ? arr[i + 1].code_snapshot : row.code),
+      agentCreated: e.agent_created ?? false,
     })),
     historyOpen: row.chat_entries.length > 0,
     insight: row.insight ?? null,
@@ -1118,7 +1122,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       currentSessionId: null,
       agentRefCells: [],
     })
-    if (notebookId) saveAgentSessions(notebookId, updated)
+    if (notebookId) {
+      saveAgentSessions(notebookId, updated)
+      saveCurrentSessionMeta(notebookId, null)
+      // 서버의 agent_history 도 비워, 다음 로드 때 아카이브된 메시지가 '현재 대화'로 다시 올라오지 않게 한다.
+      archiveAgentHistory(notebookId).catch(() => {})
+    }
   },
 
   resumeAgentSession: (id) => {
@@ -1164,7 +1173,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
       agentRefCells: [],
       agentMode: true,
     })
-    if (notebookId) saveAgentSessions(notebookId, sessions)
+    if (notebookId) {
+      saveAgentSessions(notebookId, sessions)
+      // resume 한 세션을 "현재 대화" 메타로 기록 — 새로고침 시 sidebar 에 그대로 복원.
+      saveCurrentSessionMeta(notebookId, {
+        id,
+        createdAtMs: target.createdAtMs ?? Date.now(),
+        title: target.title ?? null,
+      })
+      // 현재 대화를 아카이브했다면 서버의 agent_history 도 비운다.
+      // resume 된 세션의 메시지들은 localStorage 에만 있고, 다음 턴부터 새로 agent_history 에 쌓임.
+      archiveAgentHistory(notebookId).catch(() => {})
+    }
   },
 
   deleteAgentSession: (id) => {
@@ -1188,6 +1208,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const ordering = midOrdering(beforeOrdering, afterOrdering)
 
     const defUi = defaultCellUi(type)
+    const isAgentMarkdown = type === 'markdown'
     const newCell: Cell = {
       id,
       name,
@@ -1195,9 +1216,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
       code,
       memo: '',
       ordering,
-      splitMode: defUi.splitMode,
+      splitMode: isAgentMarkdown ? false : defUi.splitMode,
       splitDir: defUi.splitDir,
-      activeTab: defUi.activeTab,
+      activeTab: isAgentMarkdown ? 'output' : defUi.activeTab,
       leftTab: defUi.leftTab,
       rightTab: defUi.rightTab,
       executed: false,
@@ -1256,10 +1277,30 @@ export const useAppStore = create<AppStore>((set, get) => ({
       agentStatus: '생각 중',
     }))
 
+    // 현재 세션 메타를 localStorage 에 반영 — 새로고침 후에도 "현재 대화" 로 복원 가능.
+    {
+      const st = get()
+      if (st.notebookId && st.currentSessionId && st.currentSessionCreatedAtMs) {
+        saveCurrentSessionMeta(st.notebookId, {
+          id: st.currentSessionId,
+          createdAtMs: st.currentSessionCreatedAtMs,
+          title: st.agentSessionTitle,
+        })
+      }
+    }
+
     if (isFirstUserMsg && !get().agentSessionTitle) {
       generateAgentSessionTitle(message).then((title) => {
         if (title && !get().agentSessionTitle) {
           set({ agentSessionTitle: title })
+          const st = get()
+          if (st.notebookId && st.currentSessionId && st.currentSessionCreatedAtMs) {
+            saveCurrentSessionMeta(st.notebookId, {
+              id: st.currentSessionId,
+              createdAtMs: st.currentSessionCreatedAtMs,
+              title,
+            })
+          }
         }
       }).catch(() => {})
     }
@@ -1405,10 +1446,56 @@ export const useAppStore = create<AppStore>((set, get) => ({
               event.cell_name,
               event.after_cell_id ?? null,
             )
+            if (event.agent_chat_entry) {
+              const entry = event.agent_chat_entry
+              const ts = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+              set((s) => ({
+                cells: s.cells.map((c) =>
+                  c.id === event.cell_id
+                    ? {
+                        ...c,
+                        chatHistory: [...c.chatHistory, {
+                          id: c.chatHistory.length + 1,
+                          user: entry.user,
+                          assistant: entry.assistant,
+                          timestamp: ts,
+                          codeSnapshot: '',
+                          codeResult: event.code,
+                          agentCreated: entry.agent_created ?? true,
+                        }],
+                        historyOpen: true,
+                      }
+                    : c
+                ),
+              }))
+            }
             pushStep('cell_created', `셀 생성 · ${event.cell_name}`, event.code)
           } else if (event.type === 'cell_code_updated') {
             set({ agentStatus: '셀 재실행 중' })
             get().updateCellCode(event.cell_id, event.code)
+            if (event.agent_chat_entry) {
+              const entry = event.agent_chat_entry
+              const ts = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+              set((s) => ({
+                cells: s.cells.map((c) =>
+                  c.id === event.cell_id
+                    ? {
+                        ...c,
+                        chatHistory: [...c.chatHistory, {
+                          id: c.chatHistory.length + 1,
+                          user: entry.user,
+                          assistant: entry.assistant,
+                          timestamp: ts,
+                          codeSnapshot: entry.code_snapshot ?? '',
+                          codeResult: event.code,
+                          agentCreated: entry.agent_created ?? true,
+                        }],
+                        historyOpen: true,
+                      }
+                    : c
+                ),
+              }))
+            }
             pushStep('cell_created', '셀 코드 수정', event.code)
           } else if (event.type === 'cell_executed') {
             const executedAt = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
@@ -1482,6 +1569,35 @@ export const useAppStore = create<AppStore>((set, get) => ({
         },
         _agentController.signal,
       )
+      // 에이전트 완료 후 제목 재생성 — 첫 질문 + 에이전트 최종 응답을 함께 요약해 실제 작업 맥락이 반영된 제목으로 덮어쓴다.
+      // (초기 빠른 제목은 질문만으로 뽑은 것이라 "설정했어." 같은 짧은 질문에는 적절치 않음)
+      try {
+        const st = get()
+        const firstUserMsg = st.agentChatHistory.find((m) => m.role === 'user')?.content ?? ''
+        const lastAsstMsg = [...st.agentChatHistory]
+          .reverse()
+          .find((m) => m.role === 'assistant' && m.kind !== 'step' && m.content)?.content ?? ''
+        if (firstUserMsg.trim() && lastAsstMsg.trim()) {
+          const refined = await generateAgentSessionTitle(firstUserMsg, lastAsstMsg)
+          if (refined) {
+            const st2 = get()
+            // 사용자가 resume 로 다른 세션으로 전환했으면 현재 세션이 바뀌었을 수 있음 → 확인 후 반영.
+            if (st2.currentSessionId === st.currentSessionId) {
+              set({ agentSessionTitle: refined })
+              if (st2.notebookId && st2.currentSessionId && st2.currentSessionCreatedAtMs) {
+                saveCurrentSessionMeta(st2.notebookId, {
+                  id: st2.currentSessionId,
+                  createdAtMs: st2.currentSessionCreatedAtMs,
+                  title: refined,
+                })
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // 제목 재생성 실패는 조용히 무시 — 초기 제목이 그대로 유지됨.
+        console.warn('title refresh failed:', e)
+      }
     } catch (err) {
       const aborted = (err as { name?: string })?.name === 'AbortError'
       if (!aborted) console.error('Agent stream failed:', err)
@@ -1629,6 +1745,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     } else {
       set({ histories: remaining, historyMenuOpen: null })
     }
+
+    // 삭제되는 노트북의 세션 메타도 정리
+    saveCurrentSessionMeta(id, null)
 
     deleteNotebook(id).catch((err) => console.error('deleteHistory API failed:', err))
   },
@@ -1863,6 +1982,22 @@ function _applyNotebookDetail(detail: NotebookDetail, _isFirst: boolean) {
   const agentChatHistory = detail.agent_messages.flatMap(rowToAgentMsgs)
   const agentSessions = loadAgentSessions(detail.id)
 
+  // 현재 진행 중인 대화가 있으면 세션 메타를 복원/생성.
+  // - agent_history 가 비어있으면 (archive 후 새로 연 경우 등) currentSessionId 는 null.
+  // - agent_history 에 메시지가 있으면 sidebar 에 "현재 대화" 로 뜨도록 안정적 ID 를 부여한다.
+  let currentMeta = loadCurrentSessionMeta(detail.id)
+  if (agentChatHistory.length === 0) {
+    // 서버에 현재 대화가 없다 → 복원할 게 없으므로 메타도 정리.
+    if (currentMeta) {
+      saveCurrentSessionMeta(detail.id, null)
+      currentMeta = null
+    }
+  } else if (!currentMeta) {
+    // 서버엔 메시지가 있는데 프론트 메타가 없는 케이스 (다른 기기에서 만든 대화 등) → 새로 부여.
+    currentMeta = { id: generateId('as'), createdAtMs: Date.now(), title: null }
+    saveCurrentSessionMeta(detail.id, currentMeta)
+  }
+
   useAppStore.setState((s) => ({
     notebookId: detail.id,
     cells,
@@ -1872,9 +2007,9 @@ function _applyNotebookDetail(detail: NotebookDetail, _isFirst: boolean) {
     selectedMarts: detail.selected_marts,
     agentChatHistory,
     agentSessions,
-    agentSessionTitle: null,
-    currentSessionId: null,
-    currentSessionCreatedAtMs: null,
+    agentSessionTitle: currentMeta?.title ?? null,
+    currentSessionId: currentMeta?.id ?? null,
+    currentSessionCreatedAtMs: currentMeta?.createdAtMs ?? null,
     collapsedSessionIds: {},
     histories: s.histories.map((h) => ({ ...h, isCurrent: h.id === detail.id })),
   }))

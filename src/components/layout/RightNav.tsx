@@ -426,23 +426,33 @@ export default function RightNav() {
                               >
                                 <div className="flex items-center gap-1.5 px-2 py-1">
                                   <span className="text-[9px] font-mono text-text-disabled shrink-0">#{hIdx + 1}</span>
+                                  {entry.agentCreated && (
+                                    <span
+                                      title="에이전트가 만든 셀"
+                                      className="shrink-0 flex items-center justify-center w-4 h-4 rounded bg-primary/10 text-primary border border-primary/20"
+                                    >
+                                      <Telescope size={9} strokeWidth={2} />
+                                    </span>
+                                  )}
                                   <div className={cn('text-[10px] text-text-primary font-medium flex-1', expandedEntry === `${cell.id}-${entry.id}` ? 'whitespace-normal break-words' : 'truncate')}>{entry.user}</div>
                                   <div className="flex items-center gap-1 shrink-0">
-                                    <button
-                                      className="p-1 rounded text-text-disabled opacity-0 group-hover:opacity-100 transition-opacity hover:text-text-secondary hover:bg-chip"
-                                      title="이 메시지를 채팅 입력창에 불러오기"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setActiveCellId(cell.id)
-                                        setCellEditOrigin(cell.id, hIdx)
-                                        updateCellChatInput(cell.id, entry.user)
-                                        setTimeout(() => {
-                                          document.getElementById(cell.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                                        }, 50)
-                                      }}
-                                    >
-                                      <Pencil size={10} />
-                                    </button>
+                                    {!entry.agentCreated && (
+                                      <button
+                                        className="p-1 rounded text-text-disabled opacity-0 group-hover:opacity-100 transition-opacity hover:text-text-secondary hover:bg-chip"
+                                        title="이 메시지를 채팅 입력창에 불러오기"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setActiveCellId(cell.id)
+                                          setCellEditOrigin(cell.id, hIdx)
+                                          updateCellChatInput(cell.id, entry.user)
+                                          setTimeout(() => {
+                                            document.getElementById(cell.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                                          }, 50)
+                                        }}
+                                      >
+                                        <Pencil size={10} />
+                                      </button>
+                                    )}
                                     {isCurrent ? (
                                       <span className="text-[8px] font-semibold px-1 py-0.5 rounded border text-primary border-primary-border bg-surface">현재</span>
                                     ) : (

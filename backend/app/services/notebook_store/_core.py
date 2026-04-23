@@ -29,22 +29,31 @@ def _save_settings(data: dict) -> None:
 
 _settings = _load_settings()
 NOTEBOOKS_DIR = Path(_settings.get("notebooks_dir", str(Path.home() / "vibe-notebooks"))).expanduser().resolve()
-CONFIG_FILE = NOTEBOOKS_DIR / ".vibe_config.json"
+VIBE_DIR = NOTEBOOKS_DIR / ".vibe"
+CONFIG_FILE = VIBE_DIR / "config.json"
 
 
 # ── 초기화 ────────────────────────────────────────────────────────────────────
 
 def _ensure_dir() -> None:
     NOTEBOOKS_DIR.mkdir(parents=True, exist_ok=True)
+    VIBE_DIR.mkdir(parents=True, exist_ok=True)
+    # Windows에서 .vibe 폴더를 숨김 처리
+    import sys
+    if sys.platform == "win32":
+        import subprocess
+        subprocess.run(["attrib", "+h", str(VIBE_DIR)], capture_output=True)
 
 
 def set_notebooks_dir(new_path: str) -> Path:
     """노트북 저장 경로를 변경하고 설정 파일에 저장합니다."""
-    global NOTEBOOKS_DIR, CONFIG_FILE
+    global NOTEBOOKS_DIR, VIBE_DIR, CONFIG_FILE
     resolved = Path(new_path).expanduser().resolve()
     resolved.mkdir(parents=True, exist_ok=True)
     NOTEBOOKS_DIR = resolved
-    CONFIG_FILE = NOTEBOOKS_DIR / ".vibe_config.json"
+    VIBE_DIR = resolved / ".vibe"
+    CONFIG_FILE = VIBE_DIR / "config.json"
+    VIBE_DIR.mkdir(parents=True, exist_ok=True)
     _save_settings({**_load_settings(), "notebooks_dir": str(resolved)})
     # 경로 변경 시 요청 캐시는 무효화 (다른 디렉터리 컨텐츠 섞이지 않도록)
     cache = _request_cache.get()

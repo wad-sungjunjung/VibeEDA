@@ -111,6 +111,32 @@ export function saveAgentSessions(notebookId: string, sessions: import('@/types'
   } catch {}
 }
 
+// ── 현재(진행 중) 에이전트 세션 메타 ─────────────────────────────────────────
+// agent_history 는 서버에 append-only 로 쌓이는데, 세션 경계는 프론트(localStorage) 가 소유한다.
+// 노트북을 다시 열 때 "현재 대화"로 복원하려면 세션 ID/시작 시각/제목을 안정적으로 저장해두어야 한다.
+export type CurrentSessionMeta = {
+  id: string
+  createdAtMs: number
+  title: string | null
+}
+
+export function loadCurrentSessionMeta(notebookId: string): CurrentSessionMeta | null {
+  try {
+    const raw = localStorage.getItem(`vibe_agent_current_${notebookId}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed?.id || typeof parsed.createdAtMs !== 'number') return null
+    return { id: parsed.id, createdAtMs: parsed.createdAtMs, title: parsed.title ?? null }
+  } catch { return null }
+}
+
+export function saveCurrentSessionMeta(notebookId: string, meta: CurrentSessionMeta | null): void {
+  try {
+    if (meta === null) localStorage.removeItem(`vibe_agent_current_${notebookId}`)
+    else localStorage.setItem(`vibe_agent_current_${notebookId}`, JSON.stringify(meta))
+  } catch {}
+}
+
 // ── Agent tool → 한국어 상태 라벨 매핑 ─────────────────────────────────────
 export function toolStatusLabel(tool: string, input?: Record<string, unknown>): string {
   const cellType = typeof input?.cell_type === 'string' ? input.cell_type : ''
