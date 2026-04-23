@@ -196,6 +196,7 @@ const SheetEditor = forwardRef<SheetEditorHandle, Props>(function SheetEditor(
     const mount = document.createElement('div')
     mount.style.width = '100%'
     mount.style.height = '100%'
+    if (theme === 'dark') mount.classList.add('univer-dark')
     host.appendChild(mount)
 
     let univer: any = null
@@ -321,6 +322,7 @@ const SheetEditor = forwardRef<SheetEditorHandle, Props>(function SheetEditor(
       const created = createUniver({
         locale: LocaleType.KO_KR,
         locales: { [LocaleType.KO_KR]: mergeLocales(sheetsCoreKoKR as any) },
+        darkMode: theme === 'dark',
         presets: [
           UniverSheetsCorePreset({
             container: mount,

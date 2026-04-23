@@ -71,6 +71,9 @@ export type CellUiState = {
   vSplitRatio: number
   /** 사용자가 리사이즈 핸들로 드래그해 조정한 패널 높이(px). 미설정이면 기본 360. */
   panelHeight: number
+  activeTab: 'input' | 'output' | 'memo'
+  leftTab: 'input' | 'output' | 'memo'
+  rightTab: 'input' | 'output' | 'memo'
 }
 
 export function loadCellUi(cellId: string): Partial<CellUiState> {

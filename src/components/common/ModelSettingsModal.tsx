@@ -44,7 +44,7 @@ export default function ModelSettingsModal({ onClose }: Props) {
   const selectClass = 'w-full text-[12px] bg-bg-sidebar border border-border rounded-md px-3 py-2 outline-none focus:border-primary cursor-pointer'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <div className="bg-surface rounded-xl shadow-2xl w-[480px] max-w-[95vw] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">

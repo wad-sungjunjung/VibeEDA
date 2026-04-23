@@ -40,8 +40,9 @@ FastAPI 백엔드 (localhost:4750)
 | 런타임 | Python FastAPI (`backend/`) |
 | 저장소 | `.ipynb` 파일 (`~/vibe-notebooks/*.ipynb`) |
 | Vibe Chat | **기본 Gemini** (`gemini-2.5-flash`) 또는 Claude (`claude-haiku-4-5-20251001` / sonnet / opus). 프론트 `X-Vibe-Model` 헤더로 런타임 스위치. SSE streaming. |
-| Agent Mode | **기본 Claude Opus** (`claude-opus-4-7`) 또는 Gemini. 프론트 `X-Agent-Model` 헤더로 스위치. Tool use + SSE + 차트 PNG 이미지 블록 주입. 메모 강제 가드·반복 호출 가드 내장. 자세한 내부는 `docs/vibe-eda-agent-pipeline.md`. |
+| Agent Mode | **기본 Claude Opus** (`claude-opus-4-7`) 또는 Gemini. 프론트 `X-Agent-Model` 헤더로 스위치. Tool use + SSE + 차트 PNG 이미지 블록 주입. 메모 강제 가드·반복 호출 가드 내장. 에이전트 세션 연속성(세션 아카이브·복원) 지원. 자세한 내부는 `docs/vibe-eda-agent-pipeline.md`. |
 | Reporting | **기본 Claude Opus** (`DEFAULT_REPORT_MODEL`). 프론트 `X-Report-Model` 헤더로 스위치. SSE 스트리밍 Markdown 생성 → `reports/*.md` 저장. 차트는 `{id}_images/*.png` 상대 경로로 임베드. 자세한 내부는 `docs/vibe-eda-reporting-pipeline.md`. |
+| Sheet 셀 | UniverJS 기반 스프레드시트 셀. `sheet_snapshot.py`로 workbook JSON 생성·파싱, `sheet_vibe_service.py`로 자연어→JSON 패치 변환. |
 | 커널 | in-process Python exec (노트북별 namespace 유지), Plotly Figure 출력 시 600×400 PNG 자동 렌더 (`kaleido` 필요) |
 | SQL 실행 | Snowflake Python Connector (externalbrowser SSO, 세션 싱글톤) |
 | MCP 서버 | `backend/app/api/mcp_server.py` (Claude Code 연동) |
@@ -52,38 +53,44 @@ FastAPI 백엔드 (localhost:4750)
 |---|---|
 | 노트북 (셀 코드, 출력, 차트 PNG base64) | `~/vibe-notebooks/{title}.ipynb` |
 | 채팅 히스토리 | 동일 `.ipynb` → `metadata.vibe.chat_history` |
-| 에이전트 히스토리 | 동일 `.ipynb` → `metadata.vibe.agent_history` |
+| 에이전트 히스토리 | 동일 `.ipynb` → `metadata.vibe.agent_history` (현재 세션만; 아카이브 후 비워짐) |
+| 에이전트 세션 목록 | 프론트 localStorage (`vibe_agent_sessions_{notebookId}`) |
+| 현재 세션 메타 | 프론트 localStorage (`vibe_current_session_{notebookId}`) |
 | 리포트 참조 포인터 | 동일 `.ipynb` → `metadata.vibe.reports[]` |
 | 리포트 본문 (`.md`) | `~/vibe-notebooks/reports/{YYYYMMDD_HHMMSS}_{slug}.md` (YAML frontmatter + Markdown) |
 | 리포트 이미지 | `~/vibe-notebooks/reports/{report_id}_images/*.png` |
-| 폴더 메타데이터 | `~/vibe-notebooks/.vibe_config.json` |
+| 폴더/파일 트리 메타 | `~/vibe-notebooks/.vibe_config.json` |
+| 카테고리 컬럼 캐시 | `~/vibe-notebooks/.vibe/.categories_cache.json` |
+| 로컬 파일 프로파일 캐시 | `~/vibe-notebooks/.files_profile_cache.json` |
 
 ## 폴더 구조
 
 ```
 src/
 ├── components/
-│   ├── layout/          # LeftSidebar (히스토리 + 리포트 목록), TopMetaHeader, RightNav, CellAddBar
-│   ├── cells/           # NotebookArea, CellContainer, CellOutput, CodeEditor
+│   ├── layout/          # LeftSidebar (파일트리 + 히스토리 + 리포트), TopMetaHeader, RightNav, CellAddBar
+│   ├── cells/           # NotebookArea, CellContainer, CellOutput, CodeEditor, SheetEditor
 │   ├── agent/           # AgentFAB, AgentChatPanel
 │   ├── reporting/       # ReportModal (목표+모델+셀 선택), ReportResult (진행 단계 · Markdown 렌더)
-│   └── common/          # RollbackToast, ModelSettingsModal, ShortcutsModal,
-│                        # SnowflakeConnectionGuard, ConnectionModal, Markdown
+│   └── common/          # RollbackToast, ModelSettingsModal, ShortcutsModal, HelpModal,
+│                        # SnowflakeConnectionGuard, ConnectionModal, Markdown, UserGuideModal
 ├── store/
-│   ├── useAppStore.ts     # 모든 전역 상태 (Zustand) — 리포트 스트림·리스트 상태 포함
+│   ├── useAppStore.ts     # 모든 전역 상태 (Zustand) — 에이전트 세션·리포트 스트림 포함
 │   ├── modelStore.ts      # API 키 + vibe/agent/report 모델 선택 (localStorage persist)
 │   └── connectionStore.ts # Snowflake 연결 정보 (localStorage persist)
 ├── lib/
-│   ├── utils.ts
+│   ├── utils.ts           # loadAgentSessions/saveAgentSessions/loadCurrentSessionMeta 등 세션 헬퍼 포함
 │   ├── snowflakeTheme.ts
-│   └── api.ts           # 백엔드 API 클라이언트 (SSE 스트리밍) + API_BASE_URL export
-├── types/index.ts
+│   └── api.ts             # 백엔드 API 클라이언트 (SSE 스트리밍) + FileNode 타입 + archiveAgentHistory
+├── types/index.ts         # CellType('sheet' 포함), AgentSession, AgentBlock 등
 └── data/
     ├── marts.ts
     └── mockNotebook.ts
 
 backend/
-├── main.py                # FastAPI 앱 + /healthz + /v1/system/* + notebooks-dir + 라우터 등록
+├── main.py                # FastAPI 앱 + /healthz + /v1/system/{info,open-folder,notebooks-dir} + 라우터 등록
+│                          # 요청 스코프 노트북 파일 캐시 미들웨어 (SSE 엔드포인트는 캐시 제외)
+│                          # 카테고리 캐시 30분 주기 갱신 스케줄러
 ├── requirements.txt       # fastapi/anthropic/google-genai/pandas/plotly/kaleido/snowflake-connector 등
 ├── .env / .env.example
 └── app/
@@ -95,8 +102,11 @@ backend/
     │   ├── notebooks.py   # GET/POST/PATCH/DELETE /notebooks[/{id}]
     │   ├── cells.py       # POST/PATCH/DELETE /notebooks/{id}/cells[/{cid}]
     │   │                  # + chat/{index} DELETE, chat/truncate POST
-    │   ├── vibe.py        # POST /vibe (Gemini/Claude 스트리밍)
+    │   ├── vibe.py        # POST /vibe (Gemini/Claude 스트리밍), POST /vibe/sheet (Sheet 셀 전용)
     │   ├── agent.py       # POST /agent/stream, POST /agent/title
+    │   │                  # POST /notebooks/{id}/agent/archive (세션 아카이브)
+    │   ├── files.py       # GET /files/tree, POST /files/mkdir|move|rename|delete|upload
+    │   │                  # (루트 폴더 통합 파일 트리 — ipynb·report·일반 파일·디렉터리)
     │   ├── execute.py     # POST /execute/{cell_id}, DELETE /kernel/{nb_id}
     │   ├── folders.py     # /folders CRUD
     │   ├── marts.py       # GET /marts
@@ -105,14 +115,30 @@ backend/
     │   ├── report.py      # POST /reports/stream, GET /reports[/{id}[/assets/{f}]], DELETE /reports/{id}
     │   └── mcp_server.py  # MCP 서버 (Claude Code 연동, 별도 프로세스)
     └── services/
-        ├── notebook_store.py      # .ipynb 파일 CRUD 핵심, 폴더 · reports[] 참조 관리
+        ├── notebook_store/        # .ipynb 파일 CRUD 패키지 (리팩터 후 서브모듈 분리)
+        │   ├── __init__.py        # 외부 진입점 — 이전과 동일한 네임스페이스 유지
+        │   ├── _core.py           # NOTEBOOKS_DIR, _read_nb/_write_nb, request_cache_scope
+        │   ├── _notebooks.py      # list/create/get/update/delete_notebook, create_onboarding_notebook
+        │   ├── _cells.py          # create/update/delete_cell, get_cell_above_name
+        │   ├── _history.py        # add/delete/truncate chat + add/clear agent history
+        │   ├── _folders.py        # list/create/update/delete_folder
+        │   ├── _formatters.py     # _parse_output (출력 포맷 변환)
+        │   └── _onboarding_data.py # 온보딩 노트북 초기 데이터
+        ├── agent_tools.py         # Claude/Gemini 공용 tool 스펙 단일 소스 + Gemini 변환 헬퍼
+        ├── agent_events.py        # 에이전트 SSE 이벤트 타입 단일 소스 (프론트 AgentEvent union 과 동기화)
+        ├── agent_skills.py        # 분석가 마인드셋 스킬 모듈 (플래닝·가설·에러 회복·출력 비평 등)
+        ├── claude_agent.py        # Claude Agent tool loop (NotebookState, agent_skills 통합)
+        ├── claude_vibe_service.py # Claude Vibe Chat
+        ├── gemini_agent_service.py # Gemini Agent tool loop (agent_tools/_execute_tool 공유)
+        ├── gemini_service.py      # Gemini Vibe Chat
+        ├── sheet_snapshot.py      # UniverJS workbook JSON 생성·파싱 헬퍼 (SheetEditor 와 동기화 필수)
+        ├── sheet_vibe_service.py  # Sheet 셀 자연어→JSON 패치 변환 (Claude/Gemini)
+        ├── vibe_prompts.py        # Vibe Chat 공용 프롬프트·포스트프로세싱 헬퍼 (clean_code 등)
+        ├── report_service.py      # 리포트 evidence 빌드 · LLM 스트림(Claude/Gemini 분리) · 후처리 · 파일 저장
         ├── kernel.py              # Python 커널 (exec 기반) + Plotly → PNG(kaleido) 렌더
         ├── snowflake_session.py   # Snowflake 세션 싱글톤
-        ├── claude_agent.py        # Claude Agent tool loop (10개 tool, 메모 가드 포함)
-        ├── claude_vibe_service.py # Claude Vibe Chat
-        ├── gemini_agent_service.py # Gemini Agent tool loop (claude_agent 와 _execute_tool 공유)
-        ├── gemini_service.py      # Gemini Vibe Chat
-        ├── report_service.py      # 리포트 evidence 빌드 · LLM 스트림(Claude/Gemini 분리) · 후처리 · 파일 저장
+        ├── category_cache.py      # _status/_type 컬럼 distinct 값 캐시 (`.vibe/.categories_cache.json`)
+        ├── file_profile_cache.py  # 로컬 CSV/TSV/Parquet/Excel 스키마·카테고리 캐시
         ├── mart_tools.py          # get_mart_schema / preview_mart / profile_mart
         ├── naming.py              # snake_case 셀명 새니타이저
         └── code_style.py          # SQL/Python 스타일 가이드 텍스트
@@ -158,6 +184,7 @@ Tailwind `darkMode: 'class'`, `<html>.dark` 클래스 토글로 전환.
 - 클래스 조합은 **`cn()`** 유틸 사용
 - 스크롤 영역에는 **`.hide-scrollbar`** 클래스
 - 모든 아이콘-only 버튼에 **`title` 속성** 필수
+- **모달 z-index**: 모달 backdrop은 반드시 `z-[130]` 이상 사용 (RightNav `z-[110]`, AgentChatPanel `z-[115]`, AgentFAB `z-[120]` 보다 높아야 함)
 
 ## 개발 실행
 
@@ -223,12 +250,13 @@ python -m app.api.mcp_server
       "cell_type": "code",
       "source": "SELECT ...",
       "metadata": {
-        "vibe_type": "sql",
+        "vibe_type": "sql",          // "sql" | "python" | "markdown" | "sheet"
         "vibe_name": "query_1",
         "vibe_memo": "",
         "vibe_ordering": 1000.0,
         "vibe_agent_generated": false,
-        "vibe_insight": ""
+        "vibe_insight": "",
+        "vibe_sheet_data": { ... }   // sheet 셀 전용: UniverJS IWorkbookData JSON
       },
       "outputs": [
         {
@@ -262,7 +290,7 @@ fig = px.bar(query_1, x='region', y='revenue')
 | M2: LLM 연동 (Vibe Chat + Agent, Claude/Gemini 이중) | ✅ 완료 |
 | M3: 실행 엔진 (.ipynb + Python 커널 + Snowflake) | ✅ 완료 |
 | M4: Claude Code MCP 연동 | ✅ 완료 |
-| M5: 에이전트 모드 고도화 (ask_user, 메모 강제 가드, 차트 이미지 tool_result) | 🟡 진행 중 |
+| M5: 에이전트 모드 고도화 (ask_user, 메모 강제 가드, 차트 이미지, 세션 연속성, per-cell 나레이션) | 🟡 진행 중 |
 | M6: 리포팅 파이프라인 (LLM 기반 Markdown + 차트 임베드) | ✅ 완료 (HTML/PDF 포맷 확장은 추후) |
 | M7: 파일럿 (5명 내부 테스트) | 예정 |
 

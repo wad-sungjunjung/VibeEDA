@@ -186,7 +186,7 @@ export default function ConnectionModal({ onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <div className="bg-surface rounded-xl shadow-2xl w-[520px] max-w-[95vw] flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">

@@ -104,6 +104,7 @@ export default function CellContainer({ cell }: Props) {
   useEffect(() => { saveCellUi(cell.id, { vSplitRatio }) }, [cell.id, vSplitRatio])
   useEffect(() => { saveCellUi(cell.id, { panelHeight }) }, [cell.id, panelHeight])
   useEffect(() => { saveCellUi(cell.id, { splitMode: cell.splitMode, splitDir: cell.splitDir }) }, [cell.id, cell.splitMode, cell.splitDir])
+  useEffect(() => { saveCellUi(cell.id, { activeTab: cell.activeTab, leftTab: cell.leftTab, rightTab: cell.rightTab }) }, [cell.id, cell.activeTab, cell.leftTab, cell.rightTab])
   const [elapsedSecs, setElapsedSecs] = useState(0)
   const [vibeElapsed, setVibeElapsed] = useState(0) // 0.1s 단위
   const fullscreen = fullscreenCellId === cell.id

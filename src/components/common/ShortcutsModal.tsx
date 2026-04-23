@@ -63,7 +63,7 @@ function Kbd({ label }: { label: string }) {
 
 export default function ShortcutsModal({ onClose }: Props) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
       <div
         className="bg-surface rounded-xl shadow-2xl w-[500px] max-w-[95vw] flex flex-col max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}

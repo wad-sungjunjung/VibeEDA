@@ -135,16 +135,27 @@ export default function RightNav() {
     setNavDrop(null)
   }
 
-  const [sidebarWidth, setSidebarWidth] = useState(256)
-  // 전체화면 셀이 우측 사이드바 폭을 알 수 있도록 CSS 변수로 노출
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try { return Number(localStorage.getItem('vibe_rnav_width')) || 256 } catch { return 256 }
+  })
   useEffect(() => {
+    try { localStorage.setItem('vibe_rnav_width', String(sidebarWidth)) } catch {}
     document.documentElement.style.setProperty('--right-nav-width', `${sidebarWidth}px`)
     return () => {
       document.documentElement.style.setProperty('--right-nav-width', '256px')
     }
   }, [sidebarWidth])
   // heights[0]=data%, heights[1]=nav%, heights[2]=agent%
-  const [sections, setSections] = useState([20, 42, 38])
+  const [sections, setSections] = useState<number[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('vibe_rnav_sections') || 'null')
+      if (Array.isArray(saved) && saved.length === 3) return saved
+    } catch {}
+    return [20, 42, 38]
+  })
+  useEffect(() => {
+    try { localStorage.setItem('vibe_rnav_sections', JSON.stringify(sections)) } catch {}
+  }, [sections])
 
   const asideRef = useRef<HTMLElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -352,7 +363,7 @@ export default function RightNav() {
                       navDragId === cell.id ? 'opacity-40' :
                       activeCellId === cell.id
                         ? 'border-primary-border bg-primary-light'
-                        : 'border-transparent hover:bg-bg-sidebar'
+                        : 'border-border bg-surface hover:border-primary/30 hover:bg-primary-light/20'
                     )}
                     onClick={() => {
                       if (activeCellId === cell.id && cell.chatHistory.length > 0) {
@@ -406,11 +417,16 @@ export default function RightNav() {
                   </div>
 
                   {cell.chatHistory.length > 0 && cell.historyOpen && (() => {
-                    // "현재" 배지: 활성 엔트리가 지정되어 있으면 그 항목, 아니면 마지막 항목.
+                    // "현재" 배지: 활성 셀일 때만 표시.
+                    // 명시적 activeEntryId가 있으면 그 항목, 없으면 마지막 항목.
+                    // 비활성 셀에서는 어떤 항목도 강조하지 않는다.
+                    const isActiveCell = cell.id === activeCellId
                     const activeId = cellActiveEntryId[cell.id] ?? null
-                    const activeIdx = activeId !== null
-                      ? cell.chatHistory.findIndex((e) => e.id === activeId)
-                      : cell.chatHistory.length - 1
+                    const activeIdx = isActiveCell
+                      ? (activeId !== null
+                          ? cell.chatHistory.findIndex((e) => e.id === activeId)
+                          : cell.chatHistory.length - 1)
+                      : -1
                     return (
                     <div className="ml-3 pl-2 border-l-2 border-border-subtle mt-1 space-y-1.5 pb-2">
                           {cell.chatHistory.map((entry, hIdx) => {
@@ -420,7 +436,7 @@ export default function RightNav() {
                                 key={entry.id}
                                 className={cn(
                                   'group relative rounded-md border cursor-pointer transition-all',
-                                  isCurrent ? 'bg-primary-light border-primary-border' : 'bg-surface border-border'
+                                  isCurrent ? 'bg-primary-light border-primary-border' : 'border-transparent hover:bg-chip'
                                 )}
                                 onClick={() => setExpandedEntry(expandedEntry === `${cell.id}-${entry.id}` ? null : `${cell.id}-${entry.id}`)}
                               >
