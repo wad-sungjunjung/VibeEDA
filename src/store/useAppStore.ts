@@ -9,6 +9,7 @@ import type {
   Folder,
   MartMeta,
   ToastData,
+  ImageAttachment,
 } from '@/types'
 import {
   generateId,
@@ -307,6 +308,7 @@ interface AppStore {
   executeCell: (id: string) => Promise<void>
   executeAllCells: () => Promise<void>
   updateCellChatInput: (id: string, input: string) => void
+  updateCellChatImages: (id: string, images: ImageAttachment[]) => void
   cellEditOrigins: Record<string, number>
   setCellEditOrigin: (cellId: string, idx: number | null) => void
   cellActiveEntryId: Record<string, number | null>
@@ -321,6 +323,8 @@ interface AppStore {
   // ── Agent mode ─────────────────────────────────────────────────────────────
   agentMode: boolean
   agentChatInput: string
+  agentChatImages: ImageAttachment[]
+  setAgentChatImages: (images: ImageAttachment[]) => void
   agentChatHistory: AgentMessage[]
   agentSessions: AgentSession[]
   agentSessionTitle: string | null
@@ -680,6 +684,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       executedAt: null,
       output: null,
       chatInput: '',
+      chatImages: [],
       chatHistory: [],
       historyOpen: false,
       insight: null,
@@ -871,9 +876,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
         ),
       }))
     } catch (err) {
+      const { ApiError } = await import('@/lib/api')
+      const { toast } = await import('@/store/useToastStore')
+      const detail = err instanceof ApiError ? err.detail : String(err)
+      const cell = get().cells.find((c) => c.id === id)
+      toast.error(`셀 실행 실패${cell?.name ? ` — ${cell.name}` : ''}`, detail)
       const errOutput: import('@/types').CellOutput = {
         type: 'error',
-        message: String(err),
+        message: detail,
       }
       const executedAt = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
       set((s) => ({

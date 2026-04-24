@@ -13,6 +13,7 @@ import ApiKeyGuard from '@/components/common/ApiKeyGuard'
 import ReportModal from '@/components/reporting/ReportModal'
 import ReportResult from '@/components/reporting/ReportResult'
 import CellTypePicker from '@/components/common/CellTypePicker'
+import ToastHost from '@/components/common/ToastHost'
 import { useAppStore } from '@/store/useAppStore'
 import { useModelStore } from '@/store/modelStore'
 
@@ -296,6 +297,7 @@ export default function App() {
       {notebookId !== null && <AgentFAB />}
       {agentMode && <AgentChatPanel />}
       <RollbackToast />
+      <ToastHost />
       <SnowflakeConnectionGuard />
       <ApiKeyGuard />
 

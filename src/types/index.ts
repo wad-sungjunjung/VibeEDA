@@ -1,5 +1,12 @@
 // ─── Cell ──────────────────────────────────────────────────────────────────
 
+export interface ImageAttachment {
+  id: string
+  mediaType: string
+  data: string       // base64 (data URL prefix 제외)
+  previewUrl: string // data URL (미리보기용)
+}
+
 export type CellType = 'sql' | 'python' | 'markdown' | 'sheet'
 export type CellPanelTab = 'input' | 'output' | 'memo'
 export type CellTab = CellPanelTab
@@ -47,6 +54,7 @@ export interface Cell {
   executedAt: string | null
   output: CellOutput | null
   chatInput: string
+  chatImages: ImageAttachment[]
   chatHistory: ChatEntry[]
   historyOpen: boolean
   insight: string | null

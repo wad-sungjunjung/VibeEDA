@@ -114,17 +114,67 @@ function getLLMHeaders(): Record<string, string> {
   return headers
 }
 
+export class ApiError extends Error {
+  status: number
+  detail: string
+  rawBody: string
+  method: string
+  path: string
+  constructor(init: { status: number; detail: string; rawBody: string; method: string; path: string }) {
+    super(init.detail || `API ${init.method} ${init.path} → ${init.status}`)
+    this.name = 'ApiError'
+    this.status = init.status
+    this.detail = init.detail
+    this.rawBody = init.rawBody
+    this.method = init.method
+    this.path = init.path
+  }
+  // 네트워크 단절/도달 불가 등 fetch 자체가 실패한 경우
+  static networkFailure(method: string, path: string, cause: unknown): ApiError {
+    const msg = cause instanceof Error ? cause.message : String(cause)
+    return new ApiError({
+      status: 0,
+      detail: `서버에 연결할 수 없습니다 (${msg})`,
+      rawBody: '',
+      method,
+      path,
+    })
+  }
+}
+
 async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...((options.headers as Record<string, string>) ?? {}) },
-    ...options,
-  })
+  const method = options.method ?? 'GET'
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json', ...((options.headers as Record<string, string>) ?? {}) },
+      ...options,
+    })
+  } catch (e) {
+    throw ApiError.networkFailure(method, path, e)
+  }
   if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`API ${options.method ?? 'GET'} ${path} → ${res.status}: ${text}`)
+    const rawBody = await res.text().catch(() => '')
+    let detail = ''
+    try {
+      const parsed = JSON.parse(rawBody)
+      if (parsed && typeof parsed === 'object') {
+        // FastAPI 표준: { "detail": "..." } 또는 detail 이 배열(validation) 일 수 있음
+        if (typeof parsed.detail === 'string') detail = parsed.detail
+        else if (Array.isArray(parsed.detail)) {
+          detail = parsed.detail
+            .map((d: { msg?: string; loc?: string[] }) => d.msg ?? JSON.stringify(d))
+            .join('; ')
+        } else if (parsed.detail) detail = JSON.stringify(parsed.detail)
+      }
+    } catch {
+      // JSON 파싱 실패 — rawBody 그대로
+    }
+    if (!detail) detail = rawBody || `요청 실패 (HTTP ${res.status})`
+    throw new ApiError({ status: res.status, detail, rawBody, method, path })
   }
   return res.json() as Promise<T>
 }
@@ -269,6 +319,12 @@ export const executeCell = (cellId: string, notebookId: string) =>
 export const resetKernel = (notebookId: string) =>
   apiFetch<{ ok: boolean }>(`/kernel/${notebookId}`, { method: 'DELETE' })
 
+export const exportFullTable = (notebookId: string, cellId: string) =>
+  apiFetch<{ columns: { name: string }[]; rows: unknown[][]; rowCount: number }>(
+    `/execute/${notebookId}/${cellId}/export`,
+    { method: 'GET' }
+  )
+
 // ─── Vibe chat ────────────────────────────────────────────────────────────────
 
 export interface VibeMartMeta {
@@ -286,6 +342,7 @@ export interface VibeRequest {
   mart_metadata?: VibeMartMeta[]
   analysis_theme: string
   notebook_id?: string | null
+  images?: { media_type: string; data: string }[]
 }
 
 export async function streamVibeChat(
@@ -354,6 +411,7 @@ export interface AgentRequest {
   analysis_description: string
   conversation_history: { role: 'user' | 'assistant'; content: string }[]
   notebook_id?: string | null
+  images?: { media_type: string; data: string }[]
 }
 
 export async function generateAgentSessionTitle(question: string, response?: string): Promise<string> {
