@@ -1,11 +1,12 @@
 import { useRef, useEffect, useState } from 'react'
-import { Telescope, X, User, ArrowUp, Plus, FileCode, Search, SquarePen, ChevronDown, ChevronRight, Loader2, Wrench, FileCode2, PlayCircle, StickyNote, AlertTriangle, StopCircle } from 'lucide-react'
+import { Telescope, X, User, ArrowUp, Plus, FileCode, Search, SquarePen, ChevronDown, ChevronRight, Loader2, Wrench, FileCode2, PlayCircle, StickyNote, AlertTriangle, StopCircle, Paperclip } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useModelStore, AGENT_MODELS, getModelContextWindow } from '@/store/modelStore'
 import { useConnectionStore } from '@/store/connectionStore'
 import { cn } from '@/lib/utils'
 import Markdown from '@/components/common/Markdown'
+import type { ImageAttachment } from '@/types'
 
 // 스텝 타입별 아이콘/색. 색은 tailwind 시맨틱 클래스로 — 다크모드 자동 대응.
 const STEP_ICONS: Record<string, { icon: typeof Wrench; className: string }> = {
@@ -21,12 +22,14 @@ export default function AgentChatPanel() {
     cells,
     agentChatHistory,
     agentChatInput,
+    agentChatImages,
     agentRefCells,
     agentLoading,
     agentStartedAtMs,
     agentStatus,
     toggleAgentMode,
     setAgentChatInput,
+    setAgentChatImages,
     submitAgentMessage,
     cancelAgent,
     toggleAgentRefCell,
@@ -35,12 +38,14 @@ export default function AgentChatPanel() {
     cells: s.cells,
     agentChatHistory: s.agentChatHistory,
     agentChatInput: s.agentChatInput,
+    agentChatImages: s.agentChatImages,
     agentRefCells: s.agentRefCells,
     agentLoading: s.agentLoading,
     agentStartedAtMs: s.agentStartedAtMs,
     agentStatus: s.agentStatus,
     toggleAgentMode: s.toggleAgentMode,
     setAgentChatInput: s.setAgentChatInput,
+    setAgentChatImages: s.setAgentChatImages,
     submitAgentMessage: s.submitAgentMessage,
     cancelAgent: s.cancelAgent,
     toggleAgentRefCell: s.toggleAgentRefCell,
@@ -64,6 +69,23 @@ export default function AgentChatPanel() {
   const displayName = sfUser ? sfUser.split('@')[0] : '하우'
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const agentImageInputRef = useRef<HTMLInputElement>(null)
+  const handleAgentImageFiles = (files: FileList | File[] | null) => {
+    if (!files) return
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) return
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string
+        const [header, data] = dataUrl.split(',')
+        const mediaType = header.replace('data:', '').replace(';base64', '')
+        const img: ImageAttachment = { id: crypto.randomUUID(), mediaType, data, previewUrl: dataUrl }
+        setAgentChatImages([...(agentChatImages ?? []), img])
+      }
+      reader.readAsDataURL(file)
+    })
+    if (agentImageInputRef.current) agentImageInputRef.current.value = ''
+  }
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const pickerInputRef = useRef<HTMLInputElement>(null)
@@ -575,6 +597,31 @@ export default function AgentChatPanel() {
           className="relative rounded-2xl border border-border shadow-sm"
           style={{ backgroundColor: 'rgb(var(--color-surface-hover))' }}
         >
+          {/* 이미지 미리보기 */}
+          {(agentChatImages ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
+              {(agentChatImages ?? []).map((img) => (
+                <div key={img.id} className="relative group/img">
+                  <img src={img.previewUrl} alt="" className="w-12 h-12 object-cover rounded-lg border border-border" />
+                  <button
+                    title="이미지 제거"
+                    onClick={() => setAgentChatImages((agentChatImages ?? []).filter((i) => i.id !== img.id))}
+                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-surface border border-border flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                  >
+                    <X size={9} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <input
+            ref={agentImageInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => handleAgentImageFiles(e.target.files)}
+          />
           <textarea
             className="w-full bg-transparent text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none resize-none leading-relaxed overflow-hidden rounded-2xl"
             style={{ minHeight: '56px', height: '56px', padding: '10px 48px 28px 16px' }}
@@ -592,8 +639,17 @@ export default function AgentChatPanel() {
                 e.currentTarget.style.height = '56px'
               }
             }}
+            onPaste={(e) => {
+              const imageFiles = Array.from(e.clipboardData.items)
+                .filter((item) => item.type.startsWith('image/'))
+                .map((item) => item.getAsFile())
+                .filter((f): f is File => f !== null)
+              if (imageFiles.length === 0) return
+              e.preventDefault()
+              handleAgentImageFiles(imageFiles)
+            }}
           />
-          <div className="absolute left-3 bottom-2.5 flex items-center gap-1" style={{ zIndex: 10 }}>
+          <div className="absolute left-3 bottom-2.5 flex items-center gap-1.5" style={{ zIndex: 10 }}>
             <div className="relative flex items-center">
               <select
                 value={agentModel}
@@ -604,6 +660,14 @@ export default function AgentChatPanel() {
               </select>
               <ChevronDown size={9} className="absolute right-0 pointer-events-none text-text-disabled" />
             </div>
+            <button
+              title="이미지 첨부"
+              disabled={agentLoading}
+              onClick={() => agentImageInputRef.current?.click()}
+              className="flex items-center justify-center text-text-disabled hover:text-text-secondary transition-colors disabled:cursor-not-allowed"
+            >
+              <Paperclip size={11} />
+            </button>
           </div>
           <button
             title="전송"

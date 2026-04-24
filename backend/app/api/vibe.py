@@ -30,6 +30,10 @@ class VibeMartMeta(BaseModel):
     description: str = ""
     columns: list[MartColumnMeta] = []
 
+class ImageBlock(BaseModel):
+    media_type: str
+    data: str  # base64
+
 class VibeRequest(BaseModel):
     cell_id: str
     cell_type: Literal["sql", "python", "markdown"]
@@ -39,6 +43,9 @@ class VibeRequest(BaseModel):
     mart_metadata: list[VibeMartMeta] = []
     analysis_theme: str = ""
     notebook_id: Optional[str] = None
+    images: list[ImageBlock] = []
+    # 직전 실행 결과 요약 (에러 메시지 / 테이블 스키마 등) — 사용자가 "같은 오류 수정" 등으로 요청 시 맥락 제공
+    current_output_summary: str = ""
 
 
 @router.post("/vibe")
@@ -76,6 +83,8 @@ async def vibe_endpoint(
             analysis_theme=req.analysis_theme,
             df_summaries=df_summaries,
             cell_above_name=cell_above_name,
+            images=[{"media_type": img.media_type, "data": img.data} for img in req.images],
+            current_output_summary=req.current_output_summary,
         ):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             if event.get("type") == "complete":

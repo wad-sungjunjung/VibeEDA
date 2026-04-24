@@ -113,5 +113,9 @@ def build_markdown_system(analysis_theme: str) -> str:
     )
 
 
-def build_user_prompt(current_code: str, message: str) -> str:
-    return f"[현재 코드]\n{current_code}\n\n[요청]\n{message}"
+def build_user_prompt(current_code: str, message: str, current_output_summary: str = "") -> str:
+    blocks = [f"[현재 코드]\n{current_code}"]
+    if current_output_summary and current_output_summary.strip():
+        blocks.append(f"[직전 실행 결과]\n{current_output_summary.strip()}")
+    blocks.append(f"[요청]\n{message}")
+    return "\n\n".join(blocks)

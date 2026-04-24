@@ -1,6 +1,35 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import type { CellType } from '@/types'
+import type { CellType, CellOutput } from '@/types'
+
+/**
+ * Vibe Chat 에 넘길 "직전 실행 결과" 요약 문자열 생성.
+ * 에러는 전체 메시지, 테이블은 스키마 + 행수, stdout 은 앞 1000자 등 맥락은 유지하되 토큰은 절약.
+ */
+export function summarizeCellOutput(output: CellOutput | null | undefined): string {
+  if (!output) return ''
+  switch (output.type) {
+    case 'error':
+      return `실행 실패\n${output.message ?? '(메시지 없음)'}`
+    case 'table': {
+      const cols = (output.columns ?? []).map((c) => `${c.name}(${c.type})`).join(', ')
+      const n = output.rowCount ?? output.rows?.length ?? 0
+      const truncated = output.truncated ? ' — 상위 500행만 반환' : ''
+      return `테이블 결과 · ${n.toLocaleString('ko-KR')}행${truncated}\n컬럼: ${cols}`
+    }
+    case 'chart':
+      return `차트 결과 (${output.chartType ?? 'plotly'}) — 렌더링 완료`
+    case 'stdout': {
+      const c = (output.content ?? '').trim()
+      if (!c) return '출력 없음'
+      return `표준 출력:\n${c.length > 1200 ? c.slice(0, 1200) + '\n…(중략)' : c}`
+    }
+    case 'markdown':
+      return ''
+    default:
+      return ''
+  }
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))

@@ -32,12 +32,14 @@ const SECTIONS = [
       { keys: ['Ctrl', 'B'], desc: '셀 추가 (타입 선택 팝업)' },
       { keys: ['← →', 'Enter'], desc: '팝업 내 타입 선택 · 확인 (1~4 키로 바로 선택)' },
       { keys: ['Ctrl', 'G'], desc: '에이전트 모드 토글' },
+      { keys: ['Ctrl', 'Shift', 'F'], desc: '활성 셀 전체화면 토글' },
     ],
   },
   {
     title: '패널 탐색 (커맨드 모드)',
     shortcuts: [
       { keys: ['↑', '↓'], desc: '이전/다음 패널 선택 (입력·출력·메모·바이브챗)' },
+      { keys: ['←', '→'], desc: '선택된 패널의 탭 전환 (입력 ↔ 출력 ↔ 메모)' },
       { keys: ['Enter'], desc: '선택된 패널 편집기로 진입' },
       { keys: ['Esc'], desc: '편집기에서 커맨드 모드로 복귀' },
       { keys: ['Alt', '↑/↓'], desc: '활성 셀을 위/아래로 순서 이동' },
@@ -48,6 +50,13 @@ const SECTIONS = [
     shortcuts: [
       { keys: ['▶ 버튼'], desc: '현재 셀 실행 (헤더 호버 시)' },
       { keys: ['모두 실행 버튼'], desc: '모든 SQL/Python 셀 순서대로 실행' },
+    ],
+  },
+  {
+    title: '시트 셀',
+    shortcuts: [
+      { keys: ['Ctrl', 'C'], desc: '복사 (서식 복사 원본 지정)' },
+      { keys: ['Ctrl', 'Alt', 'V'], desc: '서식만 붙여넣기' },
     ],
   },
   {

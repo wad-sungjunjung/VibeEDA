@@ -343,6 +343,8 @@ export interface VibeRequest {
   analysis_theme: string
   notebook_id?: string | null
   images?: { media_type: string; data: string }[]
+  // 직전 실행 결과 요약 — 에러 메시지 / 결과 스키마 / stdout 등. "같은 오류 수정해줘" 같은 요청에 맥락 제공.
+  current_output_summary?: string
 }
 
 export async function streamVibeChat(

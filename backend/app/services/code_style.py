@@ -21,6 +21,12 @@ WHERE / CASE WHEN 의 문자열 리터럴은 **시스템 프롬프트 "카테고
   - **Agent 모드**: `get_category_values` tool 로 먼저 확인 → 그래도 불확실하면 `ask_user`
   - **Vibe Chat 모드**: 추측하지 말고 **해당 필터를 제거**하거나, 주석으로 `-- ⚠️ 값 확인 필요` 를 남기고 결과에 원본 컬럼을 포함해 사용자가 눈으로 확인할 수 있게 함
 
+### 0-B. 🗂 테이블 참조는 기본 스키마(`wad_dw_prod.mart`)로 완전 수식
+- 시스템에 제공된 "Available marts" 의 테이블은 **반드시 `wad_dw_prod.mart.<table>` 형태**로 완전 수식하여 사용 (FROM / JOIN 모두)
+  - 예: `from wad_dw_prod.mart.fact_reservation as fr`
+- 목록에 없는 **다른 스키마/DB(`raw`, `common`, `prod`, `analytics` 등) 는 절대 참조 금지** — 추측해서 외부 스키마 테이블을 호출하지 말 것. 필요한 데이터가 없으면 주석으로 `-- ⚠️ 이 분석에 필요한 마트가 선택되지 않음` 을 남기고 중단
+- 쿼리 내부 CTE(`with xxx as ...`) 는 스키마 prefix 없이 이름 그대로 참조 (CTE 는 테이블이 아님)
+
 ### 1. SQL 키워드는 소문자
 select, from, where, join, case, when, group by, order by, with, as 등 모두 소문자.
 

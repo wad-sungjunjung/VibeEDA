@@ -45,6 +45,7 @@ async def run_agent_stream_gemini(
     user_message: str,
     notebook_state: NotebookState,
     conversation_history: list[dict],
+    images: list[dict] | None = None,
 ) -> AsyncGenerator[dict, None]:
     if not api_key:
         yield {"type": "error", "message": "Google Gemini API 키가 설정되지 않았습니다."}
@@ -56,7 +57,16 @@ async def run_agent_stream_gemini(
     system_prompt = _build_system_prompt(notebook_state)
 
     contents = _to_gemini_history(conversation_history)
-    contents.append(types.Content(role="user", parts=[types.Part.from_text(text=user_message)]))
+    if images:
+        import base64 as _b64
+        user_parts = [
+            types.Part.from_bytes(data=_b64.b64decode(img["data"]), mime_type=img["media_type"])
+            for img in images
+        ]
+        user_parts.append(types.Part.from_text(text=user_message))
+        contents.append(types.Content(role="user", parts=user_parts))
+    else:
+        contents.append(types.Content(role="user", parts=[types.Part.from_text(text=user_message)]))
 
     created_cell_ids: list[str] = []
     import time as _time

@@ -42,7 +42,8 @@ export default function ConnectionModal({ onClose }: Props) {
   })
   const [connectState, setConnectState] = useState<ConnectState>('idle')
   const [connectMsg, setConnectMsg] = useState('')
-  const [isConnected, setIsConnected] = useState(false)
+  const isConnected = useConnectionStore((s) => s.isConnected)
+  const setIsConnected = useConnectionStore((s) => s.setIsConnected)
 
   // ── Local env state ─────────────────────────────────────────────────────────
   type ServiceStatus = 'checking' | 'ok' | 'error'

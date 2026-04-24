@@ -24,6 +24,7 @@ import {
   saveCurrentSessionMeta,
   toSnakeCase,
   toolStatusLabel,
+  summarizeCellOutput,
 } from '@/lib/utils'
 import {
   streamVibeChat,
@@ -128,6 +129,7 @@ function rowToCell(row: CellRow): Cell {
       agentCreated: e.agent_created ?? false,
     })),
     historyOpen: row.chat_entries.length > 0,
+    chatImages: [],
     insight: row.insight ?? null,
     agentGenerated: row.agent_generated,
   }
@@ -555,9 +557,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
       fullscreenCellId: s.fullscreenCellId && id ? id : s.fullscreenCellId,
       cells:
         id && id !== s.activeCellId
-          ? s.cells.map((c) =>
-              c.id === id && c.chatHistory.length > 0 ? { ...c, historyOpen: true } : c
-            )
+          ? s.cells.map((c) => {
+              if (c.id === id) return c.chatHistory.length > 0 ? { ...c, historyOpen: true } : c
+              if (c.id === s.activeCellId) return { ...c, historyOpen: false }
+              return c
+            })
           : s.cells,
     })),
 
@@ -602,6 +606,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         executedAt: null,
         output: null,
         chatInput: '',
+        chatImages: [],
         chatHistory: [],
         historyOpen: false,
         insight: null,
@@ -734,6 +739,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       name: orig.name + ' 복사',
       ordering,
       chatHistory: [],
+      chatImages: [],
       executed: false,
       executedAt: null,
       insight: null,
@@ -919,6 +925,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   updateCellChatInput: (id, input) =>
     set((s) => ({ cells: s.cells.map((c) => (c.id === id ? { ...c, chatInput: input } : c)) })),
 
+  updateCellChatImages: (id, images) =>
+    set((s) => ({ cells: s.cells.map((c) => (c.id === id ? { ...c, chatImages: images } : c)) })),
+
   submitVibe: async (cellId, message) => {
     if (!message.trim()) return
     const { cells, analysisTheme, selectedMarts, martCatalog, cellEditOrigins, setCellEditOrigin, notebookId } = get()
@@ -927,6 +936,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     const editFromIdx = cellEditOrigins[cellId] ?? null
     const codeSnapshot = cell.code
+    const pendingImages = cell.chatImages ?? []
 
     set((s) => ({
       vibingCells: new Set([...s.vibingCells, cellId]),
@@ -935,6 +945,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           ? {
               ...c,
               chatInput: '',
+              chatImages: [],
               code: '',
               chatHistory:
                 editFromIdx !== null ? c.chatHistory.slice(0, editFromIdx) : c.chatHistory,
@@ -964,6 +975,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
             .map((m) => ({ key: m.key, description: m.description, columns: m.columns })),
           analysis_theme: analysisTheme,
           notebook_id: notebookId,
+          images: pendingImages.length > 0
+            ? pendingImages.map((img) => ({ media_type: img.mediaType, data: img.data }))
+            : undefined,
+          current_output_summary: summarizeCellOutput(cell.output),
         },
         (event) => {
           if (event.type === 'code_delta') {
@@ -1095,6 +1110,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   // ── Agent mode ─────────────────────────────────────────────────────────────
   agentMode: false,
   agentChatInput: '',
+  agentChatImages: [],
   agentChatHistory: [],
   agentSessions: [],
   agentSessionTitle: null,
@@ -1127,6 +1143,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   toggleAgentMode: () => set((s) => ({ agentMode: !s.agentMode })),
   setAgentChatInput: (v) => set({ agentChatInput: v }),
+  setAgentChatImages: (images) => set({ agentChatImages: images }),
 
   toggleAgentMessageCollapse: (id) =>
     set((s) => ({
@@ -1301,6 +1318,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const activeKey = isGemini ? geminiApiKey : anthropicApiKey
     const providerLabel = isGemini ? 'Gemini' : 'Anthropic'
 
+    const pendingImages = get().agentChatImages ?? []
+
     const userMsg: AgentMessage = {
       id: generateId('am'),
       role: 'user',
@@ -1313,6 +1332,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((s) => ({
       agentChatHistory: [...s.agentChatHistory, userMsg],
       agentChatInput: '',
+      agentChatImages: [],
       currentSessionCreatedAtMs: isFirstUserMsg ? Date.now() : (s.currentSessionCreatedAtMs ?? Date.now()),
       currentSessionId: s.currentSessionId ?? generateId('as'),
       agentLoading: true,
@@ -1391,6 +1411,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
             .filter((m) => m.content)
             .map((m) => ({ role: m.role, content: m.content })),
           notebook_id: notebookId,
+          images: pendingImages.length > 0
+            ? pendingImages.map((img) => ({ media_type: img.mediaType, data: img.data }))
+            : undefined,
         },
         (event) => {
           // helper: 새 텍스트 말풍선 시작 (현재 버블에 내용이 있으면)

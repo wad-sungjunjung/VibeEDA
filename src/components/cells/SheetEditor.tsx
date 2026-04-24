@@ -19,6 +19,8 @@ export interface SheetEditorHandle {
   applyPatches: (patches: { range: string; value: string | number | boolean }[]) => void
   toggleGridlines: () => boolean
   areGridlinesHidden: () => boolean
+  /** 시트 캔버스에 포커스를 주고, 선택이 없으면 A1 을 선택한다. 커맨드 모드에서 Enter 로 시트 진입 시 사용. */
+  focusGrid: () => void
 }
 
 function emptyWorkbook(): any {
@@ -187,6 +189,38 @@ const SheetEditor = forwardRef<SheetEditorHandle, Props>(function SheetEditor(
         console.error('[SheetEditor] applyPatches failed', err)
       }
     },
+    focusGrid: () => {
+      const api = apiRef.current
+      const host = hostRef.current
+      if (!host) return
+      try {
+        // 현재 선택이 없으면 A1 을 활성 범위로 지정
+        const sheet = api?.getActiveWorkbook?.()?.getActiveSheet?.()
+        if (sheet) {
+          const sel = sheet.getSelection?.()
+          const range = sel?.getActiveRange?.() ?? sel?.getRange?.()
+          if (!range) {
+            const a1 = sheet.getRange?.(0, 0, 1, 1)
+            if (a1 && typeof a1.activate === 'function') a1.activate()
+            else if (a1 && typeof sheet.setActiveRange === 'function') sheet.setActiveRange(a1)
+          }
+        }
+      } catch (err) {
+        console.warn('[SheetEditor] focusGrid selection failed', err)
+      }
+      // 캔버스/포커스 프록시에 포커스 — UniverJS 는 내부 input 이 아닌 캔버스 이벤트를 처리하므로
+      // 마운트 컨테이너에 포커스를 주거나 캔버스를 직접 찾아 click/focus 를 흉내낸다.
+      try {
+        const canvas = host.querySelector<HTMLElement>('canvas')
+        if (canvas) {
+          canvas.setAttribute('tabindex', '-1')
+          canvas.focus()
+        } else {
+          host.setAttribute('tabindex', '-1')
+          ;(host as HTMLElement).focus()
+        }
+      } catch {}
+    },
   }))
 
   useEffect(() => {
@@ -202,6 +236,9 @@ const SheetEditor = forwardRef<SheetEditorHandle, Props>(function SheetEditor(
     let univer: any = null
     let univerAPI: any = null  // createUniver 이후 할당
     let disposeEvents: (() => void) | null = null
+
+    // ── 서식 복사 원본 추적 ───────────────────────────────────────────────────
+    let copiedFormatRange: { startRow: number; startColumn: number; endRow: number; endColumn: number } | null = null
 
     // ── 포인터 추적 ───────────────────────────────────────────────────────────
     let sheetActive = false
@@ -244,6 +281,74 @@ const SheetEditor = forwardRef<SheetEditorHandle, Props>(function SheetEditor(
 
       const editing = isEditing()
       const mod = e.ctrlKey || e.metaKey
+
+      // ── Ctrl+C → 서식 복사 원본 범위 캡처 (Univer 복사는 그대로 허용) ─────────
+      if (e.key === 'c' && mod && !e.altKey && !e.shiftKey) {
+        try {
+          const sheet = univerAPI?.getActiveWorkbook?.()?.getActiveSheet?.()
+          const sel = sheet?.getSelection?.()
+          const range = sel?.getActiveRange?.() ?? sel?.getRange?.()
+          const r = range?.getRange?.() ?? range?._range
+          if (r) copiedFormatRange = { startRow: r.startRow, startColumn: r.startColumn, endRow: r.endRow, endColumn: r.endColumn }
+        } catch {}
+        // preventDefault 없음 — Univer 가 정상 복사 처리
+        return
+      }
+
+      // ── Ctrl+Alt+V → 서식만 붙여넣기 ──────────────────────────────────────
+      if (e.key === 'v' && mod && e.altKey && !e.shiftKey) {
+        e.preventDefault(); e.stopImmediatePropagation()
+        if (!copiedFormatRange) return
+        try {
+          const wb = univerAPI?.getActiveWorkbook?.()
+          const sheet = wb?.getActiveSheet?.()
+          if (!sheet) return
+
+          const snap = wb?.getSnapshot?.()
+          const sheetId = Object.keys(snap?.sheets ?? {})[0]
+          const sheetData = snap?.sheets?.[sheetId]
+          const srcStyleId = sheetData?.cellData?.[copiedFormatRange.startRow]?.[copiedFormatRange.startColumn]?.s
+          const srcStyle = srcStyleId ? snap?.styles?.[srcStyleId] : null
+          if (!srcStyle) return
+
+          const sel = sheet.getSelection?.()
+          const range = sel?.getActiveRange?.() ?? sel?.getRange?.()
+          const r = range?.getRange?.() ?? range?._range
+          if (!r) return
+
+          for (let row = r.startRow; row <= r.endRow; row++) {
+            for (let col = r.startColumn; col <= r.endColumn; col++) {
+              const cell = sheet.getRange?.(row, col, 1, 1)
+              if (!cell) continue
+              // setStyle 로 테두리·숫자 포맷 등 전체 서식 일괄 적용
+              if (typeof cell.setStyle === 'function') {
+                cell.setStyle(srcStyle)
+              } else {
+                // fallback: 개별 속성 설정
+                if (srcStyle.bg?.rgb !== undefined) cell.setBackground?.(srcStyle.bg.rgb)
+                if (srcStyle.cl?.rgb !== undefined) cell.setFontColor?.(srcStyle.cl.rgb)
+                if (srcStyle.bl !== undefined) cell.setFontWeight?.(srcStyle.bl ? 'bold' : 'normal')
+                if (srcStyle.it !== undefined) cell.setFontStyle?.(srcStyle.it ? 'italic' : 'normal')
+                if (srcStyle.ul?.s !== undefined) cell.setTextDecoration?.(srcStyle.ul.s ? 1 : 0)
+                if (srcStyle.fs !== undefined) cell.setFontSize?.(srcStyle.fs)
+                if (srcStyle.ff !== undefined) cell.setFontFamily?.(srcStyle.ff)
+                if (srcStyle.ht !== undefined) cell.setHorizontalAlignment?.(srcStyle.ht)
+                if (srcStyle.vt !== undefined) cell.setVerticalAlignment?.(srcStyle.vt)
+              }
+            }
+          }
+
+          setTimeout(() => {
+            try {
+              const s = wb?.getSnapshot?.()
+              if (s) onChangeRef.current(JSON.stringify(s))
+            } catch {}
+          }, 100)
+        } catch (err) {
+          console.warn('[SheetEditor] paste format failed', err)
+        }
+        return
+      }
 
       // ── Enter (탐색 모드) → 편집 시작 ──────────────────────────────────────
       // ── Enter (편집 모드) → Univer 에 위임 (커밋 + 아래 이동) ────────────────

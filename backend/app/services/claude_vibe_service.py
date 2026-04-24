@@ -24,6 +24,8 @@ async def stream_vibe_chat_claude(
     analysis_theme: str,
     df_summaries: dict[str, str] | None = None,
     cell_above_name: Optional[str] = None,
+    images: list[dict] | None = None,
+    current_output_summary: str = "",
 ) -> AsyncGenerator[dict, None]:
     if not api_key:
         yield {"type": "error", "message": "Anthropic API 키가 설정되지 않았습니다."}
@@ -38,7 +40,15 @@ async def stream_vibe_chat_claude(
     else:
         system = build_markdown_system(analysis_theme)
 
-    prompt = build_user_prompt(current_code, message)
+    prompt = build_user_prompt(current_code, message, current_output_summary)
+
+    user_content: list[dict] = []
+    for img in (images or []):
+        user_content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": img["media_type"], "data": img["data"]},
+        })
+    user_content.append({"type": "text", "text": prompt})
 
     accumulated = ""
     try:
@@ -46,7 +56,7 @@ async def stream_vibe_chat_claude(
             model=model,
             max_tokens=8000,
             system=system,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": user_content}],
         ) as stream:
             async for text in stream.text_stream:
                 accumulated += text

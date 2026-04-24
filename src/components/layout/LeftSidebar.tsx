@@ -90,9 +90,13 @@ export default function LeftSidebar() {
   })))
 
   const sfUser = useConnectionStore((s) => s.sfUser)
+  const sfConnected = useConnectionStore((s) => s.isConnected)
   const displayName = sfUser ? sfUser.split('@')[0] : '하우'
   const theme = useModelStore((s) => s.theme)
   const toggleTheme = useModelStore((s) => s.toggleTheme)
+  const geminiKey = useModelStore((s) => s.geminiApiKey)
+  const anthropicKey = useModelStore((s) => s.anthropicApiKey)
+  const hasModelKey = !!(geminiKey || anthropicKey)
 
   const [addingFolder, setAddingFolder] = useState(false)
   const [folderInput, setFolderInput] = useState('')
@@ -232,18 +236,20 @@ export default function LeftSidebar() {
           <Settings size={12} />
           설정
         </div>
-        <button
+        <SettingsRow
+          label="연결 관리"
           onClick={() => setShowConnection(true)}
-          className="w-full text-left px-2 py-1.5 text-[12px] text-text-secondary hover:bg-primary-light hover:text-primary rounded transition-colors"
-        >
-          연결 관리
-        </button>
-        <button
+          ok={sfConnected}
+          okLabel="연결됨"
+          offLabel="끊김"
+        />
+        <SettingsRow
+          label="모델 설정"
           onClick={() => setShowModelSettings(true)}
-          className="w-full text-left px-2 py-1.5 text-[12px] text-text-secondary hover:bg-primary-light hover:text-primary rounded transition-colors"
-        >
-          모델 설정
-        </button>
+          ok={hasModelKey}
+          okLabel="키 등록됨"
+          offLabel="키 없음"
+        />
         <button
           onClick={() => setShowHelp(true)}
           className="w-full text-left px-2 py-1.5 text-[12px] text-text-secondary hover:bg-primary-light hover:text-primary rounded transition-colors"
@@ -1074,5 +1080,35 @@ function FileTreeNode({
         document.body,
       )}
     </div>
+  )
+}
+
+function SettingsRow({
+  label,
+  onClick,
+  ok,
+  okLabel,
+  offLabel,
+}: {
+  label: string
+  onClick: () => void
+  ok: boolean
+  okLabel: string
+  offLabel: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-2 px-2 py-1.5 text-[12px] text-text-secondary hover:bg-primary-light hover:text-primary rounded transition-colors"
+      title={`${label} — ${ok ? okLabel : offLabel}`}
+    >
+      <span className="flex-1 text-left">{label}</span>
+      <span
+        className={cn(
+          'w-1.5 h-1.5 rounded-full shrink-0 transition-colors',
+          ok ? 'bg-success' : 'bg-danger'
+        )}
+      />
+    </button>
   )
 }

@@ -1351,6 +1351,7 @@ async def run_agent_stream(
     user_message: str,
     notebook_state: NotebookState,
     conversation_history: list[dict],
+    images: list[dict] | None = None,
 ) -> AsyncGenerator[dict, None]:
     if not api_key:
         yield {"type": "error", "message": "Anthropic API 키가 설정되지 않았습니다."}
@@ -1362,7 +1363,15 @@ async def run_agent_stream(
     system_prompt = _build_system_prompt(notebook_state)
 
     messages: list[dict] = list(conversation_history)
-    messages.append({"role": "user", "content": user_message})
+    if images:
+        user_content: list[dict] = [
+            {"type": "image", "source": {"type": "base64", "media_type": img["media_type"], "data": img["data"]}}
+            for img in images
+        ]
+        user_content.append({"type": "text", "text": user_message})
+        messages.append({"role": "user", "content": user_content})
+    else:
+        messages.append({"role": "user", "content": user_message})
 
     import time as _time
     created_cell_ids: list[str] = []

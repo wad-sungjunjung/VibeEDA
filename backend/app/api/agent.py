@@ -55,6 +55,10 @@ class MartMetaInput(BaseModel):
     columns: list[MartColumnInput] = []
 
 
+class ImageBlockInput(BaseModel):
+    media_type: str
+    data: str  # base64
+
 class AgentRequest(BaseModel):
     message: str
     cells: list[CellSnapshot] = []
@@ -64,6 +68,7 @@ class AgentRequest(BaseModel):
     analysis_description: str = ""
     conversation_history: list[ConversationMessage] = []
     notebook_id: Optional[str] = None
+    images: list[ImageBlockInput] = []
 
 
 @router.post("/agent/stream")
@@ -113,6 +118,7 @@ async def agent_stream_endpoint(
             user_message=req.message,
             notebook_state=notebook_state,
             conversation_history=history,
+            images=[{"media_type": img.media_type, "data": img.data} for img in req.images],
         ):
             yield f"data: {json.dumps(event, ensure_ascii=False, default=_json_default)}\n\n"
 

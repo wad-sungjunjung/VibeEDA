@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PlusCircle, Loader2 } from 'lucide-react'
 import LeftSidebar from '@/components/layout/LeftSidebar'
 import TopMetaHeader from '@/components/layout/TopMetaHeader'
@@ -27,6 +27,9 @@ export default function App() {
   const newAnalysis = useAppStore((s) => s.newAnalysis)
   const theme = useModelStore((s) => s.theme)
   const [showCellPicker, setShowCellPicker] = useState(false)
+  // showCellPicker 는 window keydown 핸들러(한 번만 등록됨) 에서 최신 값으로 참조하기 위해 ref 로도 보관
+  const showCellPickerRef = useRef(false)
+  useEffect(() => { showCellPickerRef.current = showCellPicker }, [showCellPicker])
 
   // persist 복원이 onRehydrateStorage 에서 이미 <html>.dark 를 적용하지만,
   // 세션 중 토글에도 반응하도록 마운트/변경 시점에 재동기화한다.
@@ -66,6 +69,17 @@ export default function App() {
   }, [notebookId, activeCellId])
 
   useEffect(() => {
+    // 화살표 네비게이션 직후 짧은 시간 동안 focusin 에 의한 edit 모드 플립을 억제한다.
+    // (전체화면 전환 중 CodeMirror 등이 spurious focusin 을 발사해 ring 이 잠깐 나타났다 사라지는 문제 방지)
+    let navLockUntil = 0
+    const NAV_LOCK_MS = 600
+    function lockNavigation() {
+      navLockUntil = Date.now() + NAV_LOCK_MS
+    }
+    function navLocked() {
+      return Date.now() < navLockUntil
+    }
+
     function getPanelList(): HTMLElement[] {
       return Array.from(document.querySelectorAll<HTMLElement>('[data-cell-panel-key]'))
     }
@@ -77,6 +91,8 @@ export default function App() {
       const cellId = cellIdFromKey(key)
       if (cellId && s.activeCellId !== cellId) s.setActiveCellId(cellId)
       s.setSelectedPanelKey(key)
+      if (s.cellFocusMode !== 'command') s.setCellFocusMode('command')
+      lockNavigation()
       if (scroll) {
         requestAnimationFrame(() => {
           document.querySelector<HTMLElement>(`[data-cell-panel-key="${CSS.escape(key)}"]`)
@@ -90,6 +106,69 @@ export default function App() {
       const list = getPanelList()
       if (list.length === 0) return
       const keys = list.map((el) => el.dataset.cellPanelKey ?? '')
+
+      // 전체화면 모드: 현재 전체화면 셀의 패널 내에서만 이동, 끝에 닿으면 인접 셀로 스위치
+      // (DOM 기반 flat 이동은 화면 밖에 있는 다른 셀 패널로 선택이 옮겨 시각적으로 "선택이 풀린 것처럼" 보이는 문제 방지)
+      if (s.fullscreenCellId) {
+        const fsId = s.fullscreenCellId
+        const cellKeys = keys.filter((k) => k.startsWith(`${fsId}::`))
+        const cellIdx = s.selectedPanelKey ? cellKeys.indexOf(s.selectedPanelKey) : -1
+        const targetIdx = cellIdx + direction
+        if (targetIdx >= 0 && targetIdx < cellKeys.length) {
+          selectPanelByKey(cellKeys[targetIdx])
+          return
+        }
+        // 경계 — 인접 셀로 전체화면 스위치
+        const cellList = s.cells
+        const curCellIdx = cellList.findIndex((c) => c.id === fsId)
+        const nextCellIdx = curCellIdx + direction
+        if (nextCellIdx < 0 || nextCellIdx >= cellList.length) return
+        const nextCell = cellList[nextCellIdx]
+        // 다음 셀의 실제 첫/마지막 패널 슬롯을 셀 상태로부터 계산해 키를 미리 확정 —
+        // 낙관적으로 "::content" 를 쓰면 split 셀에서 존재하지 않는 키라 ring 이 일시적으로 사라진다.
+        const isSplit = nextCell.splitMode && nextCell.type !== 'sheet'
+        const initialSlot: 'content' | 'left' | 'right' | 'vibe' =
+          direction === 1
+            ? (isSplit ? 'left' : 'content')
+            : 'vibe'
+        const initialKey = `${nextCell.id}::${initialSlot}`
+        useAppStore.setState({
+          activeCellId: nextCell.id,
+          fullscreenCellId: nextCell.id,
+          selectedPanelKey: initialKey,
+          cellFocusMode: 'command',
+        })
+        lockNavigation()
+        // 전환 중 CodeMirror 등이 focusin 을 발사하더라도 navLock 이 edit 플립을 억제한다.
+        // 그래도 활성 요소가 편집 요소로 남아 있으면 blur 하고 command 로 재확정.
+        requestAnimationFrame(() => {
+          const active = document.activeElement as HTMLElement | null
+          if (active && (active.closest('.cm-content') || active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) {
+            active.blur()
+          }
+          const st = useAppStore.getState()
+          if (st.cellFocusMode !== 'command') st.setCellFocusMode('command')
+        })
+        // 다음 프레임에 실제 DOM 에 있는 첫/마지막 패널로 보정 (split→non-split 전환 등 edge case 대비)
+        requestAnimationFrame(() => {
+          const latest = useAppStore.getState().selectedPanelKey
+          const exists = !!document.querySelector(`[data-cell-panel-key="${CSS.escape(latest ?? '')}"]`)
+          if (!exists) {
+            const own = Array.from(document.querySelectorAll<HTMLElement>('[data-cell-panel-key]'))
+              .map((el) => el.dataset.cellPanelKey ?? '')
+              .filter((k) => k.startsWith(`${nextCell.id}::`))
+            if (own.length > 0) {
+              const pick = direction === -1 ? own[own.length - 1] : own[0]
+              useAppStore.setState({ selectedPanelKey: pick })
+            }
+          }
+          document.querySelector<HTMLElement>(`[data-cell-panel-key="${CSS.escape(useAppStore.getState().selectedPanelKey ?? '')}"]`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        })
+        return
+      }
+
+      // 일반 모드: DOM 문서 순서대로 flat 이동
       let idx = s.selectedPanelKey ? keys.indexOf(s.selectedPanelKey) : -1
       if (idx < 0) idx = direction === 1 ? -1 : 0
       const next = Math.max(0, Math.min(list.length - 1, idx + direction))
@@ -113,6 +192,15 @@ export default function App() {
       if (!s.selectedPanelKey) return false
       const host = document.querySelector<HTMLElement>(`[data-cell-panel-key="${CSS.escape(s.selectedPanelKey)}"]`)
       if (!host) return false
+
+      // Sheet 패널은 툴바의 글꼴 select/input 이 먼저 잡히지 않도록 SheetEditor 에 focusGrid() 를 요청.
+      const cellId = s.selectedPanelKey.split('::')[0]
+      const cell = s.cells.find((c) => c.id === cellId)
+      if (cell?.type === 'sheet') {
+        window.dispatchEvent(new CustomEvent('vibe:focus-sheet-grid', { detail: { cellId } }))
+        return true
+      }
+
       // 포커스 우선순위: CodeMirror 에디터 → textarea → 일반 input → contentEditable
       const target =
         host.querySelector<HTMLElement>('.cm-content') ||
@@ -134,6 +222,16 @@ export default function App() {
     }
 
     function onKeyDown(e: KeyboardEvent) {
+      // 셀 타입 선택 팝업이 열려 있으면 팝업 내부에서만 키 처리 — 전역 단축키 차단
+      // (단, 팝업 포커스를 잃어버렸을 때도 Esc 로는 닫을 수 있게 허용)
+      if (showCellPickerRef.current) {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          setShowCellPicker(false)
+        }
+        return
+      }
+
       const mod = e.ctrlKey || e.metaKey
       if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'g') {
         e.preventDefault()
@@ -146,6 +244,18 @@ export default function App() {
         if (!s.notebookId) return
         e.preventDefault()
         setShowCellPicker(true)
+        return
+      }
+      // Cmd/Ctrl + Shift + F — 활성 셀 전체화면 토글
+      if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+        const s = useAppStore.getState()
+        if (!s.notebookId) return
+        e.preventDefault()
+        if (s.fullscreenCellId) {
+          s.setFullscreenCellId(null)
+        } else if (s.activeCellId) {
+          s.setFullscreenCellId(s.activeCellId)
+        }
         return
       }
       // Cmd/Ctrl + L — 활성 셀의 바이브 챗 입력으로 포커스 이동
@@ -187,6 +297,29 @@ export default function App() {
           movePanel(e.key === 'ArrowUp' ? -1 : 1)
           return
         }
+        // ←/→ — 선택된 패널의 탭(입력/출력/메모) 전환
+        if (!e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+          const key = s.selectedPanelKey
+          if (!key) return
+          const [cellId, slot] = key.split('::')
+          if (slot === 'vibe') return
+          const cell = s.cells.find((c) => c.id === cellId)
+          if (!cell || cell.type === 'sheet') return
+          const tabs = ['input', 'output', 'memo'] as const
+          type Tab = typeof tabs[number]
+          const current: Tab =
+            slot === 'left' ? (cell.leftTab as Tab) :
+            slot === 'right' ? (cell.rightTab as Tab) :
+            (cell.activeTab as Tab)
+          const dir = e.key === 'ArrowLeft' ? -1 : 1
+          const idx = tabs.indexOf(current)
+          const next = tabs[(idx + dir + tabs.length) % tabs.length]
+          e.preventDefault()
+          if (slot === 'left') s.setSplitTab(cellId, 'left', next)
+          else if (slot === 'right') s.setSplitTab(cellId, 'right', next)
+          else s.setCellTab(cellId, next)
+          return
+        }
         // Enter — 선택된 패널의 편집기로 진입
         if (!e.altKey && e.key === 'Enter') {
           if (focusSelectedPanel()) {
@@ -209,6 +342,13 @@ export default function App() {
 
     // 편집 요소에 포커스가 들어오면 edit 모드, 빠지면 command 모드로.
     function onFocusIn(e: FocusEvent) {
+      // 화살표 네비게이션 직후의 spurious focusin 은 무시 — edit 모드로 플립되어 ring 이 사라지는 것을 방지
+      if (navLocked()) {
+        const target = e.target as HTMLElement | null
+        // 네비게이션 중이면 편집 요소에 들어온 포커스를 강제로 blur
+        if (target && isEditingElement(target)) target.blur()
+        return
+      }
       const s = useAppStore.getState()
       if (isEditingElement(e.target as Element)) {
         if (s.cellFocusMode !== 'edit') s.setCellFocusMode('edit')

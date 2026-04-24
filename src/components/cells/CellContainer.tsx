@@ -1,9 +1,9 @@
 import { useRef, useEffect, useState, useCallback, lazy, Suspense } from 'react'
-import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle, Maximize2, Minimize2, Sparkles, Grid3x3 } from 'lucide-react'
+import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle, Maximize2, Minimize2, Sparkles, Grid3x3, Paperclip, X as XIcon } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useModelStore, VIBE_MODELS } from '@/store/modelStore'
-import type { Cell, CellPanelTab } from '@/types'
+import type { Cell, CellPanelTab, ImageAttachment } from '@/types'
 import { cn, loadCellUi, saveCellUi, sanitizeCellNameInput, toSnakeCase } from '@/lib/utils'
 import CellOutput from './CellOutput'
 import CodeEditor from './CodeEditor'
@@ -45,6 +45,7 @@ export default function CellContainer({ cell }: Props) {
     executingCells,
     vibingCells,
     updateCellChatInput,
+    updateCellChatImages,
     submitVibe,
     cancelVibe,
     cells,
@@ -70,6 +71,7 @@ export default function CellContainer({ cell }: Props) {
     executingCells: s.executingCells,
     vibingCells: s.vibingCells,
     updateCellChatInput: s.updateCellChatInput,
+    updateCellChatImages: s.updateCellChatImages,
     submitVibe: s.submitVibe,
     cancelVibe: s.cancelVibe,
     cells: s.cells,
@@ -100,6 +102,7 @@ export default function CellContainer({ cell }: Props) {
   }
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const splitContainerRef = useRef<HTMLDivElement>(null)
   const leftColRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<SheetEditorHandle>(null)
@@ -112,6 +115,18 @@ export default function CellContainer({ cell }: Props) {
       setGridlinesHidden(sheetRef.current?.areGridlinesHidden() ?? false)
     }, 200)
     return () => window.clearTimeout(t)
+  }, [cell.type, cell.id])
+
+  // 커맨드 모드에서 Enter 로 시트 패널 진입 시 — App.tsx 가 이벤트로 focusGrid 요청
+  useEffect(() => {
+    if (cell.type !== 'sheet') return
+    function onFocusSheetGrid(e: Event) {
+      const detail = (e as CustomEvent<{ cellId: string }>).detail
+      if (detail?.cellId !== cell.id) return
+      sheetRef.current?.focusGrid()
+    }
+    window.addEventListener('vibe:focus-sheet-grid', onFocusSheetGrid as EventListener)
+    return () => window.removeEventListener('vibe:focus-sheet-grid', onFocusSheetGrid as EventListener)
   }, [cell.type, cell.id])
   const [splitRatio, setSplitRatio] = useState(() => loadCellUi(cell.id).splitRatio ?? 50)
   const [vSplitRatio, setVSplitRatio] = useState(() => loadCellUi(cell.id).vSplitRatio ?? 50)
@@ -827,6 +842,22 @@ export default function CellContainer({ cell }: Props) {
         const submit = isSheet
           ? () => submitSheetVibe(cell.chatInput)
           : () => submitVibe(cell.id, cell.chatInput)
+        const handleImageFiles = (files: FileList | File[] | null) => {
+          if (!files) return
+          Array.from(files).forEach((file) => {
+            if (!file.type.startsWith('image/')) return
+            const reader = new FileReader()
+            reader.onload = (e) => {
+              const dataUrl = e.target?.result as string
+              const [header, data] = dataUrl.split(',')
+              const mediaType = header.replace('data:', '').replace(';base64', '')
+              const img: ImageAttachment = { id: crypto.randomUUID(), mediaType, data, previewUrl: dataUrl }
+              updateCellChatImages(cell.id, [...(cell.chatImages ?? []), img])
+            }
+            reader.readAsDataURL(file)
+          })
+          if (imageInputRef.current) imageInputRef.current.value = ''
+        }
         const placeholder = isSheet
           ? '시트를 수정해보세요 (Ctrl+Enter) — 예: 선택 영역 합계 아래 셀에'
           : cell.type === 'sql'
@@ -880,7 +911,32 @@ export default function CellContainer({ cell }: Props) {
             </>
           )}
 
+          {/* 이미지 미리보기 */}
+          {(cell.chatImages ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-3 pt-2.5" style={{ zIndex: 10 }}>
+              {(cell.chatImages ?? []).map((img) => (
+                <div key={img.id} className="relative group/img">
+                  <img src={img.previewUrl} alt="" className="w-12 h-12 object-cover rounded-lg border border-border" />
+                  <button
+                    title="이미지 제거"
+                    onClick={() => updateCellChatImages(cell.id, (cell.chatImages ?? []).filter((i) => i.id !== img.id))}
+                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-surface border border-border flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                  >
+                    <XIcon size={9} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           {/* 입력 영역 */}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => handleImageFiles(e.target.files)}
+          />
           <textarea
             ref={inputRef}
             data-vibe-chat-for={cell.id}
@@ -909,6 +965,15 @@ export default function CellContainer({ cell }: Props) {
                 }
               }
             }}
+            onPaste={(e) => {
+              const imageFiles = Array.from(e.clipboardData.items)
+                .filter((item) => item.type.startsWith('image/'))
+                .map((item) => item.getAsFile())
+                .filter((f): f is File => f !== null)
+              if (imageFiles.length === 0) return
+              e.preventDefault()
+              handleImageFiles(imageFiles)
+            }}
           />
           <div className="absolute right-3 bottom-2 w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ zIndex: 10 }}>
             <button
@@ -923,7 +988,7 @@ export default function CellContainer({ cell }: Props) {
               <ArrowUp size={16} strokeWidth={2.5} />
             </button>
           </div>
-          <div className="absolute left-3 bottom-2.5 flex items-center gap-1" style={{ zIndex: 10 }}>
+          <div className="absolute left-3 bottom-2.5 flex items-center gap-1.5" style={{ zIndex: 10 }}>
             <div className="relative flex items-center">
               <select
                 value={vibeModel}
@@ -936,6 +1001,16 @@ export default function CellContainer({ cell }: Props) {
               </select>
               <ChevronDown size={9} className="absolute right-0 pointer-events-none text-text-disabled" />
             </div>
+            {!isSheet && (
+              <button
+                title="이미지 첨부"
+                disabled={effectiveVibing}
+                onClick={(e) => { e.stopPropagation(); imageInputRef.current?.click() }}
+                className="flex items-center justify-center text-text-disabled hover:text-text-secondary transition-colors disabled:cursor-not-allowed"
+              >
+                <Paperclip size={11} />
+              </button>
+            )}
           </div>
         </div>
         )

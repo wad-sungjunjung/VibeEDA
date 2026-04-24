@@ -1,3 +1,4 @@
+import base64
 from typing import AsyncGenerator, Optional
 from google import genai
 from google.genai import types
@@ -23,6 +24,8 @@ async def stream_vibe_chat(
     analysis_theme: str,
     df_summaries: dict[str, str] | None = None,
     cell_above_name: Optional[str] = None,
+    images: list[dict] | None = None,
+    current_output_summary: str = "",
 ) -> AsyncGenerator[dict, None]:
     if not api_key:
         yield {"type": "error", "message": "Gemini API 키가 설정되지 않았습니다."}
@@ -39,13 +42,19 @@ async def stream_vibe_chat(
     else:
         system_instruction = build_markdown_system(analysis_theme)
 
-    prompt = build_user_prompt(current_code, message)
+    prompt = build_user_prompt(current_code, message, current_output_summary)
+
+    parts: list = []
+    for img in (images or []):
+        parts.append(types.Part.from_bytes(data=base64.b64decode(img["data"]), mime_type=img["media_type"]))
+    parts.append(types.Part.from_text(text=prompt))
+    contents = types.Content(role="user", parts=parts)
 
     accumulated = ""
     try:
         async for chunk in await client.aio.models.generate_content_stream(
             model=model,
-            contents=prompt,
+            contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 temperature=0.2,

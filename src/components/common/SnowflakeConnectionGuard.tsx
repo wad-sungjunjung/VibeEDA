@@ -9,6 +9,7 @@ type Phase = 'checking' | 'retrying' | 'connected' | 'disconnected' | 'dismissed
 
 export default function SnowflakeConnectionGuard() {
   const creds = useConnectionStore()
+  const setIsConnected = useConnectionStore((s) => s.setIsConnected)
   const refreshMarts = useAppStore((s) => s.refreshMarts)
   const [phase, setPhase] = useState<Phase>('checking')
 
@@ -24,11 +25,11 @@ export default function SnowflakeConnectionGuard() {
         connected = !!d.connected
       } catch {
         // 백엔드 미기동 — 무시
-        if (!cancelled) setPhase('disconnected')
+        if (!cancelled) { setPhase('disconnected'); setIsConnected(false) }
         return
       }
       if (cancelled) return
-      if (connected) { setPhase('connected'); return }
+      if (connected) { setPhase('connected'); setIsConnected(true); return }
 
       // 2차: 저장된 자격 증명이 있으면 자동 재접속 1회 시도
       const hasCreds = creds.sfAccount.trim() && creds.sfUser.trim()
@@ -55,12 +56,14 @@ export default function SnowflakeConnectionGuard() {
         if (cancelled) return
         if (data.ok) {
           setPhase('connected')
+          setIsConnected(true)
           refreshMarts()
         } else {
           setPhase('disconnected')
+          setIsConnected(false)
         }
       } catch {
-        if (!cancelled) setPhase('disconnected')
+        if (!cancelled) { setPhase('disconnected'); setIsConnected(false) }
       }
     })()
 
