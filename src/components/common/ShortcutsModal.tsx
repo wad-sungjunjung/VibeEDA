@@ -29,8 +29,18 @@ const SECTIONS = [
   {
     title: '셀 편집',
     shortcuts: [
-      { keys: ['Ctrl', 'B'], desc: '활성 셀 아래에 새 셀 추가 (동일 타입)' },
+      { keys: ['Ctrl', 'B'], desc: '셀 추가 (타입 선택 팝업)' },
+      { keys: ['← →', 'Enter'], desc: '팝업 내 타입 선택 · 확인 (1~4 키로 바로 선택)' },
       { keys: ['Ctrl', 'G'], desc: '에이전트 모드 토글' },
+    ],
+  },
+  {
+    title: '패널 탐색 (커맨드 모드)',
+    shortcuts: [
+      { keys: ['↑', '↓'], desc: '이전/다음 패널 선택 (입력·출력·메모·바이브챗)' },
+      { keys: ['Enter'], desc: '선택된 패널 편집기로 진입' },
+      { keys: ['Esc'], desc: '편집기에서 커맨드 모드로 복귀' },
+      { keys: ['Alt', '↑/↓'], desc: '활성 셀을 위/아래로 순서 이동' },
     ],
   },
   {

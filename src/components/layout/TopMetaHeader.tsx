@@ -212,7 +212,7 @@ export default function TopMetaHeader() {
               disabled={isRunningAll || !hasRunnable}
               onClick={executeAllCells}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-all shrink-0 border border-border-subtle text-sql-text disabled:cursor-not-allowed disabled:opacity-50',
+                'flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-all shrink-0 border border-border text-sql-text disabled:cursor-not-allowed disabled:opacity-50',
                 isRunningAll ? 'bg-bg-output' : 'bg-surface'
               )}
             >

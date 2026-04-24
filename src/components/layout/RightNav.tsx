@@ -35,6 +35,8 @@ export default function RightNav() {
     rollbackCell,
     deleteChatEntry,
     toggleCellHistory,
+    toggleAllCellHistory,
+    toggleAllSessionsCollapsed,
     reorderCells,
     updateCellChatInput,
     setCellEditOrigin,
@@ -60,6 +62,8 @@ export default function RightNav() {
     rollbackCell: s.rollbackCell,
     deleteChatEntry: s.deleteChatEntry,
     toggleCellHistory: s.toggleCellHistory,
+    toggleAllCellHistory: s.toggleAllCellHistory,
+    toggleAllSessionsCollapsed: s.toggleAllSessionsCollapsed,
     reorderCells: s.reorderCells,
     updateCellChatInput: s.updateCellChatInput,
     setCellEditOrigin: s.setCellEditOrigin,
@@ -329,10 +333,33 @@ export default function RightNav() {
         >
           <div className="overflow-y-auto hide-scrollbar pr-3 pt-4 pb-3 flex-1 min-h-0">
             <div className="mb-2">
-              <div className="flex items-center gap-1.5 text-[10px] text-text-tertiary font-semibold uppercase tracking-wide leading-tight">
-                <Compass size={12} strokeWidth={2} />
-                셀 네비게이션
-              </div>
+              {(() => {
+                const withHistory = cells.filter((c) => c.chatHistory.length > 0)
+                const hasHistory = withHistory.length > 0
+                const anyOpen = withHistory.some((c) => c.historyOpen)
+                return (
+                  <button
+                    type="button"
+                    onClick={toggleAllCellHistory}
+                    disabled={!hasHistory}
+                    title={hasHistory ? (anyOpen ? '모든 대화 이력 접기' : '모든 대화 이력 펼치기') : '대화 이력 없음'}
+                    className={cn(
+                      'flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide leading-tight transition-colors -mx-1 px-1 py-0.5 rounded',
+                      hasHistory
+                        ? 'text-text-tertiary hover:text-primary hover:bg-chip cursor-pointer'
+                        : 'text-text-tertiary cursor-default'
+                    )}
+                  >
+                    <Compass size={12} strokeWidth={2} />
+                    셀 네비게이션
+                    {hasHistory && (
+                      anyOpen
+                        ? <ChevronDown size={10} className="ml-0.5 opacity-70" />
+                        : <ChevronRight size={10} className="ml-0.5 opacity-70" />
+                    )}
+                  </button>
+                )
+              })()}
               <div className="text-[10px] text-text-disabled mt-0.5 leading-tight">
                 {cells.length}개 셀 / {executedCount}개 실행됨
               </div>
@@ -516,7 +543,35 @@ export default function RightNav() {
             <div className={cn('w-4 h-4 rounded-full flex items-center justify-center', agentMode ? 'bg-primary' : 'bg-border')}>
               <Telescope size={10} className="text-white" strokeWidth={2} />
             </div>
-            <span className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wide leading-tight">에이전트 이력</span>
+            {(() => {
+              const sessionIds = [
+                ...agentSessions.map((s) => s.id),
+                ...(agentChatHistory.length > 0 && currentSessionId ? [currentSessionId] : []),
+              ]
+              const hasAny = sessionIds.length > 0
+              const anyExpanded = sessionIds.some((id) => !collapsedSessionIds[id])
+              return (
+                <button
+                  type="button"
+                  onClick={() => toggleAllSessionsCollapsed(sessionIds)}
+                  disabled={!hasAny}
+                  title={hasAny ? (anyExpanded ? '모든 세션 접기' : '모든 세션 펼치기') : '세션 없음'}
+                  className={cn(
+                    'flex items-center gap-1.5 -mx-1 px-1 py-0.5 rounded transition-colors',
+                    hasAny
+                      ? 'text-text-tertiary hover:text-primary hover:bg-chip cursor-pointer'
+                      : 'text-text-tertiary cursor-default'
+                  )}
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-wide leading-tight">에이전트 이력</span>
+                  {hasAny && (
+                    anyExpanded
+                      ? <ChevronDown size={10} className="opacity-70" />
+                      : <ChevronRight size={10} className="opacity-70" />
+                  )}
+                </button>
+              )
+            })()}
             {(agentSessions.length + (agentChatHistory.length ? 1 : 0)) > 0 && (
               <span className="text-[9px] text-text-disabled">{agentSessions.length + (agentChatHistory.length ? 1 : 0)}개 대화</span>
             )}

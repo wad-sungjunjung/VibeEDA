@@ -258,3 +258,17 @@
     @apply focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary;
   }
 }
+
+/* 패널 단위 커맨드 모드 선택 외곽선 — 자식 배경에 가려지지 않도록 overlay 로 그린다 */
+[data-cell-panel-key][data-panel-selected="true"] {
+  position: relative;
+}
+[data-cell-panel-key][data-panel-selected="true"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgb(var(--color-primary));
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 20;
+}

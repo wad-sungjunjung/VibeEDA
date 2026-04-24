@@ -29,6 +29,9 @@ export default function CellContainer({ cell }: Props) {
   const {
     activeCellId,
     setActiveCellId,
+    cellFocusMode,
+    selectedPanelKey,
+    setSelectedPanelKey,
     deleteCell,
     updateCellCode,
     updateCellName,
@@ -51,6 +54,9 @@ export default function CellContainer({ cell }: Props) {
   } = useAppStore(useShallow((s) => ({
     activeCellId: s.activeCellId,
     setActiveCellId: s.setActiveCellId,
+    cellFocusMode: s.cellFocusMode,
+    selectedPanelKey: s.selectedPanelKey,
+    setSelectedPanelKey: s.setSelectedPanelKey,
     deleteCell: s.deleteCell,
     updateCellCode: s.updateCellCode,
     updateCellName: s.updateCellName,
@@ -78,6 +84,20 @@ export default function CellContainer({ cell }: Props) {
   const isVibing = vibingCells.has(cell.id)
   const isActive = activeCellId === cell.id
   const cellIndex = cells.findIndex((c) => c.id === cell.id) + 1
+
+  const panelKeyFor = (slot: 'content' | 'left' | 'right' | 'vibe') => `${cell.id}::${slot}`
+  const panelAttrs = (slot: 'content' | 'left' | 'right' | 'vibe') => {
+    const key = panelKeyFor(slot)
+    return {
+      'data-cell-panel-key': key,
+      'data-panel-selected': (cellFocusMode === 'command' && selectedPanelKey === key) ? 'true' : undefined,
+      onClickCapture: () => {
+        // capture 단계에서 먼저 선택 상태만 업데이트 — 실제 클릭 동작은 그대로 진행되게 stopPropagation 하지 않음
+        if (activeCellId !== cell.id) setActiveCellId(cell.id)
+        if (selectedPanelKey !== key) setSelectedPanelKey(key)
+      },
+    } as const
+  }
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const splitContainerRef = useRef<HTMLDivElement>(null)
@@ -670,7 +690,7 @@ export default function CellContainer({ cell }: Props) {
             const sheetHeight = fsRenderActive ? viewportTotal : panelHeight
             return (
               <>
-                <div style={{ height: sheetHeight, overflow: 'hidden' }}>
+                <div {...panelAttrs('content')} style={{ height: sheetHeight, overflow: 'hidden' }}>
                   {renderPanel('input', sheetHeight, true)}
                 </div>
                 {!fsRenderActive && <PanelResizeHandle onMouseDown={handlePanelResizeMouseDown} />}
@@ -709,7 +729,7 @@ export default function CellContainer({ cell }: Props) {
             return (
               <>
                 <div ref={splitContainerRef} style={{ height: vTotal }}>
-                  <div style={{ height: topPx, overflow: 'hidden' }}>
+                  <div {...panelAttrs('left')} style={{ height: topPx, overflow: 'hidden' }}>
                     {renderTabBar(cell.leftTab, (t) => setSplitTab(cell.id, 'left', t))}
                     {renderPanel(cell.leftTab, topContent)}
                   </div>
@@ -721,7 +741,7 @@ export default function CellContainer({ cell }: Props) {
                   >
                     <div className="h-px w-full rounded-full transition-colors bg-border-subtle group-hover/div:bg-primary" />
                   </div>
-                  <div style={{ height: bottomPx, overflow: 'hidden' }}>
+                  <div {...panelAttrs('right')} style={{ height: bottomPx, overflow: 'hidden' }}>
                     {renderTabBar(cell.rightTab, (t) => setSplitTab(cell.id, 'right', t))}
                     {renderPanel(cell.rightTab, bottomContent)}
                   </div>
@@ -745,7 +765,7 @@ export default function CellContainer({ cell }: Props) {
                     alignItems: 'stretch',
                   }}
                 >
-                  <div ref={leftColRef} className="min-w-0 flex flex-col" style={{ height: effectiveHeight, overflow: 'hidden' }}>
+                  <div ref={leftColRef} {...panelAttrs('left')} className="min-w-0 flex flex-col" style={{ height: effectiveHeight, overflow: 'hidden' }}>
                     {renderTabBar(cell.leftTab, (t) => setSplitTab(cell.id, 'left', t))}
                     <div className={cn('flex-1 min-h-0', leftIsOutput ? 'overflow-hidden' : 'overflow-auto')}>
                       {renderPanel(cell.leftTab, effectiveHeight, true)}
@@ -758,7 +778,7 @@ export default function CellContainer({ cell }: Props) {
                   >
                     <div className="w-px h-full rounded-full transition-colors bg-border-subtle group-hover/div:bg-primary" />
                   </div>
-                  <div className="min-w-0 flex flex-col" style={{ height: effectiveHeight, overflow: 'hidden' }}>
+                  <div {...panelAttrs('right')} className="min-w-0 flex flex-col" style={{ height: effectiveHeight, overflow: 'hidden' }}>
                     {renderTabBar(cell.rightTab, (t) => setSplitTab(cell.id, 'right', t))}
                     <div className={cn('flex-1 min-h-0', rightIsOutput ? 'overflow-hidden' : 'overflow-auto')}>
                       {renderPanel(cell.rightTab, effectiveHeight, true)}
@@ -774,7 +794,7 @@ export default function CellContainer({ cell }: Props) {
             return (
               <>
                 {renderTabBar(cell.activeTab, (t) => setCellTab(cell.id, t))}
-                <div style={{ height: effectiveHeight, overflow: 'hidden' }}>
+                <div {...panelAttrs('content')} style={{ height: effectiveHeight, overflow: 'hidden' }}>
                   {renderPanel(cell.activeTab, effectiveHeight, true)}
                 </div>
                 <PanelResizeHandle onMouseDown={handlePanelResizeMouseDown} />
@@ -784,7 +804,7 @@ export default function CellContainer({ cell }: Props) {
           return (
             <>
               {renderTabBar(cell.activeTab, (t) => setCellTab(cell.id, t))}
-              <div style={{ maxHeight: panelMaxHeight, overflow: 'auto' }}>
+              <div {...panelAttrs('content')} style={{ maxHeight: panelMaxHeight, overflow: 'auto' }}>
                 {renderPanel(cell.activeTab)}
               </div>
             </>
@@ -817,6 +837,7 @@ export default function CellContainer({ cell }: Props) {
         const busyLabel = isSheet ? '시트 업데이트 중' : '코드 생성 중'
         return (
         <div
+          {...panelAttrs('vibe')}
           className={cn(
             'relative mx-4 rounded-2xl',
             fsRenderActive ? 'mt-3 mb-2' : 'mt-0 mb-2',
@@ -831,7 +852,6 @@ export default function CellContainer({ cell }: Props) {
             animation: 'vibe-border-flow 2s linear infinite',
             boxShadow: '0 0 8px rgba(217,92,63,0.12)',
           } : undefined}
-          onClick={(e) => e.stopPropagation()}
         >
           {/* 뒤 텍스트 가리기 + 상태 표시 */}
           {effectiveVibing && (

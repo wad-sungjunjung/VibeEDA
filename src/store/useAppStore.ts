@@ -284,6 +284,10 @@ interface AppStore {
   vibingCells: Set<string>
   activeCellId: string | null
   setActiveCellId: (id: string | null) => void
+  cellFocusMode: 'command' | 'edit'
+  setCellFocusMode: (mode: 'command' | 'edit') => void
+  selectedPanelKey: string | null
+  setSelectedPanelKey: (key: string | null) => void
   fullscreenCellId: string | null
   setFullscreenCellId: (id: string | null) => void
   newAnalysis: () => Promise<void>
@@ -311,6 +315,7 @@ interface AppStore {
   rollbackCell: (cellId: string, entryId: number) => void
   deleteChatEntry: (cellId: string, index: number) => void
   toggleCellHistory: (id: string) => void
+  toggleAllCellHistory: () => void
   setCellInsight: (id: string, insight: string | null) => void
 
   // ── Agent mode ─────────────────────────────────────────────────────────────
@@ -332,6 +337,7 @@ interface AppStore {
   /** 접힘 상태: 세션 ID → collapsed 여부 */
   collapsedSessionIds: Record<string, boolean>
   toggleSessionCollapsed: (id: string) => void
+  toggleAllSessionsCollapsed: (sessionIds: string[]) => void
   agentLoading: boolean
   agentStartedAtMs: number | null
   agentStatus: string | null
@@ -530,6 +536,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   vibingCells: new Set<string>(),
   activeCellId: null,
   fullscreenCellId: null,
+  cellFocusMode: 'command',
+  setCellFocusMode: (mode) => set({ cellFocusMode: mode }),
+  selectedPanelKey: null,
+  setSelectedPanelKey: (key) => set({ selectedPanelKey: key }),
 
   setFullscreenCellId: (id) => set({ fullscreenCellId: id }),
 
@@ -1052,6 +1062,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((s) => ({
       cells: s.cells.map((c) => (c.id === id ? { ...c, historyOpen: !c.historyOpen } : c)),
     })),
+  toggleAllCellHistory: () =>
+    set((s) => {
+      const withHistory = s.cells.filter((c) => c.chatHistory.length > 0)
+      if (withHistory.length === 0) return {}
+      // 하나라도 열려 있으면 전부 접고, 전부 닫혀 있으면 전부 편다.
+      const anyOpen = withHistory.some((c) => c.historyOpen)
+      const next = !anyOpen
+      return {
+        cells: s.cells.map((c) =>
+          c.chatHistory.length > 0 ? { ...c, historyOpen: next } : c
+        ),
+      }
+    }),
 
   setCellInsight: (id, insight) => {
     set((s) => ({ cells: s.cells.map((c) => (c.id === id ? { ...c, insight } : c)) }))
@@ -1070,6 +1093,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
   collapsedSessionIds: {},
   toggleSessionCollapsed: (id) =>
     set((s) => ({ collapsedSessionIds: { ...s.collapsedSessionIds, [id]: !s.collapsedSessionIds[id] } })),
+  toggleAllSessionsCollapsed: (sessionIds) =>
+    set((s) => {
+      if (sessionIds.length === 0) return {}
+      // 하나라도 펼쳐져 있으면 전부 접고, 전부 접혀 있으면 전부 편다.
+      const anyExpanded = sessionIds.some((id) => !s.collapsedSessionIds[id])
+      const next = anyExpanded
+      const map = { ...s.collapsedSessionIds }
+      sessionIds.forEach((id) => { map[id] = next })
+      return { collapsedSessionIds: map }
+    }),
   agentLoading: false,
   agentStartedAtMs: null,
   agentStatus: null,
