@@ -239,6 +239,49 @@ def _format_output_for_claude(output: dict) -> str:
     return str(output)
 
 
+# ─── JSON 안전 변환 (Decimal/NaN/datetime/numpy → 기본 타입) ───────────────────
+# tool_result 가 Claude 의 json.dumps / Gemini 의 from_function_response 둘 다에 들어가는데,
+# Snowflake Decimal · pandas/numpy 스칼라 · datetime 이 직렬화 실패의 흔한 원인.
+# `_execute_tool` 의 모든 반환 결과를 이 함수로 한 번 통과시켜 두 경로가 동일하게 안전.
+def _make_json_safe(obj):
+    import datetime as _dt
+    import math as _math
+    from decimal import Decimal as _Dec
+    if obj is None or isinstance(obj, (str, bool, int)):
+        return obj
+    if isinstance(obj, float):
+        if _math.isnan(obj) or _math.isinf(obj):
+            return None
+        return obj
+    if isinstance(obj, _Dec):
+        try:
+            f = float(obj)
+            if _math.isnan(f) or _math.isinf(f):
+                return None
+            return f
+        except Exception:
+            return str(obj)
+    if isinstance(obj, (_dt.datetime, _dt.date, _dt.time)):
+        return obj.isoformat()
+    if isinstance(obj, (bytes, bytearray)):
+        return obj.decode("utf-8", errors="replace")
+    if isinstance(obj, dict):
+        return {str(k): _make_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_make_json_safe(v) for v in obj]
+    if isinstance(obj, set):
+        return [_make_json_safe(v) for v in obj]
+    # numpy/pandas 스칼라 (.item() 으로 파이썬 native 추출)
+    item = getattr(obj, "item", None)
+    if callable(item):
+        try:
+            return _make_json_safe(item())
+        except Exception:
+            pass
+    # 마지막 폴백 — 문자열화
+    return str(obj)
+
+
 # ─── Cell chat-entry narration helper ─────────────────────────────────────────
 # 에이전트가 셀을 생성/수정할 때 셀별 chat_history 에 남길 한 줄짜리 user_msg 를 만든다.
 # 우선순위: (1) 이번 턴 내레이션 → (2) 원 사용자 요청 → (3) 짧은 기본 문구.
@@ -262,6 +305,21 @@ def _build_cell_chat_narration(state: "NotebookState", created: bool) -> str:
 # ─── Tool execution ───────────────────────────────────────────────────────────
 
 async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dict, list[dict]]:
+    """Public wrapper — sanitizes JSON-incompatible types in the result dict.
+
+    Snowflake Decimal · pandas/numpy 스칼라 · datetime 등이 tool_result 에 섞이면
+    Claude 의 `json.dumps` 또는 Gemini 의 `Part.from_function_response` 가 직렬화 실패
+    ("Object of type Decimal is not JSON serializable") 한다.
+    실제 핸들러는 `_execute_tool_impl` 가 담당하고, 본 wrapper 가 결과를 보정한다.
+    SSE 이벤트(events)는 별도 경로(agent.py 의 _json_default)에서 처리되므로 손대지 않는다.
+    """
+    result, events = await _execute_tool_impl(name, inp, state)
+    if isinstance(result, dict):
+        result = _make_json_safe(result)
+    return result, events
+
+
+async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tuple[dict, list[dict]]:
     """Returns (tool_result_dict, list_of_sse_events)."""
 
     # ─── Phase 0 pre-guard — L2/L3 는 첫 도구로 select_methods 강제 ────────
