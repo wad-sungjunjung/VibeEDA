@@ -15,7 +15,7 @@ from .claude_agent import (
     NotebookState,
     PARALLEL_SAFE_TOOLS,
 )
-from . import agent_skills, agent_tools
+from . import agent_skills, agent_tools, agent_budget, agent_classifier
 
 GENERATE_TIMEOUT_SEC = 300  # Gemini 단일 호출 타임아웃 (5분)
 REPEAT_CALL_LIMIT = 3      # 동일 tool+input 반복 허용 횟수
@@ -47,6 +47,7 @@ async def run_agent_stream_gemini(
     notebook_state: NotebookState,
     conversation_history: list[dict],
     images: list[dict] | None = None,
+    tier_override: str | None = None,
 ) -> AsyncGenerator[dict, None]:
     if not api_key:
         yield {"type": "error", "message": "Google Gemini API 키가 설정되지 않았습니다."}
@@ -55,6 +56,36 @@ async def run_agent_stream_gemini(
     client = genai.Client(api_key=api_key)
     agent_skills.init_skill_ctx(notebook_state, user_message)
     notebook_state.user_message_latest = user_message
+
+    # ─── Phase -1: 복잡도 분류 + 예산 세팅 (Claude 와 동일 로직) ───────────
+    # Haiku fallback 은 Anthropic 키가 따로 있어야 가능. settings 에서 시도.
+    from ..config import settings as _settings
+    haiku_key = _settings.anthropic_api_key or ""
+    classification = await agent_classifier.classify_request_async(
+        user_message,
+        api_key=haiku_key,
+        mart_count=len(notebook_state.selected_marts),
+        has_image=bool(images),
+        history_depth=len(conversation_history),
+        tier_override=tier_override,  # type: ignore[arg-type]
+    )
+    budget = agent_budget.make_budget(
+        classification.tier,  # type: ignore[arg-type]
+        reason=classification.reason,
+    )
+    budget.user_overridden = classification.method == "override"
+    notebook_state.budget = budget
+    yield {
+        "type": "tier_classified",
+        "tier": budget.tier,
+        "reason": budget.classification_reason,
+        "estimated_cells": budget.estimated_cells,
+        "estimated_seconds": budget.estimated_seconds,
+        "max_turns": budget.max_turns,
+        "max_tool_calls": budget.max_tool_calls,
+        "methods": [],
+    }
+
     system_prompt = _build_system_prompt(notebook_state)
 
     contents = _to_gemini_history(conversation_history)
@@ -72,18 +103,19 @@ async def run_agent_stream_gemini(
     created_cell_ids: list[str] = []
     import time as _time
     updated_cell_ids: list[str] = []
-    MAX_TURNS = 50
+    # MAX_TURNS / TOTAL_TOOL_LIMIT 은 budget 에서 동적으로 읽음 — auto-promotion 시 갱신.
     NARRATION_MIN_CHARS = 20
     LONG_RUN_SEC = 30
-    TOTAL_TOOL_LIMIT = 200
     repeat_counter: dict[str, int] = {}  # 동일 툴 호출 반복 감지
     total_tool_calls = 0
     narration_warning_used = False
     long_run_warning_used = False
     loop_started_at = _time.monotonic()
+    budget.started_at = loop_started_at
     ask_user_called = False
     pending_guard_count = 0
     PENDING_GUARD_MAX = 3
+    turn_index = 0
 
     def _norm_key(tool_name: str, inp: dict) -> str:
         def _norm(v):
@@ -97,7 +129,8 @@ async def run_agent_stream_gemini(
         return f"{tool_name.lower()}:{json.dumps(_norm(inp), sort_keys=True, ensure_ascii=False)}"
 
     try:
-        for turn in range(MAX_TURNS):
+        while turn_index < budget.max_turns:
+            turn = turn_index  # 호환 — 기존 코드가 turn 변수명을 사용
             retried_for_narration = False
             while True:
                 try:
@@ -207,14 +240,14 @@ async def run_agent_stream_gemini(
                 fc = p.function_call
                 args = dict(fc.args) if fc.args else {}
                 total_tool_calls += 1
-                if total_tool_calls > TOTAL_TOOL_LIMIT:
+                if total_tool_calls > budget.max_tool_calls:
                     yield {
                         "type": "error",
                         "message": (
-                            f"세션 안전 상한에 도달했어요 (총 도구 호출 {TOTAL_TOOL_LIMIT}회 초과). "
+                            f"세션 예산에 도달했어요 ({budget.tier} 티어, 총 도구 호출 {budget.max_tool_calls}회). "
                             "여기서 일단 멈춥니다. 이어서 진행하려면 **새 메시지로 \"이어서 분석해줘\" "
                             "또는 남은 하위 질문** 을 주시면 현 상태에서 재개합니다. "
-                            "매번 새 분석을 더 짧은 단위로 쪼개 요청하는 것도 도움이 돼요."
+                            "또는 채팅창의 '더 깊게' 버튼으로 상위 티어로 재시도해주세요."
                         ),
                     }
                     safety_break = True
@@ -343,14 +376,58 @@ async def run_agent_stream_gemini(
                 long_run_warning_used = True
 
             contents.append(types.Content(role="user", parts=tool_response_parts))
+            turn_index += 1
+
+            # ─── 예산 진행 체크 (Claude 와 동일) ─────────────────────────
+            promoted, promo_msg = agent_budget.maybe_promote(
+                budget,
+                cells_created=len(created_cell_ids),
+                turns=turn_index,
+            )
+            if promoted is not budget:
+                old_tier = budget.tier
+                budget = promoted
+                notebook_state.budget = budget
+                yield {
+                    "type": "tier_promoted",
+                    "from_tier": old_tier,
+                    "to_tier": budget.tier,
+                    "reason": promo_msg or "",
+                    "new_max_turns": budget.max_turns,
+                    "new_max_tool_calls": budget.max_tool_calls,
+                }
+
+            pct = budget.percent_used(turn_index, total_tool_calls)
+            if pct >= budget.soft_warning_at and not budget.soft_warning_fired:
+                budget.soft_warning_fired = True
+                remaining_turns = budget.remaining_turns(turn_index)
+                yield {
+                    "type": "budget_warning",
+                    "percent_used": round(pct, 2),
+                    "remaining_turns": remaining_turns,
+                    "remaining_tool_calls": budget.remaining_tool_calls(total_tool_calls),
+                    "message": (
+                        f"세션 예산 {int(pct * 100)}% 도달 — 남은 턴 약 {remaining_turns}개. "
+                        "핵심 발견을 정리하고 마무리할 시점입니다."
+                    ),
+                }
+                contents.append(types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=(
+                        f"[시스템 리마인더] 세션 예산 {int(pct * 100)}% 사용. "
+                        f"남은 턴 약 {remaining_turns}개. "
+                        "지금까지의 핵심 발견을 정리하고, 미검증 가설은 다음 세션으로 미루며, "
+                        "최종 Markdown 요약 셀로 마무리하세요. 새 분석 흐름 시작 금지."
+                    ))],
+                ))
         else:
-            # for-else: MAX_TURNS 소진
+            # while-else: 조건이 False 가 되어 자연 종료 (break 시는 미실행)
             yield {
                 "type": "error",
                 "message": (
-                    f"모델 왕복 상한에 도달했어요 (MAX_TURNS={MAX_TURNS}). "
+                    f"모델 왕복 상한에 도달했어요 ({budget.tier} 티어, MAX_TURNS={budget.max_turns}). "
                     "남은 분석이 있다면 **새 메시지로 \"이어서 진행해줘\"** 라고 주시거나, "
-                    "다음 단계를 더 짧게 쪼개서 다시 요청해주세요."
+                    "채팅창의 '더 깊게' 버튼으로 상위 티어로 재시도해주세요."
                 ),
             }
             return

@@ -418,6 +418,17 @@ interface AppStore {
   agentLoading: boolean
   agentStartedAtMs: number | null
   agentStatus: string | null
+  // 현재 진행중 세션의 tier 분류 결과 + 예산 진행 상황 (tier_classified / tier_promoted / budget_warning 으로 갱신)
+  agentTier: import('@/lib/api').AgentTier | null
+  agentTierReason: string | null
+  agentEstimatedSeconds: number | null
+  agentMaxTurns: number | null
+  agentMaxToolCalls: number | null
+  agentBudgetPercent: number | null   // 0.0 ~ 1.0
+  agentBudgetWarningMessage: string | null
+  // 다음 요청 시 분류기 우회 — '더 깊게'/'간단히' override 버튼이 세팅
+  agentTierOverride: import('@/lib/api').AgentTier | null
+  setAgentTierOverride: (tier: import('@/lib/api').AgentTier | null) => void
   agentRefCells: string[]
   toggleAgentRefCell: (id: string) => void
   toggleAgentMode: () => void
@@ -1255,6 +1266,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
   agentLoading: false,
   agentStartedAtMs: null,
   agentStatus: null,
+  agentTier: null,
+  agentTierReason: null,
+  agentEstimatedSeconds: null,
+  agentMaxTurns: null,
+  agentMaxToolCalls: null,
+  agentBudgetPercent: null,
+  agentBudgetWarningMessage: null,
+  agentTierOverride: null,
+  setAgentTierOverride: (tier) => set({ agentTierOverride: tier }),
   agentRefCells: [],
 
   toggleAgentRefCell: (id) =>
@@ -1522,6 +1542,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
     _agentController = new AbortController()
 
     try {
+      const tierOverride = get().agentTierOverride
+      // 첫 요청에 override 를 한 번 사용하고 비움 (다음 요청에 다시 적용되지 않게).
+      if (tierOverride) set({ agentTierOverride: null })
+      // tier 관련 상태 초기화 (tier_classified 가 다시 채움)
+      set({
+        agentTier: null,
+        agentTierReason: null,
+        agentEstimatedSeconds: null,
+        agentMaxTurns: null,
+        agentMaxToolCalls: null,
+        agentBudgetPercent: null,
+        agentBudgetWarningMessage: null,
+      })
+
       await streamAgentMessage(
         {
           message,
@@ -1539,6 +1573,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           images: pendingImages.length > 0
             ? pendingImages.map((img) => ({ media_type: img.mediaType, data: img.data }))
             : undefined,
+          tier_override: tierOverride,
         },
         (event) => {
           // helper: 새 텍스트 말풍선 시작 (현재 버블에 내용이 있으면)
@@ -1593,7 +1628,32 @@ export const useAppStore = create<AppStore>((set, get) => ({
           if (event.type !== 'message_delta') {
             flushAgentDeltas()
           }
-          if (event.type === 'thinking') {
+          if (event.type === 'tier_classified') {
+            set({
+              agentTier: event.tier,
+              agentTierReason: event.reason,
+              agentEstimatedSeconds: event.estimated_seconds,
+              agentMaxTurns: event.max_turns,
+              agentMaxToolCalls: event.max_tool_calls,
+              agentBudgetPercent: 0,
+            })
+          } else if (event.type === 'tier_promoted') {
+            // 자동 승격: 라벨에 알리고 한도 갱신, percent 재계산은 budget_warning 에서.
+            set({
+              agentTier: event.to_tier,
+              agentTierReason: event.reason,
+              agentMaxTurns: event.new_max_turns,
+              agentMaxToolCalls: event.new_max_tool_calls,
+              agentBudgetWarningMessage: null,
+              agentBudgetPercent: null,
+            })
+            pushStep('tool', `티어 승격 ${event.from_tier} → ${event.to_tier}`, event.reason)
+          } else if (event.type === 'budget_warning') {
+            set({
+              agentBudgetPercent: event.percent_used,
+              agentBudgetWarningMessage: event.message,
+            })
+          } else if (event.type === 'thinking') {
             set({ agentStatus: '생각 중' })
           } else if (event.type === 'tool_use') {
             const label = toolStatusLabel(event.tool, event.input)

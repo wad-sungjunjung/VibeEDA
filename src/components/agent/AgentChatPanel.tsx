@@ -53,6 +53,24 @@ export default function AgentChatPanel() {
     toggleAgentRefCell: s.toggleAgentRefCell,
     newAgentSession: s.newAgentSession,
   })))
+  // Tier 분류 + 예산 정보 (별도 셀렉터 — 위 useShallow 가 비대해지지 않게 분리)
+  const {
+    agentTier,
+    agentTierReason,
+    agentEstimatedSeconds,
+    agentBudgetPercent,
+    agentBudgetWarningMessage,
+    agentTierOverride,
+    setAgentTierOverride,
+  } = useAppStore(useShallow((s) => ({
+    agentTier: s.agentTier,
+    agentTierReason: s.agentTierReason,
+    agentEstimatedSeconds: s.agentEstimatedSeconds,
+    agentBudgetPercent: s.agentBudgetPercent,
+    agentBudgetWarningMessage: s.agentBudgetWarningMessage,
+    agentTierOverride: s.agentTierOverride,
+    setAgentTierOverride: s.setAgentTierOverride,
+  })))
 
   // 에이전트 실행 경과 시간 — 스토어의 시작 시각을 기준으로 현재 시각에서 빼서 계산.
   // 컴포넌트 mount/unmount와 무관하게 올바른 경과 시간이 표시됨.
@@ -501,6 +519,105 @@ export default function AgentChatPanel() {
             )
           })}
           <div ref={messagesEndRef} />
+        </div>
+      )}
+
+      {/* Tier classification chip + override + budget progress */}
+      {(agentTier || agentTierOverride) && (
+        <div className="px-4 pt-2 pb-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Tier chip */}
+            {agentTier && (
+              <span
+                title={agentTierReason ?? ''}
+                className={cn(
+                  'flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border',
+                  agentTier === 'L1' && 'bg-success/10 text-success border-success/30',
+                  agentTier === 'L2' && 'bg-primary-light text-primary-text border-primary-border',
+                  agentTier === 'L3' && 'bg-warning-bg text-warning-text border-warning/40',
+                )}
+              >
+                {agentTier === 'L1' ? '간단' : agentTier === 'L2' ? '중간' : '심층'}
+                {agentEstimatedSeconds && agentEstimatedSeconds > 0 && (
+                  <span className="font-normal opacity-75">
+                    · 약 {agentEstimatedSeconds < 60 ? `${agentEstimatedSeconds}초` : `${Math.round(agentEstimatedSeconds / 60)}분`}
+                  </span>
+                )}
+              </span>
+            )}
+
+            {/* Override pending chip — 다음 요청에 적용될 override */}
+            {agentTierOverride && (
+              <span
+                title="다음 요청에 적용될 티어"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border border-dashed border-primary-border bg-primary-pale text-primary-text"
+              >
+                다음: {agentTierOverride === 'L1' ? '간단' : agentTierOverride === 'L2' ? '중간' : '심층'}
+                <button
+                  title="해제"
+                  onClick={() => setAgentTierOverride(null)}
+                  className="ml-0.5 hover:text-danger"
+                >
+                  <X size={9} />
+                </button>
+              </span>
+            )}
+
+            {/* Override buttons */}
+            {agentTier && !agentLoading && (
+              <div className="flex items-center gap-0.5 ml-auto text-[10px] font-medium text-text-tertiary">
+                <span className="mr-1 opacity-70">다음 요청:</span>
+                <button
+                  title="다음 요청을 더 깊은 티어로"
+                  onClick={() => {
+                    const next = agentTier === 'L1' ? 'L2' : agentTier === 'L2' ? 'L3' : 'L3'
+                    setAgentTierOverride(next)
+                  }}
+                  disabled={agentTier === 'L3'}
+                  className="px-1.5 py-0.5 rounded border border-border-subtle hover:bg-chip disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  더 깊게
+                </button>
+                <button
+                  title="다음 요청을 더 간단한 티어로"
+                  onClick={() => {
+                    const next = agentTier === 'L3' ? 'L2' : agentTier === 'L2' ? 'L1' : 'L1'
+                    setAgentTierOverride(next)
+                  }}
+                  disabled={agentTier === 'L1'}
+                  className="px-1.5 py-0.5 rounded border border-border-subtle hover:bg-chip disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  간단히
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Budget progress bar — 80% 도달 시 활성화 */}
+          {agentLoading && agentBudgetPercent !== null && agentBudgetPercent > 0 && (
+            <div className="mt-1.5 flex items-center gap-2">
+              <div className="flex-1 h-1 rounded-full bg-chip overflow-hidden">
+                <div
+                  className={cn(
+                    'h-full transition-all duration-300',
+                    agentBudgetPercent >= 0.8 ? 'bg-warning' : 'bg-primary'
+                  )}
+                  style={{ width: `${Math.min(100, agentBudgetPercent * 100)}%` }}
+                />
+              </div>
+              <span className="text-[10px] font-mono text-text-tertiary tabular-nums">
+                {Math.round(agentBudgetPercent * 100)}%
+              </span>
+            </div>
+          )}
+
+          {/* Budget warning text */}
+          {agentBudgetWarningMessage && agentLoading && (
+            <div className="mt-1 flex items-start gap-1.5 text-[11px] leading-relaxed px-2 py-1 rounded-md bg-warning-bg/50 border border-dashed border-warning/40 text-warning-text">
+              <AlertTriangle size={11} className="shrink-0 mt-0.5" />
+              <span>{agentBudgetWarningMessage}</span>
+            </div>
+          )}
         </div>
       )}
 

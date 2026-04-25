@@ -13,6 +13,8 @@ from . import mart_tools
 from . import agent_skills
 from . import category_cache
 from . import file_profile_cache
+from . import agent_budget
+from . import agent_classifier
 from .code_style import SQL_STYLE_GUIDE, PYTHON_RULES, MARKDOWN_RULES
 
 logger = logging.getLogger(__name__)
@@ -157,6 +159,8 @@ class NotebookState:
     explored_marts: set = field(default_factory=set)
     # 분석 todo 리스트 — Claude Code 스타일 투명한 진행 상황 트래커
     todos: list = field(default_factory=list)
+    # 복잡도 분류 결과 + 예산 상태. run_agent_stream 진입 직후 세팅.
+    budget: Optional[agent_budget.BudgetState] = None
 
 
 # ─── Tool definitions ────────────────────────────────────────────────────────
@@ -1510,6 +1514,7 @@ async def run_agent_stream(
     notebook_state: NotebookState,
     conversation_history: list[dict],
     images: list[dict] | None = None,
+    tier_override: Optional[str] = None,
 ) -> AsyncGenerator[dict, None]:
     if not api_key:
         yield {"type": "error", "message": "Anthropic API 키가 설정되지 않았습니다."}
@@ -1521,6 +1526,34 @@ async def run_agent_stream(
     )
     agent_skills.init_skill_ctx(notebook_state, user_message)
     notebook_state.user_message_latest = user_message
+
+    # ─── Phase -1: 복잡도 분류 + 예산 세팅 ────────────────────────────────
+    # 휴리스틱 → (애매하면) Haiku → default. Anthropic 키가 이미 있으니 Haiku 호출 가능.
+    classification = await agent_classifier.classify_request_async(
+        user_message,
+        api_key=api_key,
+        mart_count=len(notebook_state.selected_marts),
+        has_image=bool(images),
+        history_depth=len(conversation_history),
+        tier_override=tier_override,  # type: ignore[arg-type]
+    )
+    budget = agent_budget.make_budget(
+        classification.tier,  # type: ignore[arg-type]
+        reason=classification.reason,
+    )
+    budget.user_overridden = classification.method == "override"
+    notebook_state.budget = budget
+    yield {
+        "type": "tier_classified",
+        "tier": budget.tier,
+        "reason": budget.classification_reason,
+        "estimated_cells": budget.estimated_cells,
+        "estimated_seconds": budget.estimated_seconds,
+        "max_turns": budget.max_turns,
+        "max_tool_calls": budget.max_tool_calls,
+        "methods": [],  # Phase 0 (S2) 에서 채워질 예정
+    }
+
     system_prompt = _build_system_prompt(notebook_state)
 
     messages: list[dict] = list(conversation_history)
@@ -1537,14 +1570,17 @@ async def run_agent_stream(
     import time as _time
     created_cell_ids: list[str] = []
     updated_cell_ids: list[str] = []
-    MAX_TURNS = 50
+    # MAX_TURNS / TOTAL_TOOL_LIMIT 은 더 이상 하드코딩하지 않고 budget 에서 읽음.
+    # tier 별로 L1=5/10, L2=25/60, L3=80/200 — agent_budget.TIER_BUDGETS 참조.
+    MAX_TURNS = budget.max_turns
     REPEAT_CALL_LIMIT = 3
-    TOTAL_TOOL_LIMIT = 200     # 세션당 총 tool_call 상한 (우회 방지)
+    TOTAL_TOOL_LIMIT = budget.max_tool_calls
     NARRATION_MIN_CHARS = 20   # 도구 호출 전 내레이션 최소 길이
     LONG_RUN_SEC = 30          # 이 시간 넘게 분석하면 재질문 고려 리마인더 주입
     repeat_counter: dict[str, int] = {}
     total_tool_calls = 0
     turn_index = 0
+    budget.started_at = _time.monotonic()
     narration_warning_used = False
     long_run_warning_used = False
     loop_started_at = _time.monotonic()
@@ -1566,7 +1602,7 @@ async def run_agent_stream(
         return f"{tool_name.lower()}:{json.dumps(_norm(inp), sort_keys=True, ensure_ascii=False)}"
 
     try:
-        for _ in range(MAX_TURNS):
+        while turn_index < budget.max_turns:
             # 내레이션 누락 시 1회 재요청 — tool_use만 있고 text가 부족하면 턴을 폐기하고
             # "텍스트 먼저" 강제 지시를 주입해 다시 호출한다.
             retried_for_narration = False
@@ -1704,15 +1740,15 @@ async def run_agent_stream(
             safety_break = False
             for tb in tool_uses:
                 total_tool_calls += 1
-                if total_tool_calls > TOTAL_TOOL_LIMIT:
+                if total_tool_calls > budget.max_tool_calls:
                     yield {
                         "type": "error",
                         "message": (
-                            f"세션 안전 상한에 도달했어요 (총 도구 호출 {TOTAL_TOOL_LIMIT}회 초과). "
+                            f"세션 예산에 도달했어요 ({budget.tier} 티어, 총 도구 호출 {budget.max_tool_calls}회). "
                             f"지금까지 셀 {len(created_cell_ids)}개 생성·{len(updated_cell_ids)}개 수정했고, "
                             "여기서 일단 멈춥니다. 이어서 진행하려면 **새 메시지로 "
                             "\"이어서 분석해줘\" 또는 남은 하위 질문** 을 주시면 현 상태에서 재개합니다. "
-                            "매번 새 분석을 더 짧은 단위로 쪼개 요청하는 것도 도움이 돼요."
+                            "또는 채팅창의 '더 깊게' 버튼으로 상위 티어로 재시작 가능합니다."
                         ),
                     }
                     safety_break = True
@@ -1866,15 +1902,63 @@ async def run_agent_stream(
             # 컨텍스트 압축: 20턴 이상 길어지면 오래된 tool_result 를 요약으로 교체
             if turn_index >= 20:
                 _compact_messages_inplace(messages, keep_recent_turns=10)
+
+            # ─── 예산 진행 체크 ─────────────────────────────────────────────
+            # (1) Auto-promotion — L1 인데 셀 4+, L2 인데 turn 20+ 이면 한 단계 승격.
+            promoted, promo_msg = agent_budget.maybe_promote(
+                budget,
+                cells_created=len(created_cell_ids),
+                turns=turn_index,
+            )
+            if promoted is not budget:
+                old_tier = budget.tier
+                budget = promoted
+                notebook_state.budget = budget
+                yield {
+                    "type": "tier_promoted",
+                    "from_tier": old_tier,
+                    "to_tier": budget.tier,
+                    "reason": promo_msg or "",
+                    "new_max_turns": budget.max_turns,
+                    "new_max_tool_calls": budget.max_tool_calls,
+                }
+
+            # (2) Soft warning — 80% 도달 시 1회. 모델에게 마무리 압박.
+            pct = budget.percent_used(turn_index, total_tool_calls)
+            if pct >= budget.soft_warning_at and not budget.soft_warning_fired:
+                budget.soft_warning_fired = True
+                remaining_turns = budget.remaining_turns(turn_index)
+                yield {
+                    "type": "budget_warning",
+                    "percent_used": round(pct, 2),
+                    "remaining_turns": remaining_turns,
+                    "remaining_tool_calls": budget.remaining_tool_calls(total_tool_calls),
+                    "message": (
+                        f"세션 예산 {int(pct * 100)}% 도달 — 남은 턴 약 {remaining_turns}개. "
+                        f"핵심 발견을 정리하고 마무리할 시점입니다."
+                    ),
+                }
+                # 모델에게도 시스템 리마인더로 마무리 압박을 한 번 전달
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        f"[시스템 리마인더] 세션 예산 {int(pct * 100)}% 사용. "
+                        f"남은 턴 약 {remaining_turns}개. "
+                        "지금까지의 핵심 발견을 정리하고, 미검증 가설은 다음 세션으로 미루며, "
+                        "최종 Markdown 요약 셀로 마무리하세요. 새 분석 흐름 시작 금지."
+                    ),
+                })
+
         else:
-            # for-else: MAX_TURNS 를 break 없이 모두 소진했을 때만 진입
+            # while-else: 조건(turn_index < budget.max_turns) 이 False 가 되어 자연 종료.
+            # break 로 빠져나온 경우(루프 내 graceful exit)는 이 블록 실행 안 됨 — Python while-else 의미.
             yield {
                 "type": "error",
                 "message": (
-                    f"모델 왕복 상한에 도달했어요 (MAX_TURNS={MAX_TURNS}). "
+                    f"모델 왕복 상한에 도달했어요 ({budget.tier} 티어, MAX_TURNS={budget.max_turns}). "
                     f"지금까지 셀 {len(created_cell_ids)}개 생성·{len(updated_cell_ids)}개 수정했습니다. "
                     "남은 분석이 있다면 **새 메시지로 \"이어서 진행해줘\"** 라고 주시거나, "
-                    "다음 단계를 더 짧게 쪼개서 다시 요청해주세요."
+                    "채팅창의 '더 깊게' 버튼으로 상위 티어로 재시도해주세요."
                 ),
             }
             return

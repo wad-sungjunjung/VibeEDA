@@ -19,6 +19,8 @@ export type AgentTodo = {
   active_form?: string
 }
 
+export type AgentTier = 'L1' | 'L2' | 'L3'
+
 export type AgentEvent =
   | { type: 'thinking'; content: string }
   | { type: 'tool_use'; tool: string; input: Record<string, unknown> }
@@ -33,6 +35,9 @@ export type AgentEvent =
   | { type: 'ask_user'; question: string; options: string[] }
   | { type: 'exec_heartbeat'; cell_id: string; cell_name: string; elapsed_sec: number; message: string }
   | { type: 'exec_completed_notice'; cell_id: string; cell_name: string; elapsed_sec: number; message: string }
+  | { type: 'tier_classified'; tier: AgentTier; reason: string; estimated_cells: number; estimated_seconds: number; max_turns: number; max_tool_calls: number; methods: string[] }
+  | { type: 'budget_warning'; percent_used: number; remaining_turns: number; remaining_tool_calls: number; message: string }
+  | { type: 'tier_promoted'; from_tier: AgentTier; to_tier: AgentTier; reason: string; new_max_turns: number; new_max_tool_calls: number }
   | { type: 'complete'; created_cell_ids: string[]; updated_cell_ids: string[] }
   | { type: 'error'; message: string }
 
@@ -416,6 +421,8 @@ export interface AgentRequest {
   conversation_history: { role: 'user' | 'assistant'; content: string }[]
   notebook_id?: string | null
   images?: { media_type: string; data: string }[]
+  // 사용자가 프론트에서 명시적으로 tier 를 지정했을 때 — 휴리스틱·Haiku 분류기 우회.
+  tier_override?: AgentTier | null
 }
 
 export async function generateAgentSessionTitle(question: string, response?: string): Promise<string> {

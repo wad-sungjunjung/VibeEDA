@@ -117,6 +117,9 @@ class AgentRequest(BaseModel):
     conversation_history: list[ConversationMessage] = []
     notebook_id: Optional[str] = None
     images: list[ImageBlockInput] = []
+    # 프론트가 명시적으로 tier 를 지정한 경우 — 휴리스틱·Haiku 분류기 우회.
+    # 사용자가 "더 깊게" / "간단히" override 버튼을 눌렀을 때 채워진다.
+    tier_override: Optional[Literal["L1", "L2", "L3"]] = None
 
 
 @router.post("/agent/stream")
@@ -167,6 +170,7 @@ async def agent_stream_endpoint(
             notebook_state=notebook_state,
             conversation_history=history,
             images=[{"media_type": img.media_type, "data": img.data} for img in req.images],
+            tier_override=req.tier_override,
         ):
             yield f"data: {json.dumps(event, ensure_ascii=False, default=_json_default)}\n\n"
 

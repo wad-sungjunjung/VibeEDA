@@ -21,6 +21,12 @@ AgentEventType = Literal[
     "ask_user",
     "exec_heartbeat",
     "exec_completed_notice",
+    # Phase -1: 복잡도 분류 결과 (run loop 진입 직후 1회)
+    "tier_classified",
+    # 예산 80% 도달 시 1회. 프론트가 progress bar / 마무리 안내에 사용.
+    "budget_warning",
+    # tier 자동 승격 알림 (L1 → L2 등). 분류기가 부실해도 실행 중 보정됨을 노출.
+    "tier_promoted",
     "complete",
     "error",
 ]
@@ -39,6 +45,9 @@ ALL_EVENT_TYPES: tuple[str, ...] = (
     "ask_user",
     "exec_heartbeat",
     "exec_completed_notice",
+    "tier_classified",
+    "budget_warning",
+    "tier_promoted",
     "complete",
     "error",
 )
@@ -138,6 +147,35 @@ class ExecCompletedNoticeEvent(TypedDict):
     message: str
 
 
+class TierClassifiedEvent(TypedDict, total=False):
+    type: Literal["tier_classified"]
+    tier: Literal["L1", "L2", "L3"]
+    reason: str
+    estimated_cells: int
+    estimated_seconds: int
+    max_turns: int
+    max_tool_calls: int
+    # Phase 0 결과로 채워질 자리. S1 단계에선 빈 배열.
+    methods: list[str]
+
+
+class BudgetWarningEvent(TypedDict):
+    type: Literal["budget_warning"]
+    percent_used: float
+    remaining_turns: int
+    remaining_tool_calls: int
+    message: str
+
+
+class TierPromotedEvent(TypedDict):
+    type: Literal["tier_promoted"]
+    from_tier: Literal["L1", "L2", "L3"]
+    to_tier: Literal["L1", "L2", "L3"]
+    reason: str
+    new_max_turns: int
+    new_max_tool_calls: int
+
+
 AgentEvent = Union[
     ThinkingEvent,
     ToolUseEvent,
@@ -152,6 +190,9 @@ AgentEvent = Union[
     AskUserEvent,
     ExecHeartbeatEvent,
     ExecCompletedNoticeEvent,
+    TierClassifiedEvent,
+    BudgetWarningEvent,
+    TierPromotedEvent,
     CompleteEvent,
     ErrorEvent,
 ]
