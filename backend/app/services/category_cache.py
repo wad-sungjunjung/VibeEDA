@@ -83,6 +83,51 @@ def _flush_to_disk() -> None:
         logger.warning("category cache flush failed: %s", e)
 
 
+# 디바운스 플러시: get_category_values 가 한 에이전트 턴에 수십번 호출되면서
+# 매번 sync JSON write 가 일어나는 것을 막는다. 5초 idle 후에야 디스크 기록.
+# 명시적 무효화(clear_cache) 와 프로세스 종료(atexit) 시에는 즉시 flush.
+_FLUSH_DELAY = 5.0
+_flush_timer_lock = threading.Lock()
+_flush_timer: threading.Timer | None = None
+_dirty = False
+
+
+def _schedule_flush() -> None:
+    global _flush_timer, _dirty
+    with _flush_timer_lock:
+        _dirty = True
+        if _flush_timer is not None and _flush_timer.is_alive():
+            return
+        _flush_timer = threading.Timer(_FLUSH_DELAY, _flush_if_dirty)
+        _flush_timer.daemon = True
+        _flush_timer.start()
+
+
+def _flush_if_dirty() -> None:
+    global _flush_timer, _dirty
+    with _flush_timer_lock:
+        _flush_timer = None
+        if not _dirty:
+            return
+        _dirty = False
+    _flush_to_disk()
+
+
+def _flush_now() -> None:
+    """타이머 취소 후 동기 flush — 명시적 invalidation 또는 종료 시 사용."""
+    global _flush_timer, _dirty
+    with _flush_timer_lock:
+        if _flush_timer is not None:
+            _flush_timer.cancel()
+            _flush_timer = None
+        _dirty = False
+    _flush_to_disk()
+
+
+import atexit as _atexit
+_atexit.register(_flush_if_dirty)
+
+
 def is_category_column(col_name: str) -> bool:
     return bool(_CATEGORY_COL_RE.search(col_name or ""))
 
@@ -99,7 +144,7 @@ def clear_cache(mart_key: Optional[str] = None) -> int:
             for k in keys:
                 del _cache[k]
             n = len(keys)
-    _flush_to_disk()
+    _flush_now()  # 사용자 명시 무효화 — 즉시 디스크 반영
     return n
 
 
@@ -164,7 +209,7 @@ def get_category_values(mart_key: str, col: str, use_cache: bool = True) -> Opti
         return None   # 캐시에 쓰지 않음 — 다음 요청 시 재시도
     with _lock:
         _cache[key] = {"values": vals, "fetched_at": time.time()}
-    _flush_to_disk()
+    _schedule_flush()  # 핫패스 — 5초 디바운스로 디스크 쓰기 묶음
     return vals
 
 
@@ -285,7 +330,7 @@ def invalidate_changed_marts() -> int:
                 del _cache[key]
                 removed += 1
     if removed:
-        _flush_to_disk()
+        _flush_now()  # 변경 감지 — 즉시 영속해 다음 prewarm 이 stale 보지 않게.
         logger.info("invalidated %d cache entries due to last_altered change", removed)
     return removed
 

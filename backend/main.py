@@ -89,15 +89,42 @@ def open_folder():
     return {"ok": True, "path": nd}
 
 
+# /v1/system/info 는 사이드바 등에서 자주 호출되는데, 매 호출마다 nd.glob('*.ipynb')
+# 디렉터리 스캔이 발생한다 (Windows 에서 특히 비싸다). 60초 TTL 메모리 캐시로
+# 단순 카운트는 즉시 반환. notebooks_dir 변경 시 cache_clear() 로 무효화.
+_SYSTEM_INFO_TTL = 60.0  # seconds
+_system_info_cache: dict | None = None
+_system_info_cache_ts: float = 0.0
+
+
+def _invalidate_system_info_cache() -> None:
+    global _system_info_cache
+    _system_info_cache = None
+
+
 @app.get("/v1/system/info")
 def system_info():
+    global _system_info_cache, _system_info_cache_ts
+    import time as _time
     nd = notebook_store.NOTEBOOKS_DIR
+    nd_str = str(nd)
+    now = _time.monotonic()
+    cached = _system_info_cache
+    if (
+        cached is not None
+        and cached.get("notebooks_dir") == nd_str
+        and (now - _system_info_cache_ts) < _SYSTEM_INFO_TTL
+    ):
+        return cached
     notebook_files = list(nd.glob("*.ipynb")) if nd.exists() else []
-    return {
-        "notebooks_dir": str(nd),
+    payload = {
+        "notebooks_dir": nd_str,
         "notebook_count": len(notebook_files),
         "backend_version": app.version,
     }
+    _system_info_cache = payload
+    _system_info_cache_ts = now
+    return payload
 
 
 @app.post("/v1/system/notebooks-dir")
@@ -108,6 +135,7 @@ def update_notebooks_dir(body: dict):
         raise HTTPException(status_code=400, detail="path is required")
     try:
         resolved = notebook_store.set_notebooks_dir(new_path)
+        _invalidate_system_info_cache()  # 디렉터리 변경됨 — 캐시 무효화
         nd = notebook_store.NOTEBOOKS_DIR
         notebook_files = list(nd.glob("*.ipynb")) if nd.exists() else []
         return {"ok": True, "notebooks_dir": str(resolved), "notebook_count": len(notebook_files)}

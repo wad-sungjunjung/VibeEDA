@@ -23,7 +23,7 @@ router = APIRouter()
 # 업로드 허용 확장자 (분석 관련 포맷만 — .py/.sh 같은 실행 스크립트는 제외)
 _UPLOAD_ALLOWED_EXTS = {
     ".csv", ".tsv", ".xlsx", ".xls", ".parquet",
-    ".json", ".txt", ".md",
+    ".json", ".txt", ".md", ".ipynb",
 }
 _UPLOAD_MAX_BYTES = 100 * 1024 * 1024  # 100 MB
 _SAFE_FILENAME_RE = re.compile(r"[\x00-\x1f<>:\"/\\|?*]")
@@ -313,8 +313,9 @@ async def upload_file(
     dst_dir: str = Form(default=""),
     overwrite: bool = Form(default=False),
 ):
-    """외부 파일(csv/xlsx/parquet/tsv/json/txt/md) 업로드.
+    """외부 파일(csv/xlsx/parquet/tsv/json/txt/md/ipynb) 업로드.
     dst_dir 가 비어 있으면 NOTEBOOKS_DIR 루트에 저장. 저장 후 분석 포맷은 바로 프로파일링.
+    .ipynb 는 저장 후 notebook_store 에 자동 등록하여 파일트리에서 즉시 열 수 있게 함.
     """
     raw_name = file.filename or "upload"
     safe_name = _sanitize_filename(raw_name)
@@ -377,12 +378,35 @@ async def upload_file(
         except Exception as e:
             profile = {"error": str(e)}
 
+    # .ipynb 는 notebook_store 에 등록 — vibe.id 가 없으면 새로 부여, rel 경로로 id_to_file 기록
+    notebook_id = None
+    if ext == ".ipynb":
+        try:
+            import json as _json, uuid as _uuid
+            from ..services.notebook_store._core import _register_file, NOTEBOOKS_DIR
+            nb = _json.loads(target.read_text(encoding="utf-8"))
+            vibe = nb.setdefault("metadata", {}).setdefault("vibe", {})
+            nb_id = vibe.get("id") or str(_uuid.uuid4())
+            vibe["id"] = nb_id
+            if not vibe.get("title"):
+                vibe["title"] = target.stem
+            target.write_text(_json.dumps(nb, ensure_ascii=False, indent=2), encoding="utf-8")
+            try:
+                rel = str(target.resolve().relative_to(NOTEBOOKS_DIR.resolve()).with_suffix(""))
+            except ValueError:
+                rel = target.stem
+            _register_file(nb_id, rel)
+            notebook_id = nb_id
+        except Exception as e:
+            profile = {"error": f"notebook 등록 실패: {e}"}
+
     return {
         "ok": True,
         "path": str(target),
         "name": target.name,
         "size": total,
         "profile": profile,
+        **({"notebook_id": notebook_id} if notebook_id else {}),
     }
 
 

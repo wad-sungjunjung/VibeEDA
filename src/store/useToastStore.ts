@@ -31,7 +31,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
     const item: ToastItem = { ...t, id }
     set((s) => ({ toasts: [...s.toasts, item] }))
     const auto =
-      t.duration ?? (t.kind === 'error' ? 0 : t.kind === 'warning' ? 6000 : 4000)
+      t.duration ?? (t.kind === 'error' ? 5000 : t.kind === 'warning' ? 6000 : 4000)
     if (auto > 0) {
       setTimeout(() => get().dismiss(id), auto)
     }

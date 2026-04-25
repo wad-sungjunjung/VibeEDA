@@ -63,6 +63,49 @@ def _flush_to_disk() -> None:
         logger.warning("file profile cache flush failed: %s", e)
 
 
+# 디바운스 플러시: scan_and_profile_root() 등이 다수 파일을 순회하며 매번 sync write
+# 하지 않도록 5초 idle 후 한 번만 디스크에 기록. clear_cache 와 종료 시는 즉시 flush.
+_FLUSH_DELAY = 5.0
+_flush_timer_lock = threading.Lock()
+_flush_timer: threading.Timer | None = None
+_dirty = False
+
+
+def _schedule_flush() -> None:
+    global _flush_timer, _dirty
+    with _flush_timer_lock:
+        _dirty = True
+        if _flush_timer is not None and _flush_timer.is_alive():
+            return
+        _flush_timer = threading.Timer(_FLUSH_DELAY, _flush_if_dirty)
+        _flush_timer.daemon = True
+        _flush_timer.start()
+
+
+def _flush_if_dirty() -> None:
+    global _flush_timer, _dirty
+    with _flush_timer_lock:
+        _flush_timer = None
+        if not _dirty:
+            return
+        _dirty = False
+    _flush_to_disk()
+
+
+def _flush_now() -> None:
+    global _flush_timer, _dirty
+    with _flush_timer_lock:
+        if _flush_timer is not None:
+            _flush_timer.cancel()
+            _flush_timer = None
+        _dirty = False
+    _flush_to_disk()
+
+
+import atexit as _atexit
+_atexit.register(_flush_if_dirty)
+
+
 def _read_df(path: Path) -> Optional[Any]:
     """파일 확장자에 맞춰 pandas 로 읽기. 큰 파일은 nrows 제한."""
     import pandas as pd
@@ -130,7 +173,7 @@ def profile_file(path: Path | str, force: bool = False) -> dict:
         entry = {"path": key, "mtime": stat.st_mtime, "size": stat.st_size, "error": "file_too_large"}
         with _lock:
             _cache[key] = entry
-        _flush_to_disk()
+        _schedule_flush()
         return entry
 
     if not force:
@@ -145,7 +188,7 @@ def profile_file(path: Path | str, force: bool = False) -> dict:
         entry = {"path": key, "mtime": stat.st_mtime, "size": stat.st_size, "error": str(e)}
         with _lock:
             _cache[key] = entry
-        _flush_to_disk()
+        _schedule_flush()
         return entry
 
     if df is None:
@@ -162,7 +205,7 @@ def profile_file(path: Path | str, force: bool = False) -> dict:
     }
     with _lock:
         _cache[key] = entry
-    _flush_to_disk()
+    _schedule_flush()
     return entry
 
 
@@ -181,7 +224,7 @@ def clear_cache(path: Optional[str] = None) -> int:
         else:
             key = str(Path(path).expanduser().resolve())
             n = 1 if _cache.pop(key, None) else 0
-    _flush_to_disk()
+    _flush_now()  # 사용자 명시 — 즉시 영속
     return n
 
 

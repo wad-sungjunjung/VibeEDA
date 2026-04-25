@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, lazy, Suspense } from 'react'
+import { useRef, useEffect, useState, useCallback, lazy, Suspense, memo } from 'react'
 import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle, Maximize2, Minimize2, Sparkles, Grid3x3, Paperclip, X as XIcon } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -14,6 +14,7 @@ import { suggestCellName } from '@/lib/api'
 
 interface Props {
   cell: Cell
+  index: number
 }
 
 const TYPE_CYCLE_ORDER = ['sql', 'python', 'markdown'] as const
@@ -25,7 +26,11 @@ const TYPE_STYLES: Record<string, string> = {
 }
 const isNonExecutable = (t: string) => t === 'markdown' || t === 'sheet'
 
-export default function CellContainer({ cell }: Props) {
+function CellContainer({ cell, index }: Props) {
+  // cells 전체를 구독하지 않는다 — 다른 셀이 바뀔 때마다 모든 CellContainer 가
+  // 재렌더링되는 것을 막기 위함. cellIndex 는 NotebookArea 가 prop 으로 주입.
+  // 풀스크린 애니메이션은 fullscreenCellId 가 바뀐 그 시점의 cells 만 필요하므로
+  // effect 안에서 useAppStore.getState() 로 lazy 조회.
   const {
     activeCellId,
     setActiveCellId,
@@ -48,7 +53,6 @@ export default function CellContainer({ cell }: Props) {
     updateCellChatImages,
     submitVibe,
     cancelVibe,
-    cells,
     notebookAreaHeight,
     fullscreenCellId,
     setFullscreenCellId,
@@ -74,7 +78,6 @@ export default function CellContainer({ cell }: Props) {
     updateCellChatImages: s.updateCellChatImages,
     submitVibe: s.submitVibe,
     cancelVibe: s.cancelVibe,
-    cells: s.cells,
     notebookAreaHeight: s.notebookAreaHeight,
     fullscreenCellId: s.fullscreenCellId,
     setFullscreenCellId: s.setFullscreenCellId,
@@ -85,7 +88,7 @@ export default function CellContainer({ cell }: Props) {
   const isExecuting = executingCells.has(cell.id)
   const isVibing = vibingCells.has(cell.id)
   const isActive = activeCellId === cell.id
-  const cellIndex = cells.findIndex((c) => c.id === cell.id) + 1
+  const cellIndex = index
 
   const panelKeyFor = (slot: 'content' | 'left' | 'right' | 'vibe') => `${cell.id}::${slot}`
   const panelAttrs = (slot: 'content' | 'left' | 'right' | 'vibe') => {
@@ -130,8 +133,8 @@ export default function CellContainer({ cell }: Props) {
   }, [cell.type, cell.id])
   const [splitRatio, setSplitRatio] = useState(() => loadCellUi(cell.id).splitRatio ?? 50)
   const [vSplitRatio, setVSplitRatio] = useState(() => loadCellUi(cell.id).vSplitRatio ?? 50)
-  // 사용자가 직접 드래그로 조정한 패널 높이. 기본값은 360px.
-  const [panelHeight, setPanelHeight] = useState(() => loadCellUi(cell.id).panelHeight ?? 360)
+  // 사용자가 직접 드래그로 조정한 패널 높이. 기본값은 540px.
+  const [panelHeight, setPanelHeight] = useState(() => loadCellUi(cell.id).panelHeight ?? 540)
   const hasSavedPanelHeight = loadCellUi(cell.id).panelHeight != null
   const userResizedRef = useRef(hasSavedPanelHeight)
 
@@ -163,9 +166,10 @@ export default function CellContainer({ cell }: Props) {
       setFsVisible(true)
       if (prev && prev !== myId) {
         // 다른 셀에서 전환: 인덱스 방향에 따라 상/하 슬라이드
-        // 아래 셀로 이동(myIdx > prevIdx) → 새 셀은 아래에서 올라옴
-        const prevIdx = cells.findIndex((c) => c.id === prev)
-        const myIdx = cells.findIndex((c) => c.id === myId)
+        // cells 배열은 effect 트리거 시점의 스냅샷만 필요 (slide 방향만 결정).
+        const cellsNow = useAppStore.getState().cells
+        const prevIdx = cellsNow.findIndex((c) => c.id === prev)
+        const myIdx = cellsNow.findIndex((c) => c.id === myId)
         setFsAnim(myIdx > prevIdx ? 'slide-in-down' : 'slide-in-up')
       } else {
         // 최초 진입: grow
@@ -178,9 +182,9 @@ export default function CellContainer({ cell }: Props) {
       // 내가 fullscreen 에서 벗어남
       if (curr) {
         // 다른 셀에 넘어감 → 반대 방향으로 빠짐
-        // 아래 셀로 이동(currIdx > myIdx) → 이전 셀은 위로 빠짐
-        const currIdx = cells.findIndex((c) => c.id === curr)
-        const myIdx = cells.findIndex((c) => c.id === myId)
+        const cellsNow = useAppStore.getState().cells
+        const currIdx = cellsNow.findIndex((c) => c.id === curr)
+        const myIdx = cellsNow.findIndex((c) => c.id === myId)
         setFsAnim(currIdx > myIdx ? 'slide-out-up' : 'slide-out-down')
       } else {
         // 완전 해제 → grow-out
@@ -194,7 +198,7 @@ export default function CellContainer({ cell }: Props) {
       }, exitDuration)
       return () => window.clearTimeout(t)
     }
-  }, [fullscreenCellId, cell.id, cells])
+  }, [fullscreenCellId, cell.id])
 
   const fsRenderActive = fullscreen || fsVisible // DOM 에 fullscreen 스타일로 렌더할지
   const fsAnimClass = fsAnim ? `cell-fs-${fsAnim}` : ''
@@ -1035,3 +1039,9 @@ function PanelResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent)
     </div>
   )
 }
+
+// memo 로 감싸 부모(NotebookArea)가 cells.map 으로 다시 렌더링해도
+// 자기 셀의 props (cell, index) 가 그대로면 리렌더 스킵.
+// store 구독에서 발생한 변경(executingCells, vibingCells 등)은 useShallow 가
+// 객체 동등성으로 감지해 정상적으로 리렌더 트리거함.
+export default memo(CellContainer)

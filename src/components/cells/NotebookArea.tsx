@@ -39,7 +39,7 @@ export default function NotebookArea() {
           <span className="text-[12px]">하단 셀 추가 바에서 새 셀을 추가하세요</span>
         </div>
       ) : (
-        cells.map((cell) => <CellContainer key={cell.id} cell={cell} />)
+        cells.map((cell, idx) => <CellContainer key={cell.id} cell={cell} index={idx + 1} />)
       )}
     </div>
   )

@@ -6,6 +6,18 @@ from datetime import datetime
 from typing import Optional
 
 
+def _sanitize_nan(obj):
+    """Recursively replace float NaN/Inf with None so JSON serialization never fails."""
+    import math
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_nan(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_nan(v) for v in obj]
+    return obj
+
+
 def _parse_output(outputs: list) -> Optional[dict]:
     if not outputs:
         return None
@@ -13,7 +25,8 @@ def _parse_output(outputs: list) -> Optional[dict]:
         data = out.get("data", {})
         if "application/vnd.vibe+json" in data:
             val = data["application/vnd.vibe+json"]
-            return json.loads(val) if isinstance(val, str) else val
+            parsed = json.loads(val) if isinstance(val, str) else val
+            return _sanitize_nan(parsed)
         if out.get("output_type") == "error":
             return {
                 "type": "error",

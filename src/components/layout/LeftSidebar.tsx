@@ -35,6 +35,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useModelStore } from '@/store/modelStore'
 import { cn } from '@/lib/utils'
+import { toast } from '@/store/useToastStore'
 import ModelSettingsModal from '@/components/common/ModelSettingsModal'
 import ConnectionModal from '@/components/common/ConnectionModal'
 import HelpModal from '@/components/common/HelpModal'
@@ -580,9 +581,15 @@ function UnifiedFolderSection({
       setUploading(false)
     }
     if (ok.length === 0 && fail.length === 0) return
-    const dstLabel = dstDir ? (dstDir.split('/').pop() || '폴더') : '루트'
+    const dstLabel = dstDir ? (dstDir.split(/[\\/]/).pop() || '폴더') : '루트'
     setUploadStatus({ ok, fail, dstLabel })
     statusTimerRef.current = setTimeout(() => setUploadStatus(null), 4000)
+    if (fail.length > 0) {
+      toast.error(
+        `업로드 실패 (${fail.length}개)`,
+        fail.join('\n'),
+      )
+    }
   }
 
   // FileTreeNode(자식) 의 폴더 업로드 결과도 여기 배너로 받아 표시
@@ -650,7 +657,7 @@ function UnifiedFolderSection({
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".csv,.tsv,.xlsx,.xls,.parquet,.json,.txt,.md"
+            accept=".csv,.tsv,.xlsx,.xls,.parquet,.json,.txt,.md,.ipynb"
             style={{ display: 'none' }}
             onChange={(e) => {
               void handleUpload(e.target.files, '')
@@ -659,7 +666,7 @@ function UnifiedFolderSection({
           />
           <button
             type="button"
-            title="파일 업로드 (csv, xlsx, parquet, tsv, json 등)"
+            title="파일 업로드 (csv, xlsx, parquet, tsv, json, ipynb 등)"
             onClick={(e) => {
               e.stopPropagation()
               if (uploading) return
@@ -884,6 +891,12 @@ function FileTreeNode({
     window.dispatchEvent(new CustomEvent('vibe:upload-status', {
       detail: { ok, fail, dstLabel: node.name },
     }))
+    if (fail.length > 0) {
+      toast.error(
+        `업로드 실패 (${fail.length}개)`,
+        fail.join('\n'),
+      )
+    }
   }
 
   async function copyPath() {
@@ -939,7 +952,7 @@ function FileTreeNode({
             ref={folderFileInputRef}
             type="file"
             multiple
-            accept=".csv,.tsv,.xlsx,.xls,.parquet,.json,.txt,.md"
+            accept=".csv,.tsv,.xlsx,.xls,.parquet,.json,.txt,.md,.ipynb"
             style={{ display: 'none' }}
             onChange={(e) => {
               void uploadToFolder(e.target.files)

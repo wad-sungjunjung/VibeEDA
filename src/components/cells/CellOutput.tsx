@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from 'react'
 import Plot from 'react-plotly.js'
 import { Copy, Check } from 'lucide-react'
 import type { Cell } from '@/types'
@@ -105,7 +105,7 @@ async function copyPlotAsImage(gd: HTMLElement | null) {
   }
 }
 
-export default function CellOutput({ cell }: Props) {
+function CellOutput({ cell }: Props) {
   const plotDivRef = useRef<HTMLDivElement | null>(null)
   const theme = useModelStore((s) => s.theme)
   const isDark = theme === 'dark'
@@ -549,3 +549,7 @@ function MarkdownOutput({ content }: { content: string }) {
     </div>
   )
 }
+
+// memo: 부모(CellContainer)가 다른 이유로 리렌더링되어도
+// cell prop 의 ref 가 같으면 출력 영역(테이블/차트/마크다운) 리렌더를 건너뛴다.
+export default memo(CellOutput)

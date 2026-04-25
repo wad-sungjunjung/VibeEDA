@@ -96,10 +96,9 @@ export default function RightNav() {
 
   const dataItems: DataItem[] = [
     ...selectedMartObjects.map((m) => ({ kind: 'mart' as const, key: m.key, description: m.description })),
-    // Only SQL cells produce DataFrames automatically; Python cells may create arbitrary variables
     ...cells
-      .filter((c) => c.executed && c.type === 'sql')
-      .map((c) => ({ kind: 'cell' as const, id: c.id, name: c.name, type: 'sql' as const })),
+      .filter((c) => c.executed && (c.type === 'sql' || (c.type === 'python' && (c.output as { type?: string } | null)?.type === 'table')))
+      .map((c) => ({ kind: 'cell' as const, id: c.id, name: c.name, type: c.type as 'sql' | 'python' })),
   ]
 
   const filteredData = dataSearch
@@ -142,10 +141,16 @@ export default function RightNav() {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try { return Number(localStorage.getItem('vibe_rnav_width')) || 256 } catch { return 256 }
   })
+  // CSS 변수는 매 변경마다 즉시 반영(시각 동기화), localStorage 쓰기는 디바운스.
+  // 드래그 중 한 프레임마다 setState 가 호출되며, sync localStorage write 가 누적되면
+  // 메인 스레드를 점유해 드래그가 끊겨 보임. 300ms 디바운스로 안정 시점에만 영속.
   useEffect(() => {
-    try { localStorage.setItem('vibe_rnav_width', String(sidebarWidth)) } catch {}
     document.documentElement.style.setProperty('--right-nav-width', `${sidebarWidth}px`)
+    const t = window.setTimeout(() => {
+      try { localStorage.setItem('vibe_rnav_width', String(sidebarWidth)) } catch {}
+    }, 300)
     return () => {
+      window.clearTimeout(t)
       document.documentElement.style.setProperty('--right-nav-width', '256px')
     }
   }, [sidebarWidth])
@@ -158,7 +163,10 @@ export default function RightNav() {
     return [20, 42, 38]
   })
   useEffect(() => {
-    try { localStorage.setItem('vibe_rnav_sections', JSON.stringify(sections)) } catch {}
+    const t = window.setTimeout(() => {
+      try { localStorage.setItem('vibe_rnav_sections', JSON.stringify(sections)) } catch {}
+    }, 300)
+    return () => window.clearTimeout(t)
   }, [sections])
 
   const asideRef = useRef<HTMLElement>(null)

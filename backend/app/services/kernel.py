@@ -182,13 +182,30 @@ def _to_cell_output(
 
     if var is not None and hasattr(var, "columns") and hasattr(var, "values"):
         try:
+            import math as _math
+            import datetime as _dt2
+
+            def _safe_py(v):
+                if v is None:
+                    return None
+                cls = v.__class__.__name__
+                if cls == "NaTType":
+                    return None
+                if isinstance(v, float) and (_math.isnan(v) or _math.isinf(v)):
+                    return None
+                if isinstance(v, (_dt2.datetime, _dt2.date, _dt2.time)):
+                    return v.isoformat()
+                if isinstance(v, (bytes, bytearray)):
+                    return v.decode("utf-8", errors="replace")
+                return v
+
             df = var
             rows = df.head(500).values.tolist()
             columns = [{"name": str(c), "type": str(df[c].dtype)} for c in df.columns]
             return {
                 "type": "table",
                 "columns": columns,
-                "rows": [[None if (hasattr(v, '__class__') and v.__class__.__name__ == 'NaTType') else v for v in row] for row in rows],
+                "rows": [[_safe_py(v) for v in row] for row in rows],
                 "rowCount": len(df),
                 "truncated": len(df) > 500,
             }

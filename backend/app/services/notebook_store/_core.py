@@ -63,13 +63,26 @@ def set_notebooks_dir(new_path: str) -> Path:
 
 
 def _read_config() -> dict:
+    # 요청 스코프 안에서는 한 번만 디스크 읽고 같은 dict 객체를 재사용한다.
+    # 호출자(_register_file 등)는 cfg 를 mutate 후 _write_config(cfg) 로 영속하는데,
+    # 같은 객체를 들고 있으므로 같은 요청 내 후속 _read_config 도 최신 상태를 본다.
+    holder = _request_config_cache.get()
+    if holder is not None and "data" in holder:
+        return holder["data"]
     if CONFIG_FILE.exists():
-        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-    return {"folders": []}
+        data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    else:
+        data = {"folders": []}
+    if holder is not None:
+        holder["data"] = data
+    return data
 
 
 def _write_config(cfg: dict) -> None:
     CONFIG_FILE.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    holder = _request_config_cache.get()
+    if holder is not None:
+        holder["data"] = cfg
 
 
 # ── 파일명 관리 ───────────────────────────────────────────────────────────────
@@ -151,19 +164,24 @@ def _nb_path(nb_id: str) -> Path:
 
 
 # 요청 스코프 캐시 (FastAPI 미들웨어가 scope를 연다).
-# 한 HTTP 요청 내에서 같은 nb_id 를 여러 번 읽을 때 파일 I/O 를 반복하지 않도록.
+# 한 HTTP 요청 내에서 같은 nb_id / config 를 여러 번 읽을 때 파일 I/O 를 반복하지 않도록.
 # 쓰기는 cache 에도 반영해 동일 요청 내 후속 read 가 최신 상태를 보게 한다.
 _request_cache: ContextVar[Optional[dict]] = ContextVar("nb_request_cache", default=None)
+# config (folders/id_to_file 인덱스) 전용 — 한 요청 내 _read_config 호출이
+# 셀/노트북/폴더 모듈에 걸쳐 누적될 수 있어 별도로 관리.
+_request_config_cache: ContextVar[Optional[dict]] = ContextVar("nb_request_config_cache", default=None)
 
 
 @contextmanager
 def request_cache_scope():
-    """한 요청 동안 유지되는 노트북 파일 캐시를 연다. 미들웨어에서 호출."""
-    token = _request_cache.set({})
+    """한 요청 동안 유지되는 노트북 파일/설정 캐시를 연다. 미들웨어에서 호출."""
+    nb_token = _request_cache.set({})
+    cfg_token = _request_config_cache.set({})
     try:
         yield
     finally:
-        _request_cache.reset(token)
+        _request_config_cache.reset(cfg_token)
+        _request_cache.reset(nb_token)
 
 
 def _read_nb(nb_id: str) -> dict:

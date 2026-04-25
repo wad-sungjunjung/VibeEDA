@@ -6,7 +6,8 @@ import { markdown } from '@codemirror/lang-markdown'
 import { keymap, EditorView, Decoration, ViewPlugin } from '@codemirror/view'
 import type { DecorationSet, ViewUpdate } from '@codemirror/view'
 import { indentWithTab } from '@codemirror/commands'
-import { Prec, RangeSetBuilder } from '@codemirror/state'
+import { Prec, RangeSetBuilder, EditorState } from '@codemirror/state'
+import { indentUnit } from '@codemirror/language'
 import { search, searchKeymap } from '@codemirror/search'
 import { snowflakeTheme } from '@/lib/snowflakeTheme'
 import type { CellType } from '@/types'
@@ -193,6 +194,9 @@ export default function CodeEditor({ type, value, onChange, onRun, fixedHeight, 
     runKeymap,
     type === 'sql' ? sql() : type === 'python' ? python() : markdown(),
     keymap.of([indentWithTab]),
+    // Tab 들여쓰기 = 4칸 (기본 2칸 → 4칸). \t 시각 폭도 4로 맞춰 기존 탭 문자가 섞여도 일관되게 표시.
+    indentUnit.of('    '),
+    EditorState.tabSize.of(4),
     search({ top: true }),
     keymap.of(searchKeymap),
     ...(type !== 'markdown' ? [...snowflakeTheme, fnCallTheme, fnCallHighlighter] : []),

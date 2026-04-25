@@ -82,6 +82,68 @@ function flushDebouncedForCell(cellId: string) {
   }
 }
 
+// ─── SSE delta batching ──────────────────────────────────────────────────────
+// 토큰 단위 SSE 이벤트(`code_delta`, `message_delta`)를 매번 set() 하면
+// 한 응답에 수백 번 store mutation 이 발생해 cells/agentChatHistory 구독 컴포넌트가
+// 매 토큰 재렌더링됨. requestAnimationFrame 으로 ~60Hz 단위 배치하면 시각적으로
+// 차이가 없으면서 렌더 비용이 한 자릿수로 줄어든다.
+//
+// 비-델타 이벤트(tool_use, cell_created, complete, error 등)가 도착하면 핸들러는
+// 후속 이벤트 처리 전 `flushAgentDeltas()` / `flushVibeDeltas()` 를 동기 호출해
+// 버퍼를 비우고 store 와 일치시킨다 — 이벤트 순서/get() 일관성 보장 핵심.
+
+const _vibeDeltaBuffer = new Map<string, string>()
+let _vibeRafHandle: number | null = null
+const _agentDeltaBuffer = new Map<string, string>()
+let _agentRafHandle: number | null = null
+
+function flushVibeDeltas() {
+  if (_vibeRafHandle !== null) {
+    cancelAnimationFrame(_vibeRafHandle)
+    _vibeRafHandle = null
+  }
+  if (_vibeDeltaBuffer.size === 0) return
+  const drained = new Map(_vibeDeltaBuffer)
+  _vibeDeltaBuffer.clear()
+  useAppStore.setState((s) => ({
+    cells: s.cells.map((c) =>
+      drained.has(c.id) ? { ...c, code: c.code + (drained.get(c.id) ?? '') } : c
+    ),
+  }))
+}
+
+function scheduleVibeFlush() {
+  if (_vibeRafHandle !== null) return
+  _vibeRafHandle = requestAnimationFrame(() => {
+    _vibeRafHandle = null
+    flushVibeDeltas()
+  })
+}
+
+function flushAgentDeltas() {
+  if (_agentRafHandle !== null) {
+    cancelAnimationFrame(_agentRafHandle)
+    _agentRafHandle = null
+  }
+  if (_agentDeltaBuffer.size === 0) return
+  const drained = new Map(_agentDeltaBuffer)
+  _agentDeltaBuffer.clear()
+  useAppStore.setState((s) => ({
+    agentStatus: null,
+    agentChatHistory: s.agentChatHistory.map((m) =>
+      drained.has(m.id) ? { ...m, content: m.content + (drained.get(m.id) ?? '') } : m
+    ),
+  }))
+}
+
+function scheduleAgentFlush() {
+  if (_agentRafHandle !== null) return
+  _agentRafHandle = requestAnimationFrame(() => {
+    _agentRafHandle = null
+    flushAgentDeltas()
+  })
+}
+
 // ─── DB row → Cell converter ─────────────────────────────────────────────────
 
 function defaultCellUi(type: CellType) {
@@ -982,12 +1044,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
         },
         (event) => {
           if (event.type === 'code_delta') {
-            set((s) => ({
-              cells: s.cells.map((c) =>
-                c.id === cellId ? { ...c, code: c.code + event.delta } : c
-              ),
-            }))
+            // 토큰별 set 대신 rAF 배치 — flushVibeDeltas() 가 한 프레임에 모아서 적용.
+            _vibeDeltaBuffer.set(cellId, (_vibeDeltaBuffer.get(cellId) ?? '') + event.delta)
+            scheduleVibeFlush()
           } else if (event.type === 'complete') {
+            // complete 는 누적 코드를 final_code 로 통째 교체 — 버퍼는 의미 없으니 폐기.
+            _vibeDeltaBuffer.delete(cellId)
             finalCode = event.full_code
             const currentCell = get().cells.find((c) => c.id === cellId)
             const entry: ChatEntry = {
@@ -1017,6 +1079,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
               get().executeCell(cellId)
             }
           } else if (event.type === 'error') {
+            // error 도 코드 스냅샷으로 롤백 — 버퍼 폐기.
+            _vibeDeltaBuffer.delete(cellId)
             console.error('Vibe error:', event.message)
             set((s) => ({
               cells: s.cells.map((c) =>
@@ -1030,12 +1094,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
     } catch (err) {
       const aborted = (err as { name?: string })?.name === 'AbortError'
       if (!aborted) console.error('Vibe chat failed:', err)
+      _vibeDeltaBuffer.delete(cellId)
       set((s) => ({
         cells: s.cells.map((c) =>
           c.id === cellId ? { ...c, code: codeSnapshot } : c
         ),
       }))
     } finally {
+      // 안전장치: 남은 델타 버퍼가 있으면 마지막으로 한 번 flush.
+      flushVibeDeltas()
       _vibeControllers.delete(cellId)
       set((s) => ({
         vibingCells: new Set([...s.vibingCells].filter((id) => id !== cellId)),
@@ -1463,6 +1530,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
             })
           }
 
+          // 비-델타 이벤트는 후속 로직이 get().agentChatHistory 의 최신 content 를 보거나
+          // currentAssistantMsgId 를 바꾸므로, 진입 즉시 버퍼를 flush 해 store 와 일치시킨다.
+          if (event.type !== 'message_delta') {
+            flushAgentDeltas()
+          }
           if (event.type === 'thinking') {
             set({ agentStatus: '생각 중' })
           } else if (event.type === 'tool_use') {
@@ -1487,15 +1559,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
               ],
             }))
           } else if (event.type === 'message_delta') {
+            // 토큰별 set 대신 rAF 배치. agentStatus 도 flush 시 함께 null 로 정리.
             const msgId = currentAssistantMsgId
-            set((s) => ({
-              agentStatus: null,
-              agentChatHistory: s.agentChatHistory.map((m) =>
-                m.id === msgId ? { ...m, content: m.content + event.content } : m
-              ),
-            }))
+            _agentDeltaBuffer.set(msgId, (_agentDeltaBuffer.get(msgId) ?? '') + event.content)
+            scheduleAgentFlush()
           } else if (event.type === 'reset_current_bubble') {
-            // 백엔드가 내레이션 가드로 턴을 폐기할 때, 현재 말풍선에 흘러간 텍스트를 비운다.
+            // 현재 말풍선을 비운다 — 위에서 이미 flush 되었으므로 store 가 최신 상태.
             const msgId = currentAssistantMsgId
             set((s) => ({
               agentChatHistory: s.agentChatHistory.map((m) =>
@@ -1668,6 +1737,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const aborted = (err as { name?: string })?.name === 'AbortError'
       if (!aborted) console.error('Agent stream failed:', err)
     } finally {
+      // 안전장치: 종료/에러/abort 와 무관하게 남은 델타가 있으면 flush.
+      flushAgentDeltas()
       _agentController = null
       set({ agentLoading: false, agentStartedAtMs: null, agentStatus: null })
     }
@@ -1678,6 +1749,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       _agentController.abort()
       _agentController = null
     }
+    // 진행 중이던 메시지 버퍼는 flush — 부분 응답을 화면에 보존 (이후 in-flight 의 finally 가 한 번 더 실행되지만 멱등).
+    flushAgentDeltas()
     set((s) => {
       const history = [...s.agentChatHistory]
       for (let i = history.length - 1; i >= 0; i--) {

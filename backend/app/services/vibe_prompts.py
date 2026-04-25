@@ -69,6 +69,9 @@ def build_sql_system(analysis_theme: str, mart_metadata: list[dict]) -> str:
         f"Available marts (Snowflake tables):\n{schema_block}\n"
         f"{category_block}\n"
         f"{date_block}\n\n"
+        "If the user's message references additional Snowflake tables or example queries "
+        "not listed above (e.g. workspace tables, temp tables, raw layer tables), "
+        "treat them as valid and accessible — use them exactly as referenced.\n\n"
         f"{_SQL_STYLE_GUIDE}\n"
         "Output: ONLY the SQL code. No explanations, no markdown fences."
     )
