@@ -15,7 +15,7 @@ from .claude_agent import (
     NotebookState,
     PARALLEL_SAFE_TOOLS,
 )
-from . import agent_skills, agent_tools, agent_budget, agent_classifier, agent_methods
+from . import agent_skills, agent_tools, agent_budget, agent_classifier, agent_methods, agent_synthesis
 
 GENERATE_TIMEOUT_SEC = 300  # Gemini 단일 호출 타임아웃 (5분)
 REPEAT_CALL_LIMIT = 3      # 동일 tool+input 반복 허용 횟수
@@ -26,7 +26,10 @@ logger = logging.getLogger(__name__)
 
 _FUNC_DECLARATIONS = agent_tools.gemini_function_declarations(
     [],
-    method_tools_gemini=[agent_methods.SELECT_METHODS_TOOL_GEMINI],
+    method_tools_gemini=[
+        agent_methods.SELECT_METHODS_TOOL_GEMINI,
+        *agent_synthesis.SYNTHESIS_TOOLS_GEMINI,
+    ],
 )
 
 _GEMINI_TOOL = types.Tool(
@@ -225,12 +228,46 @@ async def run_agent_stream_gemini(
 
                 end_reminder = agent_skills.get_end_guard_reminder(notebook_state)
 
-                if (pending_msgs or end_reminder) and pending_guard_count < PENDING_GUARD_MAX:
+                # ─── Phase 3 종합 정리 강제 (Claude 와 동일 로직) ───────────
+                synthesis_msgs: list[str] = []
+                tier = notebook_state.budget.tier if notebook_state.budget else "L2"
+                synthesis_required = (
+                    tier in ("L2", "L3")
+                    and not notebook_state.synthesis_done
+                    and not ask_user_called
+                    and len(created_cell_ids) >= 1
+                )
+                if synthesis_required:
+                    if not notebook_state.findings:
+                        synthesis_msgs.append(
+                            "- 아직 `rate_findings` 를 호출하지 않았습니다. 핵심 결론 3~7개에 confidence 등급을 매겨 호출하세요."
+                        )
+                    if (
+                        tier == "L3"
+                        and notebook_state.findings
+                        and not notebook_state.consistency_checked
+                    ):
+                        synthesis_msgs.append(
+                            "- L3 세션은 `self_consistency_check` 1회 호출 (이슈 없으면 빈 배열)."
+                        )
+                    synthesis_msgs.append(
+                        f"- 마지막으로 `synthesize_report` 로 청자별(audience) 최종 요약 셀 생성 — "
+                        f"{tier} 티어이므로 "
+                        + ("간이 Markdown 1장" if tier == "L2" else "청자별 풀 템플릿")
+                        + "."
+                    )
+
+                if (pending_msgs or synthesis_msgs or end_reminder) and pending_guard_count < PENDING_GUARD_MAX:
                     pending_guard_count += 1
                     lines = []
                     if pending_msgs:
                         lines.append("❗ 종료 전 필수 후속 작업이 남아 있습니다:")
                         lines.extend(pending_msgs)
+                    if synthesis_msgs:
+                        if lines:
+                            lines.append("")
+                        lines.append("📝 Phase 3 종합 정리 단계:")
+                        lines.extend(synthesis_msgs)
                     if end_reminder:
                         if lines:
                             lines.append("")

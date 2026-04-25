@@ -206,6 +206,17 @@ export function toolStatusLabel(tool: string, input?: Record<string, unknown>): 
     case 'create_plan': return '분석 플랜 수립 중'
     case 'update_plan': return '분석 플랜 갱신 중'
     case 'request_marts': return '추가 마트 요청 준비 중'
+    case 'select_methods': return '분석 메서드 선택 중'
+    case 'rate_findings': {
+      const arr = Array.isArray(input?.findings) ? input.findings : null
+      return arr ? `핵심 결론 ${arr.length}개 등급 매기는 중` : '핵심 결론 등급 매기는 중'
+    }
+    case 'self_consistency_check': return '자가 일관성 검증 중'
+    case 'synthesize_report': {
+      const audience = typeof input?.audience === 'string' ? input.audience : ''
+      const label = audience === 'exec' ? '임원용' : audience === 'ds' ? 'DS용' : audience === 'pm' ? 'PM용' : ''
+      return label ? `${label} 최종 정리 중` : '최종 정리 중'
+    }
     default: return `${tool} 실행 중`
   }
 }

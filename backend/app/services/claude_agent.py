@@ -166,15 +166,23 @@ class NotebookState:
     methods: list = field(default_factory=list)
     method_rationale: str = ""
     expected_artifacts: list = field(default_factory=list)
+    # Phase 3 종합 정리 상태
+    findings: list = field(default_factory=list)        # rate_findings 결과
+    synthesis_done: bool = False                          # synthesize_report 호출 여부
+    consistency_checked: bool = False                     # self_consistency_check 1회 한정
 
 
 # ─── Tool definitions ────────────────────────────────────────────────────────
 
 from . import agent_tools
+from . import agent_synthesis
 
 TOOLS = agent_tools.claude_tools(
     agent_skills.SKILL_TOOLS_CLAUDE,
-    method_tools=[agent_methods.SELECT_METHODS_TOOL_CLAUDE],
+    method_tools=[
+        agent_methods.SELECT_METHODS_TOOL_CLAUDE,
+        *agent_synthesis.SYNTHESIS_TOOLS_CLAUDE,
+    ],
 )
 
 
@@ -323,6 +331,156 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
                 "methods": all_methods,
                 "rationale": rationale,
                 "expected_artifacts": state.expected_artifacts,
+            }],
+        )
+
+    # ─── Phase 3: rate_findings ───────────────────────────────────────────
+    if name == "rate_findings":
+        findings_in = inp.get("findings") or []
+        if not isinstance(findings_in, list) or not findings_in:
+            return {
+                "success": False,
+                "error": "findings_required",
+                "message": "최소 1개 이상의 finding 이 필요합니다.",
+            }, []
+        cells_by_id = {
+            c.id: {"name": c.name, "type": c.type, "output": c.output}
+            for c in state.cells
+        }
+        normalized: list[dict] = []
+        all_warnings: list[str] = []
+        for f in findings_in:
+            if not isinstance(f, dict):
+                continue
+            norm, warns = agent_synthesis.apply_finding_rules(
+                f, methods=state.methods, cells_by_id=cells_by_id,
+            )
+            normalized.append(norm)
+            all_warnings.extend(warns)
+        state.findings = normalized
+        return (
+            {
+                "success": True,
+                "count": len(normalized),
+                "findings": normalized,
+                "downgrades_applied": all_warnings,
+                "instruction": (
+                    "Findings 등급 기록 완료. 이제 self_consistency_check (L3 만) → synthesize_report 순서로 진행."
+                    if (state.budget and state.budget.tier == "L3")
+                    else "Findings 등급 기록 완료. 이제 synthesize_report 로 마무리하세요."
+                ),
+            },
+            [],
+        )
+
+    # ─── Phase 3: self_consistency_check (세션당 1회) ─────────────────────
+    if name == "self_consistency_check":
+        if state.consistency_checked:
+            return {
+                "success": False,
+                "error": "already_checked",
+                "message": (
+                    "self_consistency_check 는 세션당 1회만 호출 가능합니다. "
+                    "이미 호출했으니 곧바로 synthesize_report 로 마무리하세요."
+                ),
+            }, []
+        state.consistency_checked = True
+        issues = inp.get("issues") or []
+        if not isinstance(issues, list):
+            issues = []
+        summary = (inp.get("summary") or "").strip()
+        # 간단 검증 — 빈 issues + summary 만 있으면 OK
+        return (
+            {
+                "success": True,
+                "issues_count": len(issues),
+                "issues": issues,
+                "summary": summary,
+                "instruction": (
+                    "이슈가 있으면 update_cell_code 또는 write_cell_memo 로 1~2턴 안에 보강하고, "
+                    "그 다음 synthesize_report 로 마무리. 이슈가 없으면 바로 synthesize_report."
+                ),
+            },
+            [],
+        )
+
+    # ─── Phase 3: synthesize_report (세션 종료 마커) ──────────────────────
+    if name == "synthesize_report":
+        audience = (inp.get("audience") or "").strip().lower()
+        if audience not in ("exec", "ds", "pm"):
+            return {
+                "success": False,
+                "error": "invalid_audience",
+                "message": "audience 는 'exec' / 'ds' / 'pm' 중 하나여야 합니다.",
+            }, []
+        title = (inp.get("title") or "").strip()
+        if not title:
+            return {"success": False, "error": "title_required"}, []
+        body = (inp.get("body_markdown") or "").strip()
+        if not body:
+            return {"success": False, "error": "body_required"}, []
+        next_steps = inp.get("next_steps") or []
+        if not isinstance(next_steps, list):
+            next_steps = []
+
+        # 청자 라벨 + 다음 단계 부록 → Markdown 셀로
+        audience_label = {"exec": "임원 보고", "ds": "DS 리포트", "pm": "PM 의사결정"}[audience]
+        body_full = f"# {title}\n\n_({audience_label})_\n\n{body}"
+        if next_steps:
+            body_full += "\n\n## 다음 단계\n" + "\n".join(f"- {s}" for s in next_steps if str(s).strip())
+
+        cell_id = str(uuid.uuid4())
+        synthesis_cell_name = f"summary_{audience}"
+        # 이름 충돌 방지
+        existing_names = {c.name for c in state.cells}
+        if synthesis_cell_name in existing_names:
+            i = 2
+            while f"{synthesis_cell_name}_{i}" in existing_names:
+                i += 1
+            synthesis_cell_name = f"{synthesis_cell_name}_{i}"
+
+        new_cell = CellState(
+            id=cell_id, name=synthesis_cell_name, type="markdown", code=body_full,
+        )
+        new_cell.executed = True
+        state.cells.append(new_cell)
+
+        # 영속화
+        if state.notebook_id:
+            try:
+                from . import notebook_store as _ns
+                _ns.create_cell(
+                    nb_id=state.notebook_id,
+                    cell_type="markdown",
+                    name=synthesis_cell_name,
+                    code=body_full,
+                    memo="",
+                    cell_id=cell_id,
+                    after_id=None,
+                    agent_generated=True,
+                )
+            except Exception as e:
+                logger.warning("synthesize_report persist failed: %s", e)
+
+        state.synthesis_done = True
+        return (
+            {
+                "success": True,
+                "cell_id": cell_id,
+                "audience": audience,
+                "title": title,
+                "instruction": (
+                    "최종 요약 셀이 추가되었습니다. 이번 세션을 마무리하세요 — "
+                    "더 이상 도구를 호출하지 말고 짧은 마무리 텍스트만 출력하세요."
+                ),
+            },
+            [{
+                "type": "cell_created",
+                "cell_id": cell_id,
+                "cell_type": "markdown",
+                "cell_name": synthesis_cell_name,
+                "code": body_full,
+                "after_cell_id": None,
             }],
         )
 
@@ -1355,6 +1513,27 @@ def _build_system_prompt(state: NotebookState) -> str:
             "메서드 키: explore, analyze, predict, causal, ml, ab_test, benchmark.\n"
         )
 
+    # ─── Phase 3 안내 (L2/L3) ────────────────────────────────────────────────
+    synthesis_block = ""
+    if tier in ("L2", "L3"):
+        if tier == "L2":
+            synthesis_block = (
+                "\n## 🏁 종료 단계 (Phase 3 — 분석 마무리 시 반드시 수행)\n"
+                "분석을 끝내기 전에 다음 두 도구를 **반드시 순서대로** 호출하세요:\n"
+                "1. `rate_findings` — 핵심 결론 3~7개에 confidence(high/mid/low)·근거 셀·caveats 부여\n"
+                "2. `synthesize_report` — audience='exec'/'ds'/'pm' 중 하나로 마지막 Markdown 요약 셀 생성 (~10줄)\n"
+                "이 두 도구 없이는 세션이 종료되지 않습니다 (서버 가드).\n"
+            )
+        else:  # L3
+            synthesis_block = (
+                "\n## 🏁 종료 단계 (Phase 3 — 심층 분석 마무리 시 반드시 수행)\n"
+                "L3 분석은 다음 세 도구를 **반드시 이 순서로** 호출해야 종료됩니다:\n"
+                "1. `rate_findings` — 핵심 결론 3~7개에 confidence·근거 셀·caveats 부여\n"
+                "2. `self_consistency_check` — 메모/플랜/findings 의 명백한 모순만 1회 검증 (이슈 없으면 빈 배열로)\n"
+                "3. `synthesize_report` — audience='exec'/'ds'/'pm' 별 청자 맞춤 풀 템플릿 + 한계·재현 정보\n"
+                "Confidence 룰: 표본 n<30 / 인과 표현 (causal 메서드 미선택) / 단일 셀 근거 — 자동 하향됩니다.\n"
+            )
+
     return f"""You are an expert data analyst AI for an advertising platform analytics tool called Vibe EDA.
 You help analysts explore ad platform data by creating, modifying, and executing notebook cells.
 
@@ -1364,7 +1543,7 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - Data Marts: {marts}
 - Snowflake: {sf_status}
 - Tier: **{tier}** (예산 한도 자동 적용 — 답변 분량/깊이를 이 티어에 맞춰 조정하세요)
-{date_block}{mart_schema_block}{local_files_block}{routing_block}{methods_block}
+{date_block}{mart_schema_block}{local_files_block}{routing_block}{methods_block}{synthesis_block}
 
 ## Tools
 ### 셀 조작
@@ -1831,12 +2010,47 @@ async def run_agent_stream(
                 # 스킬 end-guard: 미검증 가설 / 세그먼트 미탐색이면 리마인더 1회 주입 후 재개
                 end_reminder = agent_skills.get_end_guard_reminder(notebook_state)
 
-                if (pending_msgs or end_reminder) and pending_guard_count < PENDING_GUARD_MAX:
+                # ─── Phase 3 종합 정리 강제 (L2/L3 만, ask_user 호출되면 면제) ─
+                synthesis_msgs: list[str] = []
+                tier = notebook_state.budget.tier if notebook_state.budget else "L2"
+                synthesis_required = (
+                    tier in ("L2", "L3")
+                    and not notebook_state.synthesis_done
+                    and not ask_user_called
+                    and len(created_cell_ids) >= 1   # 셀 하나라도 만들었어야 정리할 게 있음
+                )
+                if synthesis_required:
+                    if not notebook_state.findings:
+                        synthesis_msgs.append(
+                            "- 아직 `rate_findings` 를 호출하지 않았습니다. 이번 세션에서 발견한 핵심 결론 3~7개에 "
+                            "각각 `claim` / `evidence_cell_ids` / `confidence` (high/mid/low) / `caveats` 를 매겨 호출하세요."
+                        )
+                    if (
+                        tier == "L3"
+                        and notebook_state.findings
+                        and not notebook_state.consistency_checked
+                    ):
+                        synthesis_msgs.append(
+                            "- L3 세션은 `self_consistency_check` 를 1회 호출해 메모/플랜/findings 의 모순을 자가 검증해야 합니다 (이슈 없으면 빈 배열로 호출)."
+                        )
+                    synthesis_msgs.append(
+                        f"- 마지막으로 `synthesize_report` 를 호출해 청자(audience='exec'/'ds'/'pm')별 최종 요약 셀을 만드세요. "
+                        f"이번 분석은 {tier} 티어이므로 "
+                        + ("간이 Markdown 1장 (~10줄)" if tier == "L2" else "청자별 풀 템플릿 + 한계·재현 정보 포함")
+                        + "."
+                    )
+
+                if (pending_msgs or synthesis_msgs or end_reminder) and pending_guard_count < PENDING_GUARD_MAX:
                     pending_guard_count += 1
                     lines = []
                     if pending_msgs:
                         lines.append("❗ 종료 전 필수 후속 작업이 남아 있습니다:")
                         lines.extend(pending_msgs)
+                    if synthesis_msgs:
+                        if lines:
+                            lines.append("")
+                        lines.append("📝 Phase 3 종합 정리 단계:")
+                        lines.extend(synthesis_msgs)
                     if end_reminder:
                         if lines:
                             lines.append("")
