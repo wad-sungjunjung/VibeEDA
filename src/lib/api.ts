@@ -38,6 +38,7 @@ export type AgentEvent =
   | { type: 'tier_classified'; tier: AgentTier; reason: string; estimated_cells: number; estimated_seconds: number; max_turns: number; max_tool_calls: number; methods: string[] }
   | { type: 'budget_warning'; percent_used: number; remaining_turns: number; remaining_tool_calls: number; message: string }
   | { type: 'tier_promoted'; from_tier: AgentTier; to_tier: AgentTier; reason: string; new_max_turns: number; new_max_tool_calls: number }
+  | { type: 'methods_selected'; methods: string[]; rationale: string; expected_artifacts: string[] }
   | { type: 'complete'; created_cell_ids: string[]; updated_cell_ids: string[] }
   | { type: 'error'; message: string }
 

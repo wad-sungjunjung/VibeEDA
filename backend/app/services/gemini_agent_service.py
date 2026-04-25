@@ -15,7 +15,7 @@ from .claude_agent import (
     NotebookState,
     PARALLEL_SAFE_TOOLS,
 )
-from . import agent_skills, agent_tools, agent_budget, agent_classifier
+from . import agent_skills, agent_tools, agent_budget, agent_classifier, agent_methods
 
 GENERATE_TIMEOUT_SEC = 300  # Gemini 단일 호출 타임아웃 (5분)
 REPEAT_CALL_LIMIT = 3      # 동일 tool+input 반복 허용 횟수
@@ -24,7 +24,10 @@ logger = logging.getLogger(__name__)
 
 # ─── Gemini 함수 선언 (agent_tools 모듈에서 Claude 스펙 자동 변환) ────────────
 
-_FUNC_DECLARATIONS = agent_tools.gemini_function_declarations([])
+_FUNC_DECLARATIONS = agent_tools.gemini_function_declarations(
+    [],
+    method_tools_gemini=[agent_methods.SELECT_METHODS_TOOL_GEMINI],
+)
 
 _GEMINI_TOOL = types.Tool(
     function_declarations=[*_FUNC_DECLARATIONS, *agent_skills.SKILL_TOOLS_GEMINI]  # type: ignore[arg-type]
@@ -75,6 +78,13 @@ async def run_agent_stream_gemini(
     )
     budget.user_overridden = classification.method == "override"
     notebook_state.budget = budget
+
+    # Phase 0: L1 자동 메서드 세팅
+    if budget.tier == "L1":
+        notebook_state.methods = ["analyze"]
+        notebook_state.method_rationale = "L1 자동: 단순 조회"
+        notebook_state.expected_artifacts = []
+
     yield {
         "type": "tier_classified",
         "tier": budget.tier,
@@ -83,7 +93,7 @@ async def run_agent_stream_gemini(
         "estimated_seconds": budget.estimated_seconds,
         "max_turns": budget.max_turns,
         "max_tool_calls": budget.max_tool_calls,
-        "methods": [],
+        "methods": list(notebook_state.methods),
     }
 
     system_prompt = _build_system_prompt(notebook_state)

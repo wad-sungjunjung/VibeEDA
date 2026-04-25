@@ -429,6 +429,9 @@ interface AppStore {
   // 다음 요청 시 분류기 우회 — '더 깊게'/'간단히' override 버튼이 세팅
   agentTierOverride: import('@/lib/api').AgentTier | null
   setAgentTierOverride: (tier: import('@/lib/api').AgentTier | null) => void
+  // Phase 0 라우팅 결과 — methods_selected SSE 가 채움
+  agentMethods: string[]
+  agentMethodRationale: string | null
   agentRefCells: string[]
   toggleAgentRefCell: (id: string) => void
   toggleAgentMode: () => void
@@ -1275,6 +1278,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   agentBudgetWarningMessage: null,
   agentTierOverride: null,
   setAgentTierOverride: (tier) => set({ agentTierOverride: tier }),
+  agentMethods: [],
+  agentMethodRationale: null,
   agentRefCells: [],
 
   toggleAgentRefCell: (id) =>
@@ -1545,7 +1550,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const tierOverride = get().agentTierOverride
       // 첫 요청에 override 를 한 번 사용하고 비움 (다음 요청에 다시 적용되지 않게).
       if (tierOverride) set({ agentTierOverride: null })
-      // tier 관련 상태 초기화 (tier_classified 가 다시 채움)
+      // tier / 메서드 상태 초기화 (tier_classified / methods_selected 가 다시 채움)
       set({
         agentTier: null,
         agentTierReason: null,
@@ -1554,6 +1559,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         agentMaxToolCalls: null,
         agentBudgetPercent: null,
         agentBudgetWarningMessage: null,
+        agentMethods: [],
+        agentMethodRationale: null,
       })
 
       await streamAgentMessage(
@@ -1636,7 +1643,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
               agentMaxTurns: event.max_turns,
               agentMaxToolCalls: event.max_tool_calls,
               agentBudgetPercent: 0,
+              // L1 은 백엔드가 자동으로 ['analyze'] 를 채워서 보내므로 여기서도 반영.
+              agentMethods: event.methods || [],
             })
+          } else if (event.type === 'methods_selected') {
+            set({
+              agentMethods: event.methods,
+              agentMethodRationale: event.rationale,
+            })
+            pushStep('tool', `메서드 선택: ${event.methods.join(' + ')}`, event.rationale)
           } else if (event.type === 'tier_promoted') {
             // 자동 승격: 라벨에 알리고 한도 갱신, percent 재계산은 budget_warning 에서.
             set({

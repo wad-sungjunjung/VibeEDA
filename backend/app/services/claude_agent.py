@@ -15,6 +15,7 @@ from . import category_cache
 from . import file_profile_cache
 from . import agent_budget
 from . import agent_classifier
+from . import agent_methods
 from .code_style import SQL_STYLE_GUIDE, PYTHON_RULES, MARKDOWN_RULES
 
 logger = logging.getLogger(__name__)
@@ -161,13 +162,20 @@ class NotebookState:
     todos: list = field(default_factory=list)
     # 복잡도 분류 결과 + 예산 상태. run_agent_stream 진입 직후 세팅.
     budget: Optional[agent_budget.BudgetState] = None
+    # Phase 0 라우팅 결과 — select_methods 호출 후 채워짐. L1 은 자동으로 ['analyze'].
+    methods: list = field(default_factory=list)
+    method_rationale: str = ""
+    expected_artifacts: list = field(default_factory=list)
 
 
 # ─── Tool definitions ────────────────────────────────────────────────────────
 
 from . import agent_tools
 
-TOOLS = agent_tools.claude_tools(agent_skills.SKILL_TOOLS_CLAUDE)
+TOOLS = agent_tools.claude_tools(
+    agent_skills.SKILL_TOOLS_CLAUDE,
+    method_tools=[agent_methods.SELECT_METHODS_TOOL_CLAUDE],
+)
 
 
 # ─── Output formatting for Claude ────────────────────────────────────────────
@@ -247,6 +255,76 @@ def _build_cell_chat_narration(state: "NotebookState", created: bool) -> str:
 
 async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dict, list[dict]]:
     """Returns (tool_result_dict, list_of_sse_events)."""
+
+    # ─── Phase 0 pre-guard — L2/L3 는 첫 도구로 select_methods 강제 ────────
+    # L1 은 진입 시 자동으로 methods=['analyze'] 가 세팅됨 (run_agent_stream 참조).
+    # methods 가 비어있고 호출 도구가 select_methods 가 아니면 거부.
+    if (
+        state.budget is not None
+        and state.budget.tier in ("L2", "L3")
+        and not state.methods
+        and name not in agent_methods.PHASE0_TOOL_NAMES
+    ):
+        return {
+            "success": False,
+            "error": "method_routing_required",
+            "message": (
+                "이 분석을 시작하기 전에 먼저 `select_methods` 를 호출해 "
+                "어떤 분석 메서드(explore / analyze / predict / causal / ml / ab_test / benchmark) "
+                "조합으로 진행할지 선언해야 합니다. "
+                "primary 1개 (필수) + secondary 0~2개 + 짧은 rationale 을 함께 제출하세요."
+            ),
+        }, []
+
+    # ─── select_methods 핸들러 (Phase 0) ──────────────────────────────────
+    if name == "select_methods":
+        primary = (inp.get("primary") or "").strip().lower()
+        secondary_raw = inp.get("secondary") or []
+        if not isinstance(secondary_raw, list):
+            secondary_raw = []
+        # primary + secondary 합쳐 정규화 — 중복·미지의 키 제거
+        all_methods = agent_methods.normalize_methods([primary] + list(secondary_raw))
+        if primary and primary not in all_methods:
+            return {
+                "success": False,
+                "error": "invalid_primary_method",
+                "message": f"primary='{primary}' 는 미지의 메서드입니다. 허용: {agent_methods.ALL_METHODS}",
+            }, []
+        rationale = (inp.get("rationale") or "").strip()
+        if not rationale:
+            return {
+                "success": False,
+                "error": "rationale_required",
+                "message": "`rationale` (1문장 한국어 사유) 가 필수입니다.",
+            }, []
+        artifacts = inp.get("expected_artifacts") or []
+        if not isinstance(artifacts, list):
+            artifacts = []
+
+        state.methods = all_methods
+        state.method_rationale = rationale
+        state.expected_artifacts = [str(a) for a in artifacts if a]
+
+        return (
+            {
+                "success": True,
+                "primary": all_methods[0] if all_methods else "",
+                "all_methods": all_methods,
+                "rationale": rationale,
+                "expected_artifacts": state.expected_artifacts,
+                "instruction": (
+                    "메서드 선택 완료. 이제 일반 분석 흐름으로 진행하세요 "
+                    "(create_plan / profile_mart / 등). "
+                    "선택된 메서드의 추가 가이드라인은 시스템 프롬프트에 자동 주입되었습니다."
+                ),
+            },
+            [{
+                "type": "methods_selected",
+                "methods": all_methods,
+                "rationale": rationale,
+                "expected_artifacts": state.expected_artifacts,
+            }],
+        )
 
     # 스킬 프레임워크 pre-guard — 플랜 강제 등 거부 규칙
     guard_err = agent_skills.check_pre_guard(name, inp, state)
@@ -1248,6 +1326,35 @@ def _build_system_prompt(state: NotebookState) -> str:
 
     # 루트 폴더에 드롭된 로컬 데이터 파일 (CSV/Parquet 등) 프로파일
     local_files_block = file_profile_cache.format_for_prompt()
+
+    # ─── Phase 0 라우팅 블록 ────────────────────────────────────────────────
+    # L2/L3 + methods 미선택 → 모델에게 첫 도구로 select_methods 호출 강제.
+    # 이미 선택됐다면 선택 결과 + 메서드별 fragment 를 주입.
+    routing_block = ""
+    methods_block = ""
+    tier = state.budget.tier if state.budget else "L2"
+    if state.methods:
+        methods_label = ", ".join(state.methods)
+        routing_block = (
+            f"\n## 📍 분석 메서드 (선택 완료)\n"
+            f"- Methods: **{methods_label}**\n"
+            f"- Rationale: {state.method_rationale or '(없음)'}\n"
+            f"- Expected artifacts: {', '.join(state.expected_artifacts) or '(없음)'}\n"
+            "이 조합에 맞춰 분석 흐름을 진행하세요. 아래 메서드별 가이드라인을 준수.\n"
+        )
+        methods_block = agent_methods.build_methods_fragment(state.methods)
+    elif tier in ("L2", "L3"):
+        routing_block = (
+            "\n## 📍 분석 메서드 선택 (필수 — 첫 도구 호출)\n"
+            "이 요청은 **표준 이상 (L2/L3)** 으로 분류되어, 분석 시작 전에 어떤 메서드 조합으로 진행할지 "
+            "**먼저 선언** 해야 합니다. 다른 도구를 호출하기 전에 반드시 `select_methods` 를 호출하세요.\n"
+            "- primary 1개 (필수, 가장 비중 큰 메서드)\n"
+            "- secondary 0~2개 (조합 필요 시)\n"
+            "- rationale 한 줄 (왜 이 조합인지)\n"
+            "- expected_artifacts 0~3개 (선택)\n"
+            "메서드 키: explore, analyze, predict, causal, ml, ab_test, benchmark.\n"
+        )
+
     return f"""You are an expert data analyst AI for an advertising platform analytics tool called Vibe EDA.
 You help analysts explore ad platform data by creating, modifying, and executing notebook cells.
 
@@ -1256,7 +1363,8 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - Description: {state.analysis_description}
 - Data Marts: {marts}
 - Snowflake: {sf_status}
-{date_block}{mart_schema_block}{local_files_block}
+- Tier: **{tier}** (예산 한도 자동 적용 — 답변 분량/깊이를 이 티어에 맞춰 조정하세요)
+{date_block}{mart_schema_block}{local_files_block}{routing_block}{methods_block}
 
 ## Tools
 ### 셀 조작
@@ -1543,6 +1651,13 @@ async def run_agent_stream(
     )
     budget.user_overridden = classification.method == "override"
     notebook_state.budget = budget
+
+    # ─── Phase 0: L1 은 메서드 자동 세팅 (가벼운 단일 lookup), L2/L3 는 모델이 select_methods 강제 호출 ─
+    if budget.tier == "L1":
+        notebook_state.methods = ["analyze"]
+        notebook_state.method_rationale = "L1 자동: 단순 조회"
+        notebook_state.expected_artifacts = []
+
     yield {
         "type": "tier_classified",
         "tier": budget.tier,
@@ -1551,7 +1666,7 @@ async def run_agent_stream(
         "estimated_seconds": budget.estimated_seconds,
         "max_turns": budget.max_turns,
         "max_tool_calls": budget.max_tool_calls,
-        "methods": [],  # Phase 0 (S2) 에서 채워질 예정
+        "methods": list(notebook_state.methods),
     }
 
     system_prompt = _build_system_prompt(notebook_state)

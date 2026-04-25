@@ -8,6 +8,17 @@ import { cn } from '@/lib/utils'
 import Markdown from '@/components/common/Markdown'
 import type { ImageAttachment } from '@/types'
 
+// 메서드 키 → 한국어 라벨 (백엔드 agent_methods.METHOD_LABELS_KO 와 동기화)
+const METHOD_LABELS: Record<string, string> = {
+  explore: '탐색',
+  analyze: '분석',
+  predict: '예측',
+  causal: '인과추론',
+  ml: 'ML',
+  ab_test: 'A/B',
+  benchmark: '기준비교',
+}
+
 // 스텝 타입별 아이콘/색. 색은 tailwind 시맨틱 클래스로 — 다크모드 자동 대응.
 const STEP_ICONS: Record<string, { icon: typeof Wrench; className: string }> = {
   tool: { icon: Wrench, className: 'bg-chip text-text-secondary' },
@@ -53,7 +64,7 @@ export default function AgentChatPanel() {
     toggleAgentRefCell: s.toggleAgentRefCell,
     newAgentSession: s.newAgentSession,
   })))
-  // Tier 분류 + 예산 정보 (별도 셀렉터 — 위 useShallow 가 비대해지지 않게 분리)
+  // Tier 분류 + 예산 + 메서드 정보 (별도 셀렉터 — 위 useShallow 가 비대해지지 않게 분리)
   const {
     agentTier,
     agentTierReason,
@@ -62,6 +73,8 @@ export default function AgentChatPanel() {
     agentBudgetWarningMessage,
     agentTierOverride,
     setAgentTierOverride,
+    agentMethods,
+    agentMethodRationale,
   } = useAppStore(useShallow((s) => ({
     agentTier: s.agentTier,
     agentTierReason: s.agentTierReason,
@@ -70,6 +83,8 @@ export default function AgentChatPanel() {
     agentBudgetWarningMessage: s.agentBudgetWarningMessage,
     agentTierOverride: s.agentTierOverride,
     setAgentTierOverride: s.setAgentTierOverride,
+    agentMethods: s.agentMethods,
+    agentMethodRationale: s.agentMethodRationale,
   })))
 
   // 에이전트 실행 경과 시간 — 스토어의 시작 시각을 기준으로 현재 시각에서 빼서 계산.
@@ -543,6 +558,31 @@ export default function AgentChatPanel() {
                     · 약 {agentEstimatedSeconds < 60 ? `${agentEstimatedSeconds}초` : `${Math.round(agentEstimatedSeconds / 60)}분`}
                   </span>
                 )}
+              </span>
+            )}
+
+            {/* Method chips */}
+            {agentMethods.length > 0 && (
+              <span className="flex items-center gap-1" title={agentMethodRationale ?? ''}>
+                <span className="text-[10px] text-text-tertiary opacity-70">·</span>
+                {agentMethods.map((m, i) => (
+                  <span
+                    key={m}
+                    className={cn(
+                      'px-1.5 py-0.5 rounded-full text-[10px] font-medium border bg-chip text-text-secondary border-border-subtle',
+                      i === 0 && 'font-semibold text-primary-text bg-primary-pale border-primary-border',
+                    )}
+                  >
+                    {METHOD_LABELS[m] ?? m}
+                  </span>
+                ))}
+              </span>
+            )}
+
+            {/* L2/L3 인데 아직 메서드 선택 안 된 경우 — Phase 0 대기 표시 */}
+            {agentTier && agentTier !== 'L1' && agentMethods.length === 0 && agentLoading && (
+              <span className="text-[10px] font-medium text-text-tertiary opacity-70 italic">
+                · 메서드 선택 중…
               </span>
             )}
 

@@ -410,12 +410,19 @@ CORE_TOOLS: list[dict] = [
 _GEMINI_EXCLUDE: set[str] = set()
 
 
-def claude_tools(skill_tools: Iterable[dict]) -> list[dict]:
-    """Claude용 최종 tool 리스트 (CORE + skill tools)."""
-    return [*CORE_TOOLS, *skill_tools]
+def claude_tools(skill_tools: Iterable[dict], method_tools: Iterable[dict] = ()) -> list[dict]:
+    """Claude용 최종 tool 리스트 (CORE + skill tools + method routing tools).
+
+    method_tools 는 Phase 0 의 select_methods (S2) 와 향후 메서드별 도구 (S4~S6) 가
+    들어갈 자리. 호출자가 명시적으로 넘겨 의존성을 분리한다.
+    """
+    return [*CORE_TOOLS, *skill_tools, *method_tools]
 
 
-def gemini_function_declarations(skill_tools_gemini: Iterable[dict]) -> list[dict]:
+def gemini_function_declarations(
+    skill_tools_gemini: Iterable[dict],
+    method_tools_gemini: Iterable[dict] = (),
+) -> list[dict]:
     """Gemini용 최종 function declaration 리스트."""
     core = [_to_gemini_declaration(t) for t in CORE_TOOLS if t["name"] not in _GEMINI_EXCLUDE]
-    return [*core, *skill_tools_gemini]
+    return [*core, *skill_tools_gemini, *method_tools_gemini]

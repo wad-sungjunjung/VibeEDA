@@ -27,6 +27,8 @@ AgentEventType = Literal[
     "budget_warning",
     # tier 자동 승격 알림 (L1 → L2 등). 분류기가 부실해도 실행 중 보정됨을 노출.
     "tier_promoted",
+    # Phase 0: select_methods 호출 결과. 프론트는 메서드 칩 표시.
+    "methods_selected",
     "complete",
     "error",
 ]
@@ -48,6 +50,7 @@ ALL_EVENT_TYPES: tuple[str, ...] = (
     "tier_classified",
     "budget_warning",
     "tier_promoted",
+    "methods_selected",
     "complete",
     "error",
 )
@@ -176,6 +179,13 @@ class TierPromotedEvent(TypedDict):
     new_max_tool_calls: int
 
 
+class MethodsSelectedEvent(TypedDict, total=False):
+    type: Literal["methods_selected"]
+    methods: list[str]
+    rationale: str
+    expected_artifacts: list[str]
+
+
 AgentEvent = Union[
     ThinkingEvent,
     ToolUseEvent,
@@ -193,6 +203,7 @@ AgentEvent = Union[
     TierClassifiedEvent,
     BudgetWarningEvent,
     TierPromotedEvent,
+    MethodsSelectedEvent,
     CompleteEvent,
     ErrorEvent,
 ]
