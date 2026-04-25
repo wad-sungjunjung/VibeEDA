@@ -76,6 +76,26 @@ PYTHON_RULES = """
 - **마지막 줄은 반드시 `fig_xxx` 변수 식별자만** (자동 표시용)
 - `.show()` / `pio.show(...)` / `display(...)` 는 호출하지 말 것
 
+### 2-A. ⚠️ Plotly add_vline / add_hline 의 날짜 함정 (자주 터지는 에러)
+`add_vline(x=어떤_날짜)` 는 datetime 객체를 직접 못 받고 `pd.Timestamp` 또는 `int(timestamp_ms)` 가 필요.
+**올바른 방법** — `pd.Timestamp` 로 명시 변환:
+```python
+import pandas as pd
+fig.add_vline(x=pd.Timestamp("2026-04-13"), line_dash="dash", line_color="red",
+              annotation_text="정책 변경", annotation_position="top right")
+```
+또는 datetime 컬럼 값을 Timestamp 로:
+```python
+policy_date = pd.Timestamp(df["date"].min())
+fig.add_vline(x=policy_date)
+```
+**잘못된 방법** (에러 발생):
+- `add_vline(x="2026-04-13")` — 문자열 그대로 → `TypeError: object of type 'str'`
+- `add_vline(x=datetime.date(2026, 4, 13))` — date 객체 → 변환 실패 가능
+- `add_vline(x=df["date"].min())` — pandas datetime64 그대로 → 종종 실패
+
+`add_hline` 은 수치 임계값이라 일반적으로 문제 없음.
+
 ### 3. 기본 라이브러리
 기본 제공: pandas, numpy, plotly, scikit-learn, scipy, statsmodels.
 - 전처리/정제: pandas

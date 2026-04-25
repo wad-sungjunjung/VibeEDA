@@ -15,7 +15,56 @@ from .claude_agent import (
     NotebookState,
     PARALLEL_SAFE_TOOLS,
 )
-from . import agent_skills, agent_tools, agent_budget, agent_classifier, agent_methods, agent_synthesis
+from . import agent_skills, agent_tools, agent_budget, agent_classifier, agent_methods, agent_synthesis, agent_ml, agent_causal, agent_predict
+
+
+def _compact_gemini_contents_inplace(contents: list, keep_recent: int = 10) -> int:
+    """Claude 의 _compact_messages_inplace 와 등가 — function_response 포함된
+    오래된 user Content 의 응답 텍스트를 600자로 자른다.
+
+    Returns: 압축된 Part 수.
+    """
+    response_indices: list[int] = []
+    for i, c in enumerate(contents):
+        try:
+            role = c.role
+        except Exception:
+            continue
+        if role != "user":
+            continue
+        parts = list(c.parts or [])
+        if any(getattr(p, "function_response", None) for p in parts):
+            response_indices.append(i)
+    if len(response_indices) <= keep_recent:
+        return 0
+    to_compact = response_indices[:-keep_recent]
+    compacted = 0
+    for idx in to_compact:
+        c = contents[idx]
+        new_parts = []
+        for p in c.parts or []:
+            fr = getattr(p, "function_response", None)
+            if fr is None:
+                new_parts.append(p)
+                continue
+            try:
+                resp = dict(fr.response) if fr.response else {}
+            except Exception:
+                resp = {}
+            # 가장 큰 텍스트 필드를 600자로 자름 (간단 휴리스틱)
+            for k, v in list(resp.items()):
+                if isinstance(v, str) and len(v) > 600 and "(...truncated" not in v:
+                    resp[k] = v[:600] + "  (...truncated for context budget)"
+                    compacted += 1
+            try:
+                new_parts.append(types.Part.from_function_response(name=fr.name, response=resp))
+            except Exception:
+                new_parts.append(p)
+        try:
+            contents[idx] = types.Content(role=c.role, parts=new_parts)
+        except Exception:
+            pass
+    return compacted
 
 GENERATE_TIMEOUT_SEC = 300  # Gemini 단일 호출 타임아웃 (5분)
 REPEAT_CALL_LIMIT = 3      # 동일 tool+input 반복 허용 횟수
@@ -29,6 +78,9 @@ _FUNC_DECLARATIONS = agent_tools.gemini_function_declarations(
     method_tools_gemini=[
         agent_methods.SELECT_METHODS_TOOL_GEMINI,
         *agent_synthesis.SYNTHESIS_TOOLS_GEMINI,
+        *agent_ml.ML_TOOLS_GEMINI,
+        *agent_causal.CAUSAL_TOOLS_GEMINI,
+        *agent_predict.PREDICT_TOOLS_GEMINI,
     ],
 )
 
@@ -424,6 +476,10 @@ async def run_agent_stream_gemini(
 
             contents.append(types.Content(role="user", parts=tool_response_parts))
             turn_index += 1
+
+            # 컨텍스트 압축 — Claude 와 동일하게 20턴 이상이면 오래된 응답 600자 컷
+            if turn_index >= 20:
+                _compact_gemini_contents_inplace(contents, keep_recent=10)
 
             # ─── 예산 진행 체크 (Claude 와 동일) ─────────────────────────
             promoted, promo_msg = agent_budget.maybe_promote(

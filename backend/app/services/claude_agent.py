@@ -176,12 +176,19 @@ class NotebookState:
 
 from . import agent_tools
 from . import agent_synthesis
+from . import agent_ml
+from . import agent_causal
+from . import agent_predict
+from . import agent_learnings
 
 TOOLS = agent_tools.claude_tools(
     agent_skills.SKILL_TOOLS_CLAUDE,
     method_tools=[
         agent_methods.SELECT_METHODS_TOOL_CLAUDE,
         *agent_synthesis.SYNTHESIS_TOOLS_CLAUDE,
+        *agent_ml.ML_TOOLS_CLAUDE,
+        *agent_causal.CAUSAL_TOOLS_CLAUDE,
+        *agent_predict.PREDICT_TOOLS_CLAUDE,
     ],
 )
 
@@ -392,6 +399,46 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
             }],
         )
 
+    # ─── ML 메서드별 도구 (S4) — 'ml' 메서드 미선택 시 거부 ────────────────
+    if name in agent_ml.ML_TOOL_NAMES:
+        if "ml" not in (state.methods or []):
+            return {
+                "success": False,
+                "error": "method_not_selected",
+                "message": (
+                    f"`{name}` 은 'ml' 메서드 전용입니다. 현재 선택된 메서드: {state.methods}. "
+                    "ml 작업이 필요하면 select_methods 를 다시 호출해 'ml' 을 추가하세요."
+                ),
+            }, []
+        return agent_ml.handle_ml_tool(name, inp, state)
+
+    # ─── Causal/AB 메서드별 도구 (S5) ─────────────────────────────────────
+    if name in agent_causal.CAUSAL_TOOL_NAMES:
+        allowed_methods = {"causal", "ab_test"}
+        if not (set(state.methods or []) & allowed_methods):
+            return {
+                "success": False,
+                "error": "method_not_selected",
+                "message": (
+                    f"`{name}` 은 'causal' 또는 'ab_test' 메서드 전용입니다. "
+                    f"현재 선택: {state.methods}. select_methods 를 다시 호출해 메서드를 추가하세요."
+                ),
+            }, []
+        return agent_causal.handle_causal_tool(name, inp, state)
+
+    # ─── Predict 메서드별 도구 (S6) ───────────────────────────────────────
+    if name in agent_predict.PREDICT_TOOL_NAMES:
+        if "predict" not in (state.methods or []):
+            return {
+                "success": False,
+                "error": "method_not_selected",
+                "message": (
+                    f"`{name}` 은 'predict' 메서드 전용입니다. 현재 선택: {state.methods}. "
+                    "select_methods 를 다시 호출해 'predict' 를 추가하세요."
+                ),
+            }, []
+        return agent_predict.handle_predict_tool(name, inp, state)
+
     # ─── Phase 3: rate_findings ───────────────────────────────────────────
     if name == "rate_findings":
         findings_in = inp.get("findings") or []
@@ -464,6 +511,35 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
 
     # ─── Phase 3: synthesize_report (세션 종료 마커) ──────────────────────
     if name == "synthesize_report":
+        # Sequential gate: L3 는 self_consistency_check 1회 호출 필수.
+        # 모델이 한 턴에 rate_findings + synthesize_report 를 같이 부르면 종료 가드가 우회되는 것을 방지.
+        if (
+            state.budget is not None
+            and state.budget.tier == "L3"
+            and not state.consistency_checked
+        ):
+            return {
+                "success": False,
+                "error": "consistency_check_required",
+                "message": (
+                    "L3 세션은 `synthesize_report` 호출 전에 `self_consistency_check` 를 1회 호출해야 합니다 "
+                    "(이슈 없으면 `issues=[]`, `summary='all consistent'` 로). "
+                    "그 후 다시 synthesize_report 를 호출하세요."
+                ),
+            }, []
+        # rate_findings 도 sequential — findings 가 비어있으면 거부 (L2/L3 공통)
+        if (
+            state.budget is not None
+            and state.budget.tier in ("L2", "L3")
+            and not state.findings
+        ):
+            return {
+                "success": False,
+                "error": "findings_required_first",
+                "message": (
+                    "synthesize_report 전에 `rate_findings` 로 핵심 결론 3~7개에 confidence 를 매겨야 합니다."
+                ),
+            }, []
         audience = (inp.get("audience") or "").strip().lower()
         if audience not in ("exec", "ds", "pm"):
             return {
@@ -521,6 +597,20 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
                 logger.warning("synthesize_report persist failed: %s", e)
 
         state.synthesis_done = True
+
+        # learnings 누적 — high-confidence findings 만 노트북별 .md 에 append
+        try:
+            import datetime as _dt
+            ts = _dt.datetime.now().strftime("%Y-%m-%d")
+            agent_learnings.append_findings(
+                state.notebook_id,
+                state.findings,
+                session_summary=title,
+                timestamp_iso=ts,
+            )
+        except Exception as e:
+            logger.warning("learnings persist failed: %s", e)
+
         return (
             {
                 "success": True,
@@ -1543,6 +1633,9 @@ def _build_system_prompt(state: NotebookState) -> str:
     # 루트 폴더에 드롭된 로컬 데이터 파일 (CSV/Parquet 등) 프로파일
     local_files_block = file_profile_cache.format_for_prompt()
 
+    # 이전 세션의 누적 발견 (learnings.md) — 같은 노트북에서 재발견 방지
+    learnings_block = agent_learnings.load_for_prompt(state.notebook_id)
+
     # ─── Phase 0 라우팅 블록 ────────────────────────────────────────────────
     # L2/L3 + methods 미선택 → 모델에게 첫 도구로 select_methods 호출 강제.
     # 이미 선택됐다면 선택 결과 + 메서드별 fragment 를 주입.
@@ -1601,7 +1694,7 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - Data Marts: {marts}
 - Snowflake: {sf_status}
 - Tier: **{tier}** (예산 한도 자동 적용 — 답변 분량/깊이를 이 티어에 맞춰 조정하세요)
-{date_block}{mart_schema_block}{local_files_block}{routing_block}{methods_block}{synthesis_block}
+{date_block}{mart_schema_block}{local_files_block}{learnings_block}{routing_block}{methods_block}{synthesis_block}
 
 ## Tools
 ### 셀 조작
