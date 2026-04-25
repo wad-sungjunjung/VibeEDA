@@ -9,6 +9,7 @@ import { indentWithTab } from '@codemirror/commands'
 import { Prec, RangeSetBuilder, EditorState } from '@codemirror/state'
 import { indentUnit } from '@codemirror/language'
 import { search, searchKeymap } from '@codemirror/search'
+import { unifiedMergeView } from '@codemirror/merge'
 import { snowflakeTheme } from '@/lib/snowflakeTheme'
 import type { CellType } from '@/types'
 import { useModelStore } from '@/store/modelStore'
@@ -21,6 +22,22 @@ const fnCallTheme = EditorView.theme({
 // 늘어나 가로 스크롤바가 박스 하단에 붙는다 (콘텐츠가 짧을 때도 동일).
 const fillHeightTheme = EditorView.theme({
   '&': { height: '100%' },
+})
+
+// @codemirror/merge 의 기본 스타일은 추가 라인을 8% 초록 + 텍스트 하단 2px 그라디언트
+// 언더라인으로 표시하는데, 다크 테마에서 가독성이 떨어진다 ("초록 선" 처럼 보임).
+// 라인 배경을 살짝 진하게 하고, 텍스트의 언더라인을 배경 블록으로 교체해 가독성 개선.
+const mergeColorTheme = EditorView.theme({
+  // 추가/수정 라인 전체 배경 (b side).
+  '&.cm-merge-b .cm-changedLine, .cm-inlineChangedLine': {
+    backgroundColor: 'rgba(34, 197, 94, 0.14)',
+  },
+  // 변경된 텍스트의 하단 언더라인 → 배경 블록.
+  // (`&light` / `&dark` prefix 는 현재 style-mod 버전에서 미지원 → "Unsupported selector" 런타임 에러.
+  // 색이 동일하므로 라이트/다크 구분 없이 한 selector 로 통일.)
+  '&.cm-merge-b .cm-changedText': {
+    background: 'rgba(34, 197, 94, 0.32)',
+  },
 })
 
 // Ctrl+F 검색 패널을 우상단에 떠 있는 컴팩트 카드로 띄운다 (Snowsight 스타일).
@@ -178,9 +195,12 @@ interface Props {
   onRun?: () => void
   fixedHeight?: number
   readOnly?: boolean
+  // diff baseline. 지정되면 inline merge view 로 렌더 — value 가 새 코드, originalCode 가 원본.
+  // 빨강(삭제)/초록(추가) 라인이 한 에디터에 함께 표시된다.
+  originalCode?: string
 }
 
-export default function CodeEditor({ type, value, onChange, onRun, fixedHeight, readOnly }: Props) {
+export default function CodeEditor({ type, value, onChange, onRun, fixedHeight, readOnly, originalCode }: Props) {
   const onRunRef = useRef(onRun)
   useEffect(() => { onRunRef.current = onRun }, [onRun])
   const theme = useModelStore((s) => s.theme)
@@ -189,6 +209,9 @@ export default function CodeEditor({ type, value, onChange, onRun, fixedHeight, 
     { key: 'Ctrl-Enter', run: () => { onRunRef.current?.(); return true } },
     { key: 'Mod-Enter',  run: () => { onRunRef.current?.(); return true } },
   ])), [])
+
+  // diff 모드인지. originalCode 가 string 으로 들어오면 진입 (빈 문자열도 진입 — vibe 가 빈 셀에 코드 제안하는 케이스).
+  const inDiffMode = originalCode !== undefined
 
   const extensions = useMemo(() => [
     runKeymap,
@@ -200,9 +223,15 @@ export default function CodeEditor({ type, value, onChange, onRun, fixedHeight, 
     search({ top: true }),
     keymap.of(searchKeymap),
     ...(type !== 'markdown' ? [...snowflakeTheme, fnCallTheme, fnCallHighlighter] : []),
+    ...(inDiffMode ? [unifiedMergeView({
+      original: originalCode ?? '',
+      mergeControls: false,         // 셀 단위 수락/거절을 쓰므로 청크별 컨트롤은 끔.
+      highlightChanges: true,
+      syntaxHighlightDeletions: true,
+    }), mergeColorTheme] : []),
     fillHeightTheme,
     searchPanelTheme,
-  ], [type, runKeymap])
+  ], [type, runKeymap, inDiffMode, originalCode])
 
   const style: React.CSSProperties = fixedHeight
     ? { height: fixedHeight, overflow: 'hidden', borderRadius: 6 }

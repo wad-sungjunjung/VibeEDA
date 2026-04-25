@@ -59,6 +59,9 @@ export interface Cell {
   historyOpen: boolean
   insight: string | null
   agentGenerated?: boolean
+  // Vibe 제안 코드(아직 수락/거절 전). null 이면 일반 모드, 문자열이면 diff 모드.
+  // cell.code 는 항상 원본 — pendingCode 가 수락되면 cell.code 로 승격된다.
+  pendingCode: string | null
 }
 
 // ─── Mart ──────────────────────────────────────────────────────────────────
@@ -114,7 +117,7 @@ export interface AgentMessage {
   createdCellIds?: string[]
   // 중간 단계(step): 도구 호출, 셀 이벤트 등 파이프라인 상세
   kind?: 'message' | 'step'
-  stepType?: 'tool' | 'cell_created' | 'cell_executed' | 'cell_memo' | 'error'
+  stepType?: 'tool' | 'cell_created' | 'cell_executed' | 'cell_memo' | 'error' | 'exec_long' | 'exec_done'
   stepLabel?: string       // 사용자에게 보여줄 짧은 라벨 (예: "SQL 쿼리 작성 · region_sales")
   stepDetail?: string      // 확장 시 보여줄 상세 (tool input, 메모 내용, 에러 메시지 등)
   collapsed?: boolean      // true면 UI에서 접힌 상태

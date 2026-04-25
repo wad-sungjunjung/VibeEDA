@@ -19,6 +19,8 @@ AgentEventType = Literal[
     "chart_quality",
     "todos_updated",
     "ask_user",
+    "exec_heartbeat",
+    "exec_completed_notice",
     "complete",
     "error",
 ]
@@ -35,6 +37,8 @@ ALL_EVENT_TYPES: tuple[str, ...] = (
     "chart_quality",
     "todos_updated",
     "ask_user",
+    "exec_heartbeat",
+    "exec_completed_notice",
     "complete",
     "error",
 )
@@ -118,6 +122,22 @@ class ErrorEvent(TypedDict):
     message: str
 
 
+class ExecHeartbeatEvent(TypedDict):
+    type: Literal["exec_heartbeat"]
+    cell_id: str
+    cell_name: str
+    elapsed_sec: int
+    message: str
+
+
+class ExecCompletedNoticeEvent(TypedDict):
+    type: Literal["exec_completed_notice"]
+    cell_id: str
+    cell_name: str
+    elapsed_sec: int
+    message: str
+
+
 AgentEvent = Union[
     ThinkingEvent,
     ToolUseEvent,
@@ -130,6 +150,8 @@ AgentEvent = Union[
     ChartQualityEvent,
     TodosUpdatedEvent,
     AskUserEvent,
+    ExecHeartbeatEvent,
+    ExecCompletedNoticeEvent,
     CompleteEvent,
     ErrorEvent,
 ]

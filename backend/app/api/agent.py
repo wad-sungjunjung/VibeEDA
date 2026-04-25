@@ -1,9 +1,57 @@
 """Agent Mode — Claude tool use + .ipynb 파일 기반"""
+import asyncio
 import json
 import logging
 import datetime as _dt
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import AsyncIterable, Literal, Optional
+
+
+# SSE keepalive 간격 (초). 모델이 thinking/긴 응답으로 무송신일 때
+# 프록시·로드밸런서가 idle 로 끊지 않도록 주기적으로 comment 발사.
+SSE_KEEPALIVE_SEC = 5.0
+
+
+async def _with_keepalive(source: AsyncIterable[str], interval: float = SSE_KEEPALIVE_SEC):
+    """원본 SSE 청크 사이에 ': keepalive' comment 를 interval 마다 끼워 넣는다.
+
+    EventSource 스펙상 ':' 시작 줄은 무시되므로 프론트 핸들러에 영향 없음.
+    원본 generator 가 무송신으로 멈춰도 이 wrapper 가 keepalive 를 흘려 보내,
+    중간 프록시 idle timeout 으로 인한 끊김을 방지한다.
+    """
+    queue: asyncio.Queue = asyncio.Queue()
+    DONE = object()
+    ERR = "__err__"
+
+    async def _consume():
+        try:
+            async for chunk in source:
+                await queue.put(chunk)
+        except Exception as e:
+            await queue.put((ERR, e))
+        finally:
+            await queue.put(DONE)
+
+    consumer = asyncio.create_task(_consume())
+    try:
+        while True:
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=interval)
+            except asyncio.TimeoutError:
+                yield ": keepalive\n\n"
+                continue
+            if item is DONE:
+                break
+            if isinstance(item, tuple) and item and item[0] == ERR:
+                raise item[1]
+            yield item
+    finally:
+        if not consumer.done():
+            consumer.cancel()
+            try:
+                await consumer
+            except (asyncio.CancelledError, Exception):
+                pass
 
 
 def _json_default(o):
@@ -182,7 +230,7 @@ async def agent_stream_endpoint(
                     logger.warning("Failed to persist agent session: %s", e)
 
     return StreamingResponse(
-        generate(),
+        _with_keepalive(generate()),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

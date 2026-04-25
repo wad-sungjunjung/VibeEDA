@@ -11,6 +11,7 @@ from google.genai import types
 from .claude_agent import (
     _execute_tool,
     _build_system_prompt,
+    _auto_execute_after_create_or_update,
     NotebookState,
     PARALLEL_SAFE_TOOLS,
 )
@@ -291,7 +292,21 @@ async def run_agent_stream_gemini(
             else:
                 results_list = []
                 for n, a in fc_args_list:
-                    results_list.append(await _execute_tool(n, a, notebook_state))
+                    result, sse_events = await _execute_tool(n, a, notebook_state)
+                    # 이벤트 즉시 yield: 프론트가 셀 생성→실행→분석 단계를 실시간으로 보게.
+                    for ev in sse_events:
+                        yield ev
+                        if ev["type"] == "cell_created":
+                            created_cell_ids.append(ev["cell_id"])
+                        elif ev["type"] == "cell_code_updated":
+                            updated_cell_ids.append(ev["cell_id"])
+                    # SQL/Python 셀 자동 실행 — 결과는 동일 tool_result 에 머지
+                    async for ev in _auto_execute_after_create_or_update(
+                        n, a, result, notebook_state
+                    ):
+                        yield ev
+                    # sse_events 는 위에서 이미 흘렸으므로 빈 리스트로 교체 (아래 trailing 루프 중복 방지)
+                    results_list.append((result, []))
 
             for idx, ((name, args), (result, sse_events)) in enumerate(zip(fc_args_list, results_list)):
                 for event in sse_events:

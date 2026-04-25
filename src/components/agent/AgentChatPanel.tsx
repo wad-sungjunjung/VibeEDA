@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { Telescope, X, User, ArrowUp, Plus, FileCode, Search, SquarePen, ChevronDown, ChevronRight, Loader2, Wrench, FileCode2, PlayCircle, StickyNote, AlertTriangle, StopCircle, Paperclip } from 'lucide-react'
+import { Telescope, X, User, ArrowUp, Plus, FileCode, Search, SquarePen, ChevronDown, ChevronRight, Loader2, Wrench, FileCode2, PlayCircle, StickyNote, AlertTriangle, StopCircle, Paperclip, Hourglass, CheckCircle2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useModelStore, AGENT_MODELS, getModelContextWindow } from '@/store/modelStore'
@@ -15,6 +15,8 @@ const STEP_ICONS: Record<string, { icon: typeof Wrench; className: string }> = {
   cell_executed: { icon: PlayCircle, className: 'bg-success/15 text-success' },
   cell_memo: { icon: StickyNote, className: 'bg-warning-bg text-warning-text' },
   error: { icon: AlertTriangle, className: 'bg-danger-bg text-danger' },
+  exec_long: { icon: Hourglass, className: 'bg-warning-bg text-warning-text' },
+  exec_done: { icon: CheckCircle2, className: 'bg-success/15 text-success' },
 }
 
 export default function AgentChatPanel() {

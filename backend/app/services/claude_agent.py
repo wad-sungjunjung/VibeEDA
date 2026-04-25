@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -13,6 +14,39 @@ from . import agent_skills
 from . import category_cache
 from . import file_profile_cache
 from .code_style import SQL_STYLE_GUIDE, PYTHON_RULES, MARKDOWN_RULES
+
+logger = logging.getLogger(__name__)
+
+# ─── Bottleneck guards ───────────────────────────────────────────────────────
+# 모델 stream 단일 이벤트 도착 간격 상한. 모델/네트워크가 stall 한 경우 자동 종료.
+STREAM_EVENT_WATCHDOG_SEC = 90
+# stream 종료 후 final_message 회수 타임아웃 (보통 0~수초)
+STREAM_FINAL_MESSAGE_SEC = 30
+# AsyncAnthropic 자체 read timeout (Anthropic SDK 디폴트 600s 명시)
+SDK_READ_TIMEOUT_SEC = 600
+SDK_CONNECT_TIMEOUT_SEC = 10
+# 자동 실행되는 Python/SQL 셀의 커널 실행 타임아웃.
+# 모델링/장기 학습 작업은 시간 단위가 걸릴 수 있으므로 기본값을 넉넉히 잡고,
+# 환경변수로 override 가능. 0 또는 음수면 timeout 미적용 (무한 대기).
+import os as _os
+
+def _env_int(name: str, default: int) -> int:
+    raw = _os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+# Python: 모델링/대용량 처리 대비 30분 기본
+PYTHON_EXEC_TIMEOUT_SEC = _env_int("AGENT_PYTHON_EXEC_TIMEOUT_SEC", 1800)
+# SQL: Snowflake 쿼리 5분 기본 (warehouse 지연 포함)
+SQL_EXEC_TIMEOUT_SEC = _env_int("AGENT_SQL_EXEC_TIMEOUT_SEC", 300)
+# 장기 실행 임계: 이 시간을 넘기면 사용자에게 "아직 실행 중" 신호 발사
+LONG_EXEC_HEARTBEAT_THRESHOLDS_SEC = (30, 120, 300, 900)
+# 완료 후 "X초 걸렸어요" 알림을 띄우는 최소 임계
+LONG_EXEC_NOTIFY_MIN_SEC = 30
 
 
 # ─── 메모 새니타이저 ──────────────────────────────────────────────────────────
@@ -323,23 +357,10 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
             },
         }]
 
-        # 모든 셀(SQL/Python)은 생성 즉시 자동 실행 — 에이전트가 실제 출력을 보고 다음 단계를 결정
-        if cell_type in ("sql", "python") and state.notebook_id:
-            exec_result, exec_events = await _execute_tool(
-                "execute_cell", {"cell_id": cell_id}, state
-            )
-            events.extend(exec_events)
-            payload = {
-                "cell_id": cell_id,
-                "success": True,
-                "auto_executed": True,
-                "output_summary": exec_result.get("output_summary"),
-            }
-            if exec_result.get("image_png_base64"):
-                payload["image_png_base64"] = exec_result["image_png_base64"]
-            return payload, events
-
-        return {"cell_id": cell_id, "success": True}, events
+        # NOTE: SQL/Python 자동 실행은 호출부(run_agent_stream)에서 처리한다.
+        # 이 함수에서 같이 처리하면 cell_created 이벤트가 자동 실행 종료까지 batch 되어,
+        # 프론트가 'Python 코드 작성 중' 상태에서 수십 초 멈춘 것처럼 보인다.
+        return {"cell_id": cell_id, "success": True, "cell_type": cell_type}, events
 
     if name == "update_cell_code":
         cell = next((c for c in state.cells if c.id == inp["cell_id"]), None)
@@ -389,22 +410,9 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
             },
         }]
 
-        # 코드 변경 후 즉시 재실행
-        if cell.type in ("sql", "python") and state.notebook_id:
-            exec_result, exec_events = await _execute_tool(
-                "execute_cell", {"cell_id": cell.id}, state
-            )
-            events.extend(exec_events)
-            payload = {
-                "success": True,
-                "auto_executed": True,
-                "output_summary": exec_result.get("output_summary"),
-            }
-            if exec_result.get("image_png_base64"):
-                payload["image_png_base64"] = exec_result["image_png_base64"]
-            return payload, events
-
-        return {"success": True}, events
+        # NOTE: 코드 변경 후 자동 재실행은 호출부(run_agent_stream)에서 처리.
+        # cell_code_updated 이벤트를 즉시 전달해 프론트 상태가 stale 되지 않게 한다.
+        return {"success": True, "cell_id": cell.id, "cell_type": cell.type}, events
 
     if name == "execute_cell":
         cell = next((c for c in state.cells if c.id == inp["cell_id"]), None)
@@ -415,14 +423,57 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
             from ..services.kernel import run_sql, run_python
             loop = asyncio.get_event_loop()
 
+            # 커널 실행은 thread executor 위에서 돌고, 사용자 코드/Plotly→PNG 가 hang 하면
+            # 이벤트 루프와 에이전트 전체가 멈춘다. asyncio.wait_for 로 상한을 둔다.
+            # 주의: run_in_executor 의 thread 자체는 cancel 되지 않으므로 백그라운드에서
+            # 계속 돌 수 있다 — 그러나 에이전트 흐름은 즉시 복귀해 사용자에게 피드백 가능.
+            # timeout <= 0 이면 무한 대기 (모델링 등 장기 작업용 escape hatch).
+            async def _await_exec(future, timeout_sec: int):
+                if timeout_sec and timeout_sec > 0:
+                    return await asyncio.wait_for(future, timeout=timeout_sec)
+                return await future
+
             if cell.type == "sql":
-                output = await loop.run_in_executor(
-                    None, run_sql, state.notebook_id, cell.name, cell.code
-                )
+                try:
+                    output = await _await_exec(
+                        loop.run_in_executor(
+                            None, run_sql, state.notebook_id, cell.name, cell.code
+                        ),
+                        SQL_EXEC_TIMEOUT_SEC,
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(
+                        "SQL exec timeout after %ss (cell=%s)", SQL_EXEC_TIMEOUT_SEC, cell.name
+                    )
+                    output = {
+                        "type": "error",
+                        "message": (
+                            f"SQL 실행이 {SQL_EXEC_TIMEOUT_SEC}초를 넘겨 자동 중단했어요. "
+                            "Snowflake 쿼리 응답이 늦거나 결과가 너무 큰지 확인해주세요. "
+                            "WHERE/LIMIT 으로 범위를 좁혀 다시 시도하면 됩니다."
+                        ),
+                    }
             elif cell.type == "python":
-                output = await loop.run_in_executor(
-                    None, run_python, state.notebook_id, cell.name, cell.code
-                )
+                try:
+                    output = await _await_exec(
+                        loop.run_in_executor(
+                            None, run_python, state.notebook_id, cell.name, cell.code
+                        ),
+                        PYTHON_EXEC_TIMEOUT_SEC,
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(
+                        "Python exec timeout after %ss (cell=%s)", PYTHON_EXEC_TIMEOUT_SEC, cell.name
+                    )
+                    output = {
+                        "type": "error",
+                        "message": (
+                            f"Python 셀 실행이 {PYTHON_EXEC_TIMEOUT_SEC}초를 넘겨 자동 중단했어요. "
+                            "장시간 작업이 필요하면 환경변수 AGENT_PYTHON_EXEC_TIMEOUT_SEC 로 상한을 늘리거나 "
+                            "0 으로 끄세요(무한). 데이터 처리량이 과도하거나 차트 PNG 렌더가 멈춘 경우라면 "
+                            "데이터 크기/포인트 수를 줄여 다시 시도해주세요."
+                        ),
+                    }
             else:
                 output = {"type": "stdout", "content": ""}
 
@@ -1017,6 +1068,113 @@ async def _execute_tool(name: str, inp: dict, state: NotebookState) -> tuple[dic
     return {"error": f"Unknown tool: {name}"}, []
 
 
+# ─── Auto-execute helper (post create/update) ────────────────────────────────
+
+async def _auto_execute_after_create_or_update(
+    tool_name: str,
+    tool_input: dict,
+    result: dict,
+    state: NotebookState,
+) -> AsyncGenerator[dict, None]:
+    """create_cell/update_cell_code 직후 SQL/Python 셀을 자동 실행.
+
+    SSE 이벤트(cell_executed)는 즉시 yield 하고, 모델이 보는 tool_result(`result`)에는
+    auto_executed/output_summary/image_png_base64 를 in-place 머지한다.
+
+    장시간 실행(모델링 등 시간 단위 작업)에서는:
+      - LONG_EXEC_HEARTBEAT_THRESHOLDS_SEC 임계마다 `exec_heartbeat` 이벤트 발사
+        ("아직 실행 중이에요" 신호 — 프론트가 status 라벨에 경과시간 노출)
+      - 완료 시 LONG_EXEC_NOTIFY_MIN_SEC 이상 걸린 경우 `exec_completed_notice` 발사
+        (사용자에게 "X초만에 완료됐어요" 알림, 모델 응답 흐름과 별개)
+    """
+    if tool_name not in ("create_cell", "update_cell_code"):
+        return
+    if not result.get("success"):
+        return
+    if not state.notebook_id:
+        return
+    cell_id = result.get("cell_id") or tool_input.get("cell_id")
+    if not cell_id:
+        return
+    cell_type = result.get("cell_type") or tool_input.get("cell_type")
+    if not cell_type:
+        cell = next((c for c in state.cells if c.id == cell_id), None)
+        cell_type = cell.type if cell else None
+    if cell_type not in ("sql", "python"):
+        return
+
+    cell_obj = next((c for c in state.cells if c.id == cell_id), None)
+    cell_name = cell_obj.name if cell_obj else ""
+
+    import time as _time
+    start_ts = _time.monotonic()
+
+    exec_task = asyncio.create_task(
+        _execute_tool("execute_cell", {"cell_id": cell_id}, state)
+    )
+    thresholds = list(LONG_EXEC_HEARTBEAT_THRESHOLDS_SEC)
+    next_idx = 0
+    last_heartbeat_at = 0.0
+
+    try:
+        while not exec_task.done():
+            now = _time.monotonic() - start_ts
+            # 다음 wake-up 시점 결정: 다음 임계, 아니면 마지막 heartbeat + 60초.
+            if next_idx < len(thresholds):
+                target = thresholds[next_idx]
+            else:
+                target = last_heartbeat_at + 60.0
+            wait_sec = max(0.1, target - now)
+            try:
+                await asyncio.wait_for(asyncio.shield(exec_task), timeout=wait_sec)
+                break  # exec_task 완료
+            except asyncio.TimeoutError:
+                now = _time.monotonic() - start_ts
+                # 이미 지난 임계는 한꺼번에 advance — wait_for 가 정확히 임계에 깨지 않을 수 있음.
+                while next_idx < len(thresholds) and now >= thresholds[next_idx]:
+                    next_idx += 1
+                last_heartbeat_at = now
+                elapsed_int = int(now)
+                yield {
+                    "type": "exec_heartbeat",
+                    "cell_id": cell_id,
+                    "cell_name": cell_name,
+                    "elapsed_sec": elapsed_int,
+                    "message": (
+                        f"셀 `{cell_name}` 실행이 {elapsed_int}초째 진행 중이에요. "
+                        "끝날 때까지 기다린 뒤 이어서 분석할게요."
+                    ),
+                }
+        exec_result, exec_events = await exec_task
+    except asyncio.CancelledError:
+        exec_task.cancel()
+        raise
+
+    elapsed_total = _time.monotonic() - start_ts
+    for ev in exec_events:
+        yield ev
+    result["auto_executed"] = True
+    if "output_summary" in exec_result:
+        result["output_summary"] = exec_result.get("output_summary")
+    if exec_result.get("image_png_base64"):
+        result["image_png_base64"] = exec_result["image_png_base64"]
+
+    # 장기 실행이었다면 완료 알림 — 사용자가 자리 비웠다 돌아와서 확인할 수 있게.
+    if elapsed_total >= LONG_EXEC_NOTIFY_MIN_SEC:
+        yield {
+            "type": "exec_completed_notice",
+            "cell_id": cell_id,
+            "cell_name": cell_name,
+            "elapsed_sec": int(elapsed_total),
+            "message": (
+                f"셀 `{cell_name}` 이 {int(elapsed_total)}초만에 실행 완료됐어요. "
+                "이어서 결과를 분석할게요."
+            ),
+        }
+        # 모델 tool_result 에도 실행 시간을 알려, 응답에서 "X초 걸렸어요" 같은 멘트를 자연스럽게 포함하도록.
+        result["elapsed_sec"] = int(elapsed_total)
+
+
 # ─── System prompt ────────────────────────────────────────────────────────────
 
 def _build_system_prompt(state: NotebookState) -> str:
@@ -1357,7 +1515,10 @@ async def run_agent_stream(
         yield {"type": "error", "message": "Anthropic API 키가 설정되지 않았습니다."}
         return
 
-    client = anthropic.AsyncAnthropic(api_key=api_key)
+    client = anthropic.AsyncAnthropic(
+        api_key=api_key,
+        timeout=anthropic.Timeout(SDK_READ_TIMEOUT_SEC, connect=SDK_CONNECT_TIMEOUT_SEC),
+    )
     agent_skills.init_skill_ctx(notebook_state, user_message)
     notebook_state.user_message_latest = user_message
     system_prompt = _build_system_prompt(notebook_state)
@@ -1423,23 +1584,53 @@ async def run_agent_stream(
                     last = dict(cached_tools[-1])
                     last["cache_control"] = {"type": "ephemeral"}
                     cached_tools[-1] = last
-                async with client.messages.stream(
-                    model=model,
-                    max_tokens=32000,
-                    system=cached_system,  # type: ignore[arg-type]
-                    tools=cached_tools,  # type: ignore[arg-type]
-                    messages=messages,  # type: ignore[arg-type]
-                    thinking={"type": "adaptive"},  # type: ignore[arg-type]
-                ) as stream:
-                    async for event in stream:
-                        if event.type == "content_block_delta":
-                            delta = event.delta
-                            if delta.type == "thinking_delta":
-                                yield {"type": "thinking", "content": delta.thinking}
-                            elif delta.type == "text_delta":
-                                full_text += delta.text
-                                yield {"type": "message_delta", "content": delta.text}
-                    response = await stream.get_final_message()
+                # 단일 stream 이벤트 도착 간격을 watchdog 으로 감시.
+                # Anthropic API 가 stall 하면 (네트워크 stall, 모델 hang 등) 자동 종료해
+                # 사용자가 'Python 코드 작성 중' 같은 라벨에 무한 대기되지 않도록 한다.
+                stalled = False
+                try:
+                    async with client.messages.stream(
+                        model=model,
+                        max_tokens=32000,
+                        system=cached_system,  # type: ignore[arg-type]
+                        tools=cached_tools,  # type: ignore[arg-type]
+                        messages=messages,  # type: ignore[arg-type]
+                        thinking={"type": "adaptive"},  # type: ignore[arg-type]
+                    ) as stream:
+                        aiter = stream.__aiter__()
+                        while True:
+                            try:
+                                event = await asyncio.wait_for(
+                                    aiter.__anext__(), timeout=STREAM_EVENT_WATCHDOG_SEC
+                                )
+                            except StopAsyncIteration:
+                                break
+                            if event.type == "content_block_delta":
+                                delta = event.delta
+                                if delta.type == "thinking_delta":
+                                    yield {"type": "thinking", "content": delta.thinking}
+                                elif delta.type == "text_delta":
+                                    full_text += delta.text
+                                    yield {"type": "message_delta", "content": delta.text}
+                        response = await asyncio.wait_for(
+                            stream.get_final_message(), timeout=STREAM_FINAL_MESSAGE_SEC
+                        )
+                except asyncio.TimeoutError:
+                    stalled = True
+                if stalled:
+                    logger.error(
+                        "Claude stream watchdog fired (no events in %ss, turn=%d)",
+                        STREAM_EVENT_WATCHDOG_SEC, turn_index,
+                    )
+                    yield {
+                        "type": "error",
+                        "message": (
+                            f"Claude 응답이 {STREAM_EVENT_WATCHDOG_SEC}초 동안 멈춰 자동 중단했어요. "
+                            "네트워크/모델 상태를 확인하고 잠시 후 같은 메시지로 다시 시도하거나, "
+                            "분석 단위를 더 작게 쪼개서 다시 요청해주세요."
+                        ),
+                    }
+                    return
 
                 tool_uses = [b for b in response.content if b.type == "tool_use"]
 
@@ -1572,7 +1763,22 @@ async def run_agent_stream(
                     if tb.name in agent_skills.ASK_USER_LIKE_TOOLS:
                         ask_user_called = True
                     res = await _execute_tool(tb.name, tb.input, notebook_state)
-                    paired.append((tb, res))
+                    result, sse_events = res
+                    # 이벤트를 즉시 흘려보내 프론트가 단계별 상태(셀 생성→실행→분석)를
+                    # 실시간으로 본다. 묶어서 yield 하면 'Python 코드 작성 중' 라벨이 stale 됨.
+                    for sse_event in sse_events:
+                        yield sse_event
+                        if sse_event["type"] == "cell_created":
+                            created_cell_ids.append(sse_event["cell_id"])
+                        elif sse_event["type"] == "cell_code_updated":
+                            updated_cell_ids.append(sse_event["cell_id"])
+                    # SQL/Python 셀 생성·수정 직후 자동 실행 — 결과는 동일 tool_result 에 머지해
+                    # 모델은 단일 도구 호출로 인식 (auto_executed/output_summary 제공).
+                    async for ev in _auto_execute_after_create_or_update(
+                        tb.name, tb.input, result, notebook_state
+                    ):
+                        yield ev
+                    paired.append((tb, (result, [])))
 
             for tool_block, (result, sse_events) in paired:
                 for sse_event in sse_events:

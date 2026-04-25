@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, lazy, Suspense, memo } from 'react'
-import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle, Maximize2, Minimize2, Sparkles, Grid3x3, Paperclip, X as XIcon } from 'lucide-react'
+import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle, Maximize2, Minimize2, Sparkles, Grid3x3, Paperclip, X as XIcon, Check } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useModelStore, VIBE_MODELS } from '@/store/modelStore'
@@ -53,6 +53,8 @@ function CellContainer({ cell, index }: Props) {
     updateCellChatImages,
     submitVibe,
     cancelVibe,
+    acceptVibeChange,
+    rejectVibeChange,
     notebookAreaHeight,
     fullscreenCellId,
     setFullscreenCellId,
@@ -78,6 +80,8 @@ function CellContainer({ cell, index }: Props) {
     updateCellChatImages: s.updateCellChatImages,
     submitVibe: s.submitVibe,
     cancelVibe: s.cancelVibe,
+    acceptVibeChange: s.acceptVibeChange,
+    rejectVibeChange: s.rejectVibeChange,
     notebookAreaHeight: s.notebookAreaHeight,
     fullscreenCellId: s.fullscreenCellId,
     setFullscreenCellId: s.setFullscreenCellId,
@@ -455,6 +459,7 @@ function CellContainer({ cell, index }: Props) {
           </div>
         )
       }
+      const isPending = cell.pendingCode != null
       return (
         <div
           className={cn(
@@ -465,12 +470,38 @@ function CellContainer({ cell, index }: Props) {
         >
           <CodeEditor
             type={cell.type}
-            value={cell.code}
-            onChange={(v) => updateCellCode(cell.id, v)}
+            // pending 모드: 새 코드를 보여주고 cell.code 를 baseline 으로 diff. 수정 잠금.
+            value={isPending ? (cell.pendingCode ?? '') : cell.code}
+            originalCode={isPending ? cell.code : undefined}
+            onChange={(v) => { if (!isPending) updateCellCode(cell.id, v) }}
             onRun={!isNonExecutable(cell.type) ? () => executeCell(cell.id) : undefined}
             fixedHeight={stretch ? undefined : fixedHeight}
-            readOnly={isVibing}
+            readOnly={isVibing || isPending}
           />
+          {isPending && !isVibing && (
+            // 스트리밍 종료 후에만 노출 — vibingCells 가 빠진 시점이 complete 도착.
+            <div
+              className="absolute bottom-2 right-2 z-30 flex items-center gap-1.5 bg-surface border border-border rounded-lg shadow-lg px-2 py-1.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                title="새 코드로 교체하고 실행"
+                onClick={() => acceptVibeChange(cell.id)}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-success-bg text-success-text border border-success/40 hover:bg-success/15 transition-colors"
+              >
+                <Check size={12} strokeWidth={2.5} />
+                수락
+              </button>
+              <button
+                title="원본 유지"
+                onClick={() => rejectVibeChange(cell.id)}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-chip text-text-secondary border border-border hover:border-danger hover:text-danger transition-colors"
+              >
+                <XIcon size={12} strokeWidth={2.5} />
+                거절
+              </button>
+            </div>
+          )}
         </div>
       )
     }

@@ -1,6 +1,15 @@
 import ast
+import concurrent.futures
+import logging
 import traceback
 from typing import Any
+
+logger = logging.getLogger(__name__)
+
+# Plotly→PNG 렌더(kaleido)는 Windows 에서 chromium 서브프로세스 spawn 으로 종종 hang 한다.
+# 차트 JSON은 정상 반환되어 UI에는 그려지므로, PNG 가 늦으면 포기하고 None 으로 폴백한다.
+# (LLM 이 차트를 이미지로 보지 못할 뿐, 사용자 노트북 흐름은 막히지 않음)
+KALEIDO_RENDER_TIMEOUT_SEC = 30
 
 _namespaces: dict[str, dict[str, Any]] = {}
 
@@ -124,6 +133,9 @@ def _render_figure_png_base64(fig) -> str | None:
     """Plotly Figure를 저해상도 PNG로 렌더링하여 base64 문자열 반환. 실패 시 None.
     기본 비율은 2:3(height:width). fig.layout 에 명시된 width/height 가 있으면 존중.
     LLM tool_result 로 보낼 이미지라 크기는 작게 유지.
+
+    kaleido 가 hang 하는 알려진 케이스(특히 Windows 의 chromium 재사용 실패)에서
+    셀 실행 전체가 막히지 않도록 KALEIDO_RENDER_TIMEOUT_SEC 안에 못 끝내면 None 반환.
     """
     try:
         layout = getattr(fig, "layout", None)
@@ -136,7 +148,25 @@ def _render_figure_png_base64(fig) -> str | None:
             height = max(int(float(h) * scale_factor), 1)
         else:
             width, height = 600, 400  # 2:3
-        img_bytes = fig.to_image(format="png", width=width, height=height, scale=1)
+
+        # 데몬 스레드에서 fig.to_image 실행 → timeout 시 미완료 스레드는 abandon.
+        # ThreadPoolExecutor 의 worker 는 daemon=True 라 프로세스 종료 시 같이 죽음.
+        ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
+            future = ex.submit(
+                fig.to_image, format="png", width=width, height=height, scale=1
+            )
+            try:
+                img_bytes = future.result(timeout=KALEIDO_RENDER_TIMEOUT_SEC)
+            except concurrent.futures.TimeoutError:
+                logger.warning(
+                    "kaleido PNG render timed out after %ss — falling back to no PNG",
+                    KALEIDO_RENDER_TIMEOUT_SEC,
+                )
+                return None
+        finally:
+            # wait=False: hang 한 worker 스레드 기다리지 않고 즉시 풀 정리.
+            ex.shutdown(wait=False)
         import base64
         return base64.b64encode(img_bytes).decode("ascii")
     except Exception:

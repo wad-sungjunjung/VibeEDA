@@ -59,6 +59,9 @@ const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const _vibeControllers = new Map<string, AbortController>()
 let _agentController: AbortController | null = null
 const _pendingSaves = new Map<string, () => void>()
+// 보류 중 vibe 변경의 메타(수락 시점에 채팅 히스토리 엔트리 만들 때 필요).
+// pendingCode 자체는 cell 에 들어가 있고, 수락 콜백에서 이 메타를 함께 사용한다.
+const _pendingVibeMeta = new Map<string, { userMessage: string; explanation: string }>()
 function debounced(key: string, fn: () => void, delay = 800) {
   const t = _debounceTimers.get(key)
   if (t) clearTimeout(t)
@@ -105,9 +108,12 @@ function flushVibeDeltas() {
   if (_vibeDeltaBuffer.size === 0) return
   const drained = new Map(_vibeDeltaBuffer)
   _vibeDeltaBuffer.clear()
+  // 델타는 cell.pendingCode 에 누적 (cell.code 는 원본 보존 — diff 의 baseline).
   useAppStore.setState((s) => ({
     cells: s.cells.map((c) =>
-      drained.has(c.id) ? { ...c, code: c.code + (drained.get(c.id) ?? '') } : c
+      drained.has(c.id)
+        ? { ...c, pendingCode: (c.pendingCode ?? '') + (drained.get(c.id) ?? '') }
+        : c
     ),
   }))
 }
@@ -194,6 +200,7 @@ function rowToCell(row: CellRow): Cell {
     chatImages: [],
     insight: row.insight ?? null,
     agentGenerated: row.agent_generated,
+    pendingCode: null,
   }
 }
 
@@ -378,6 +385,8 @@ interface AppStore {
   cellActiveEntryId: Record<string, number | null>
   submitVibe: (cellId: string, message: string) => void
   cancelVibe: (cellId: string) => void
+  acceptVibeChange: (cellId: string) => void
+  rejectVibeChange: (cellId: string) => void
   rollbackCell: (cellId: string, entryId: number) => void
   deleteChatEntry: (cellId: string, index: number) => void
   toggleCellHistory: (id: string) => void
@@ -673,6 +682,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         historyOpen: false,
         insight: null,
         agentGenerated: false,
+        pendingCode: null,
       }
 
       set({
@@ -756,6 +766,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       historyOpen: false,
       insight: null,
       agentGenerated: false,
+      pendingCode: null,
     }
 
     const updated = [...cells]
@@ -997,8 +1008,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
     if (!cell) return
 
     const editFromIdx = cellEditOrigins[cellId] ?? null
+    // diff 의 baseline. cell.code 는 절대 손대지 않고 pendingCode 에만 새 코드를 누적.
     const codeSnapshot = cell.code
     const pendingImages = cell.chatImages ?? []
+
+    // 메타 보관 — 수락 시점에 채팅 히스토리 엔트리에 사용.
+    _pendingVibeMeta.set(cellId, { userMessage: message, explanation: '' })
 
     set((s) => ({
       vibingCells: new Set([...s.vibingCells, cellId]),
@@ -1008,7 +1023,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
               ...c,
               chatInput: '',
               chatImages: [],
-              code: '',
+              // cell.code 는 그대로(원본 유지). pendingCode='' 로 초기화 — diff 모드 진입 신호.
+              pendingCode: '',
               chatHistory:
                 editFromIdx !== null ? c.chatHistory.slice(0, editFromIdx) : c.chatHistory,
             }
@@ -1020,7 +1036,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
       if (notebookId) apiTruncateChatHistory(notebookId, cellId, editFromIdx).catch(() => {})
     }
 
-    let finalCode = ''
+    // 같은 셀에서 이전 vibe 가 아직 진행 중이면 abort 해 컨트롤러 누수 방지.
+    const prevCtrl = _vibeControllers.get(cellId)
+    if (prevCtrl) {
+      try { prevCtrl.abort() } catch { /* ignore */ }
+    }
     const controller = new AbortController()
     _vibeControllers.set(cellId, controller)
 
@@ -1044,47 +1064,30 @@ export const useAppStore = create<AppStore>((set, get) => ({
         },
         (event) => {
           if (event.type === 'code_delta') {
-            // 토큰별 set 대신 rAF 배치 — flushVibeDeltas() 가 한 프레임에 모아서 적용.
+            // 토큰별 set 대신 rAF 배치 — flushVibeDeltas() 가 한 프레임에 모아서 적용 (pendingCode 누적).
             _vibeDeltaBuffer.set(cellId, (_vibeDeltaBuffer.get(cellId) ?? '') + event.delta)
             scheduleVibeFlush()
           } else if (event.type === 'complete') {
-            // complete 는 누적 코드를 final_code 로 통째 교체 — 버퍼는 의미 없으니 폐기.
+            // complete 는 누적된 pendingCode 를 final_code 로 통째 교체. cell.code 는 아직 손대지 않음 — 사용자 수락 시점까지 대기.
             _vibeDeltaBuffer.delete(cellId)
-            finalCode = event.full_code
-            const currentCell = get().cells.find((c) => c.id === cellId)
-            const entry: ChatEntry = {
-              id: (currentCell?.chatHistory.length ?? 0) + 1,
-              user: message,
-              assistant: event.explanation || finalCode.slice(0, 80),
-              timestamp: nowTimestamp(),
-              codeSnapshot,
-              codeResult: finalCode,
-            }
+            const finalCode = event.full_code
+            const explanation = event.explanation || finalCode.slice(0, 80)
+            const meta = _pendingVibeMeta.get(cellId)
+            if (meta) meta.explanation = explanation
             set((s) => ({
               cells: s.cells.map((c) =>
-                c.id === cellId ? { ...c, code: finalCode, chatHistory: [...c.chatHistory, entry] } : c
+                c.id === cellId ? { ...c, pendingCode: finalCode } : c
               ),
               cellActiveEntryId: { ...s.cellActiveEntryId, [cellId]: null },
             }))
-            const { notebookId: nbId } = get()
-            // 실행 전에 최종 코드가 파일에 반영돼 있어야 한다. debounce 취소 후 동기 저장.
-            const debounceKey = `code-${cellId}`
-            const t = _debounceTimers.get(debounceKey)
-            if (t) { clearTimeout(t); _debounceTimers.delete(debounceKey) }
-            if (nbId) {
-              updateCell(nbId, cellId, { code: finalCode })
-                .catch(() => {})
-                .finally(() => { get().executeCell(cellId) })
-            } else {
-              get().executeCell(cellId)
-            }
           } else if (event.type === 'error') {
-            // error 도 코드 스냅샷으로 롤백 — 버퍼 폐기.
+            // error → pendingCode 정리하고 원본 그대로 둠.
             _vibeDeltaBuffer.delete(cellId)
+            _pendingVibeMeta.delete(cellId)
             console.error('Vibe error:', event.message)
             set((s) => ({
               cells: s.cells.map((c) =>
-                c.id === cellId ? { ...c, code: codeSnapshot } : c
+                c.id === cellId ? { ...c, pendingCode: null } : c
               ),
             }))
           }
@@ -1095,13 +1098,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const aborted = (err as { name?: string })?.name === 'AbortError'
       if (!aborted) console.error('Vibe chat failed:', err)
       _vibeDeltaBuffer.delete(cellId)
+      _pendingVibeMeta.delete(cellId)
       set((s) => ({
         cells: s.cells.map((c) =>
-          c.id === cellId ? { ...c, code: codeSnapshot } : c
+          c.id === cellId ? { ...c, pendingCode: null } : c
         ),
       }))
     } finally {
-      // 안전장치: 남은 델타 버퍼가 있으면 마지막으로 한 번 flush.
+      // 안전장치: 남은 델타 버퍼가 있으면 마지막으로 한 번 flush (pendingCode 에 반영).
       flushVibeDeltas()
       _vibeControllers.delete(cellId)
       set((s) => ({
@@ -1116,6 +1120,58 @@ export const useAppStore = create<AppStore>((set, get) => ({
       ctrl.abort()
       _vibeControllers.delete(cellId)
     }
+    // 취소 시 보류 중인 diff 도 함께 정리 — 사용자가 stop 을 눌렀으니 새 코드 폐기.
+    _vibeDeltaBuffer.delete(cellId)
+    _pendingVibeMeta.delete(cellId)
+    set((s) => ({
+      cells: s.cells.map((c) => (c.id === cellId ? { ...c, pendingCode: null } : c)),
+    }))
+  },
+
+  acceptVibeChange: (cellId) => {
+    // pendingCode 를 cell.code 로 승격, 채팅 히스토리에 엔트리 추가, 영속 후 실행.
+    // 스트리밍 중에는 호출하지 않음(UI 가 disabled). complete 도착 후에만 호출됨.
+    const { cells, notebookId } = get()
+    const cell = cells.find((c) => c.id === cellId)
+    if (!cell || cell.pendingCode == null) return
+    const meta = _pendingVibeMeta.get(cellId) ?? { userMessage: '', explanation: '' }
+    const newCode = cell.pendingCode
+    const codeSnapshot = cell.code
+    const entry: ChatEntry = {
+      id: cell.chatHistory.length + 1,
+      user: meta.userMessage,
+      assistant: meta.explanation || newCode.slice(0, 80),
+      timestamp: nowTimestamp(),
+      codeSnapshot,
+      codeResult: newCode,
+    }
+    _pendingVibeMeta.delete(cellId)
+    set((s) => ({
+      cells: s.cells.map((c) =>
+        c.id === cellId
+          ? { ...c, code: newCode, pendingCode: null, chatHistory: [...c.chatHistory, entry] }
+          : c
+      ),
+    }))
+    // 코드 저장 debounce 가 있다면 폐기 후 동기 저장 → 실행 전에 파일 반영.
+    const debounceKey = `code-${cellId}`
+    const t = _debounceTimers.get(debounceKey)
+    if (t) { clearTimeout(t); _debounceTimers.delete(debounceKey) }
+    if (notebookId) {
+      updateCell(notebookId, cellId, { code: newCode })
+        .catch(() => {})
+        .finally(() => { get().executeCell(cellId) })
+    } else {
+      get().executeCell(cellId)
+    }
+  },
+
+  rejectVibeChange: (cellId) => {
+    // 거절 — 원본은 그대로, pendingCode 만 정리. 히스토리 엔트리도 남기지 않음.
+    _pendingVibeMeta.delete(cellId)
+    set((s) => ({
+      cells: s.cells.map((c) => (c.id === cellId ? { ...c, pendingCode: null } : c)),
+    }))
   },
 
   rollbackCell: (cellId, entryId) => {
@@ -1352,10 +1408,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       executedAt: null,
       output: null,
       chatInput: '',
+      chatImages: [],
       chatHistory: [],
       historyOpen: false,
       insight: null,
       agentGenerated: true,
+      pendingCode: null,
     }
 
     const updated = [...cells]
@@ -1663,6 +1721,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
               ),
             }))
             pushStep('cell_memo', '인사이트 메모 기록', event.memo)
+          } else if (event.type === 'exec_heartbeat') {
+            // 장기 실행 진행 중 — status 라벨에 경과시간 노출. step 버블은 추가하지 않음(노이즈 방지).
+            set({
+              agentStatus: `셀 실행 중 · ${event.cell_name} (${event.elapsed_sec}초 경과)`,
+            })
+          } else if (event.type === 'exec_completed_notice') {
+            // 장기 실행 완료 — step 버블로 사용자에게 명시적 알림. 자리 비웠다 돌아와도 확인 가능.
+            pushStep(
+              'exec_done',
+              `셀 실행 완료 · ${event.cell_name} (${event.elapsed_sec}초 소요)`,
+              event.message,
+            )
           } else if (event.type === 'complete') {
             const lastId = currentAssistantMsgId
             set((s) => {

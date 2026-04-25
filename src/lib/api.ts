@@ -31,6 +31,8 @@ export type AgentEvent =
   | { type: 'chart_quality'; cell_id: string; passed: boolean; summary: string; issues: string[] }
   | { type: 'todos_updated'; todos: AgentTodo[] }
   | { type: 'ask_user'; question: string; options: string[] }
+  | { type: 'exec_heartbeat'; cell_id: string; cell_name: string; elapsed_sec: number; message: string }
+  | { type: 'exec_completed_notice'; cell_id: string; cell_name: string; elapsed_sec: number; message: string }
   | { type: 'complete'; created_cell_ids: string[]; updated_cell_ids: string[] }
   | { type: 'error'; message: string }
 
