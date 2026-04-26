@@ -40,7 +40,7 @@ FastAPI 백엔드 (localhost:4750)
 | 런타임 | Python FastAPI (`backend/`) |
 | 저장소 | `.ipynb` 파일 (`~/vibe-notebooks/*.ipynb`) |
 | Vibe Chat | **기본 Gemini** (`gemini-2.5-flash`) 또는 Claude (`claude-haiku-4-5-20251001` / sonnet / opus). 프론트 `X-Vibe-Model` 헤더로 런타임 스위치. SSE streaming. |
-| Agent Mode | **기본 Claude Opus** (`claude-opus-4-7`) 또는 Gemini. 프론트 `X-Agent-Model` 헤더로 스위치. Tool use + SSE + 차트 PNG 이미지 블록 주입. 메모 강제 가드·반복 호출 가드 내장. 에이전트 세션 연속성(세션 아카이브·복원) 지원. 자세한 내부는 `docs/vibe-eda-agent-pipeline.md`. |
+| Agent Mode | **기본 Claude Opus** (`claude-opus-4-7`) 또는 Gemini. 프론트 `X-Agent-Model` 헤더로 스위치. **시니어 분석가 v0.5** — 4-Phase 아키텍처 (복잡도 분류→메서드 라우팅→실행→종합 정리), 3-Tier 예산 (L1/L2/L3, auto-promotion), 7개 메서드 (analyze/explore/predict/causal/ml/ab_test/benchmark) 및 메서드별 도구 (ML·Causal·Predict 각 3개) + 가드. Tool 총 34개. 노트북별 `learnings.md` 누적. 자세한 내부는 `docs/vibe-eda-agent-pipeline.md` (구조도 포함). |
 | Reporting | **기본 Claude Opus** (`DEFAULT_REPORT_MODEL`). 프론트 `X-Report-Model` 헤더로 스위치. SSE 스트리밍 Markdown 생성 → `reports/*.md` 저장. 차트는 `{id}_images/*.png` 상대 경로로 임베드. 자세한 내부는 `docs/vibe-eda-reporting-pipeline.md`. |
 | Sheet 셀 | UniverJS 기반 스프레드시트 셀. `sheet_snapshot.py`로 workbook JSON 생성·파싱, `sheet_vibe_service.py`로 자연어→JSON 패치 변환. |
 | 커널 | in-process Python exec (노트북별 namespace 유지), Plotly Figure 출력 시 600×400 PNG 자동 렌더 (`kaleido` 필요) |
@@ -62,6 +62,7 @@ FastAPI 백엔드 (localhost:4750)
 | 폴더/파일 트리 메타 | `~/vibe-notebooks/.vibe_config.json` |
 | 카테고리 컬럼 캐시 | `~/vibe-notebooks/.vibe/.categories_cache.json` |
 | 로컬 파일 프로파일 캐시 | `~/vibe-notebooks/.files_profile_cache.json` |
+| 노트북별 누적 학습 (세션 간) | `~/vibe-notebooks/.vibe/learnings/{notebook_id}.md` |
 
 ## 폴더 구조
 
@@ -127,6 +128,14 @@ backend/
         ├── agent_tools.py         # Claude/Gemini 공용 tool 스펙 단일 소스 + Gemini 변환 헬퍼
         ├── agent_events.py        # 에이전트 SSE 이벤트 타입 단일 소스 (프론트 AgentEvent union 과 동기화)
         ├── agent_skills.py        # 분석가 마인드셋 스킬 모듈 (플래닝·가설·에러 회복·출력 비평 등)
+        ├── agent_budget.py        # [Phase -1] 3-Tier 예산 (L1/L2/L3) + auto-promotion
+        ├── agent_classifier.py    # [Phase -1] 복잡도 분류 (휴리스틱 → Haiku fallback)
+        ├── agent_methods.py       # [Phase 0] 7개 메서드 카탈로그 + select_methods 도구 + 동적 fragment
+        ├── agent_synthesis.py     # [Phase 3] rate_findings/self_consistency/synthesize_report + confidence 룰
+        ├── agent_ml.py            # [메서드별] fit_model/evaluate_model/feature_importance + 데이터 누수 가드
+        ├── agent_causal.py        # [메서드별] compare_groups/confounders_check/power_analysis
+        ├── agent_predict.py       # [메서드별] fit_trend/forecast(신뢰구간 강제)/detect_anomalies
+        ├── agent_learnings.py     # 노트북별 .vibe/learnings/{id}.md 누적·로드 (세션 간 학습)
         ├── claude_agent.py        # Claude Agent tool loop (NotebookState, agent_skills 통합)
         ├── claude_vibe_service.py # Claude Vibe Chat
         ├── gemini_agent_service.py # Gemini Agent tool loop (agent_tools/_execute_tool 공유)

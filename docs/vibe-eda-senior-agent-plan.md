@@ -2,8 +2,10 @@
 
 > 현재 에이전트(미드 레벨)를 **탐색·분석·예측·인과추론·ML·커뮤니케이션** 6축 모두 시니어 수준으로 끌어올리기 위한 통합 설계. 단순/복잡 요청을 구분해 **정도에 맞는 시간·노력**을 쓰는 것까지 포함.
 
+> **현재 상태 (S7 완료, v0.5 출시): S1~S7 의 7단계 모두 구현 완료.** 실사용 검증을 1~2주 거치며 false positive / UX 마찰 데이터 수집 중. 미완 항목은 § 9 참조.
+
 **관련 문서**
-- 현재 파이프라인: `docs/vibe-eda-agent-pipeline.md`
+- 현재 파이프라인: `docs/vibe-eda-agent-pipeline.md` (S7 기준 갱신됨, **구조도 포함**)
 - 에이전트 명세: `docs/vibe-eda-agent-spec.md`
 - 리포팅 파이프라인: `docs/vibe-eda-reporting-pipeline.md`
 
@@ -87,8 +89,10 @@
 | Phase 2 가드 | explore-before-query만 | 기본 + 1~2 메서드 가드 | 풀 가드 |
 | Phase 3 종합 | **스킵** (답변만) | Markdown 1장 + confidence | 청자별 풀 + 자기검증 + 한계 |
 | 메모 강제 | **약화** (1줄 OK) | 표준 (2~5줄) | 표준 |
-| **예산 (turns/tools)** | **5 / 10** | **25 / 60** | **80 / 200** |
+| **예산 (turns/tools)** | **5 / 10** | **25 / 60** | **100 / 250** |
 | 예상 시간 | ~30초 | 2~5분 | 10~20분 |
+
+(L3 예산은 S7 에서 80/200 → 100/250 으로 상향 — ML/Causal/Predict 도구 9개 추가 대응)
 
 ---
 
@@ -204,21 +208,25 @@ class AgentRequest(BaseModel):
 
 ---
 
-## 7. 구현 로드맵
+## 7. 구현 로드맵 (모두 완료 ✅)
 
-총 **7 단계** — 각 단계 끝에 회귀 테스트 통과 확인.
+총 **7 단계** — 한 세션에 압축 구현. 단계마다 회귀 검증 (smoke test) 통과 확인.
 
-| 단계 | 범위 | 예상 기간 | 위험도 | 검증 |
-|---|---|---|---|---|
-| **S1** | Phase -1 복잡도 분류 + 예산 시스템 + 자동 승격 + 프론트 tier UI | 1주 | 낮음 | L1/L2/L3 각 5개 시나리오 정상 분류 |
-| **S2** | Phase 0 라우팅 + 메서드별 fragment 동적 로드 | 1주 | 낮음 | 메서드 6종 라우팅 정확도 ≥ 80% |
-| **S3** | Phase 3 종합 정리 (self_consistency / rate_findings / synthesize_report) | 1.5주 | 중 | tier 별 결과물 형태 다른지 + 청자별 차이 확인 |
-| **S4** | ML 도구 + 가드 (fit_model / evaluate / feature_importance) | 2주 | 중 | 기본 분류·회귀 시나리오 + 데이터 누수 케이스 거부 확인 |
-| **S5** | 인과추론 도구 + 가드 (compare_groups / confounders / power) | 2주 | 높음 | 권고 모드 1주 운영 후 거부 모드 결정 |
-| **S6** | 예측/시계열 도구 (fit_trend / forecast / anomalies) | 1.5주 | 중 | 신뢰구간 강제 + 시간 누수 가드 검증 |
-| **S7** | 기존 플래닝/메모/sanity 가드 메서드 분기 + Gemini 컨텍스트 압축 + learnings.md 누적 | 1.5주 | 중 | L3 풀 사이클 시나리오 5개 통과 |
+| 단계 | 범위 | 상태 | 커밋 |
+|---|---|---|---|
+| **S1** | Phase -1 복잡도 분류 + 예산 시스템 + 자동 승격 + 프론트 tier UI | ✅ | `2f17a10` |
+| **S2** | Phase 0 라우팅 + 메서드별 fragment 동적 로드 + 프론트 메서드 칩 | ✅ | `e5110c6` |
+| **S3** | Phase 3 종합 정리 (rate_findings / self_consistency_check / synthesize_report) + confidence 룰 | ✅ | `f6e7da0` |
+| **fix** | Decimal/NaN/datetime 직렬화 wrapper (`_make_json_safe`) | ✅ | `c228573` |
+| **S4** | ML 도구 (fit_model / evaluate_model / feature_importance) + 데이터 누수·클래스 불균형 가드 | ✅ | `3726dc7` |
+| **S5** | 인과추론 도구 (compare_groups / confounders_check / power_analysis) + confidence 자동 하향 (인과 표현+causal 미선택→low) | ✅ | `3726dc7` |
+| **S6** | 예측·시계열 도구 (fit_trend / forecast / detect_anomalies) + 신뢰구간 강제 + horizon 가드 | ✅ | `3726dc7` |
+| **S7** | Sequential gate 픽스, Plotly add_vline 가이드, learnings.md 누적, Gemini 컨텍스트 압축, **L3 예산 80→100 turns / 200→250 tools 상향** | ✅ | `3726dc7` |
 
-**총 ~10.5주** (~2.5개월). S1+S2+S3 로 **뼈대만 먼저** 완성하면 (~3.5주) 이후 메서드 도구는 plug-in 방식으로 차례차례 추가 가능 — 즉 **3.5주 시점에 첫 시니어 에이전트 v0.5** 가 나옴.
+**실제 산출물 차이**:
+- 도구 총 **34개** (Claude) / 31개 (Gemini) — 계획 대비 모두 출시
+- L3 예산: 80/200 → **100/250** 으로 상향 (S4-S6 도구 9개 추가에 대응)
+- Phase 1 의 메서드 인식 플래닝은 deferred (§ 9.1 참조)
 
 ---
 
@@ -234,49 +242,59 @@ class AgentRequest(BaseModel):
 
 ---
 
-## 9. S1 즉시 다음 액션
+## 9. 미완 항목 (의식적으로 deferred)
 
-1. **타입 정의** (`backend/app/services/agent_budget.py` 신설):
-   - `Tier = Literal['L1', 'L2', 'L3']`
-   - `BudgetState` dataclass (tier, max_turns, max_tool_calls, soft_warning_at, hard_stop_at, started_at)
-   - `TIER_BUDGETS: dict[Tier, BudgetState]` 상수
+### 9.1 Phase 1 메서드 인식 플래닝
+현재 `create_plan` 은 generic — 가설 3+ 만 강제. 계획상 method 별 다른 스키마 (predict→target/features/split, causal→outcome/treatment/confounders/strategy, ml→task/model/CV/eval_metric, ab_test→groups/MDE/power) 강제는 미구현. **이유**: 메서드별 도구가 자체 검증 (causal 의 confounders_check 등) 하므로 absence 영향이 작음. 운영 데이터로 필요성 측정 후 결정.
 
-2. **휴리스틱 분류기**:
-   - `classify_complexity_heuristic(message, mart_count, has_image, history_depth) -> Tier | None`
-   - 강한 시그널이면 확정, 애매하면 None 반환 (LLM fallback 으로)
+### 9.2 회귀 테스트 골든 노트북
+가드 9+개, 도구 34개로 늘어나 수기 검증 한계. 5~10개 골든 시나리오 + CI 매일 자동 재실행이 필요. v0.6 범위.
 
-3. **SSE 이벤트** (`agent_events.py`):
-   - `TierClassifiedEvent`, `BudgetWarningEvent`, `PhaseTransitionEvent` 추가
-   - 프론트 `AgentEvent` union 동기화
+### 9.3 인과 표현 가드 권고→거부 모드 승격
+현재 confidence 자동 하향 (high→low) 만 함. 1주 운영 데이터로 false positive 비율 측정 후 거부 모드로 승격 가능. 데이터 수집 기간 필요.
 
-4. **agent.py 통합**:
-   - `MAX_TURNS=50`, `TOTAL_TOOL_LIMIT=200` 하드코딩 제거 → `state.budget` 사용
-   - `_is_trivial_request` 휴리스틱 → 분류기로 흡수
-   - `AgentRequest` 에 `tier_override`, `methods_override` 추가
+### 9.4 `learnings.md` 사용자 뷰/편집 UI
+백엔드 영속화는 완성, 프론트 노출 X. 사용자가 stale 항목 직접 못 지움. v0.6 polish.
 
-5. **프론트 UI**:
-   - `AgentChatPanel` 에 tier chip 추가 (분류 결과 + 예상 시간)
-   - override 버튼 ("더 깊게" / "간단히")
-   - progress display (남은 예산 %)
+### 9.5 Findings confidence 카드 UI
+S3.4 의 본래 의도 — 채팅 영역에 finding 별 confidence 시각화. 현재 `synthesize_report` 셀 안에만 있음.
 
-6. **Haiku fallback**:
-   - 휴리스틱이 None 일 때만 호출
-   - 같은 노트북 내 유사 요청 캐싱 (in-memory dict)
+### 9.6 에러 분류 LLM judge
+현재 `_classify_error_message` 휴리스틱 — Snowflake 에러 메시지 변경에 약함. Haiku 호출로 점진 교체.
+
+### 9.7 PSM/DiD/IV 정식 인과 식별
+현재 `compare_groups` 는 단순 평균차. 정식 causal inference 식별 전략은 v0.6 범위.
+
+### 9.8 통계적 엄밀성 강화
+sample_too_small, multiple comparison 보정, Simpson's paradox 자동 감지 — Tier 3 미구현.
 
 ---
 
-## 10. 단계별 의존성 그래프
+## 10. 단계별 의존성 그래프 (실제)
 
 ```
-S1 (예산/Tier) ──┬── S2 (라우팅)  ──┬── S4 (ML)
-                │                  ├── S5 (인과)  
-                │                  └── S6 (예측)
-                └── S3 (종합 정리) ──┘
-                                    │
-                            S7 (메서드별 가드 분기)
+Phase -1 (S1) ──┬── Phase 0  (S2) ──┬── ML        (S4) ─┐
+   예산/Tier    │   메서드 라우팅    ├── Causal    (S5) ─┤
+                │                    └── Predict   (S6) ─┤
+                │                                        ├──> S7 통합
+                └── Phase 3 (S3) ────────────────────────┘     (gate 보정 +
+                    종합 정리                                    learnings +
+                                                                Gemini 압축 +
+                                                                L3 예산 상향)
 ```
 
-- S1 은 모든 단계의 전제 (예산 없으면 다른 단계 무한 루프 위험)
-- S2/S3 는 병렬 진행 가능
-- S4/S5/S6 는 S2 후 병렬 (서로 독립적인 메서드)
-- S7 은 마지막 통합 단계
+S1 → S2/S3 병렬 → S4/S5/S6 병렬 → S7 통합 — 의존성 그래프대로 실제 구현됨.
+
+---
+
+## 11. 운영 KPI (v0.5 → v1.0 게이팅)
+
+§ 8 의 6개 지표를 1~2주 운영 후 측정:
+- Tier 분류 정확도 (override 비율 < 15%)
+- 메서드 라우팅 수정 비율 < 20%
+- 가드 false positive < 10% (특히 인과)
+- 세션 완료율 (hard stop 미만 95%+)
+- Phase 3 산출물 채택률 > 50%
+- 후속 "더 깊게" 요청 비율
+
+이 데이터로 § 9 의 deferred 항목 우선순위 결정.

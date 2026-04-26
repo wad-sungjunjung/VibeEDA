@@ -75,10 +75,13 @@ TIER_BUDGETS: dict[Tier, dict] = {
         "estimated_seconds": 240,
     },
     "L3": {
-        "max_turns": 80,
-        "max_tool_calls": 200,
-        "estimated_cells": 20,
-        "estimated_seconds": 900,
+        # S4-S7 에서 ML/Causal/Predict 도구 9개 추가됨 — 다중 메서드 L3 에서 빠듯해
+        # 80→100 turns, 200→250 tool_calls 로 상향 (S7 통합 시 보정).
+        # 다중 메서드 풀 사이클: 라우팅 6 + 가설×3 18 + 차트 12 + 종합 3 + 회복여유 = ~50-70턴
+        "max_turns": 100,
+        "max_tool_calls": 250,
+        "estimated_cells": 22,
+        "estimated_seconds": 1000,
     },
 }
 
