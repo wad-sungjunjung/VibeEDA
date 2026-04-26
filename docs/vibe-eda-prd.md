@@ -1,10 +1,10 @@
 # Vibe EDA — PRD (Product Requirements Document)
 
-**버전**: v1.1 (MVP 구현 반영)
-**작성일**: 2026-04-18 (최초) / **최신화**: 2026-04-20
+**버전**: v1.2 (MVP 구현 반영)
+**작성일**: 2026-04-18 (최초) / **최신화**: 2026-04-26
 **작성자**: 하우
 **대상 릴리스**: 내부 파일럿 → 사내 분석가 전체 배포
-**현재 구현 상태**: M1~M4 + M6(리포팅) 완료. M5(에이전트 고도화) 진행 중. 로컬 전용 앱으로 구동.
+**현재 구현 상태**: M1~M6 전 마일스톤 완료. 시니어 분석가 에이전트 v0.5 (4-Phase, 3-Tier, 34 tools) 완성. 로컬 전용 앱으로 구동.
 
 ---
 
@@ -287,7 +287,7 @@
 | M2: LLM 연동 | ✅ 완료 | Vibe 채팅 + Agent 모드 (Claude + Gemini 이중) |
 | M3: 실행 엔진 | ✅ 완료 | Snowflake 쿼리 + in-process Python 커널 + `.ipynb` 저장 |
 | M4: Claude Code MCP 연동 | ✅ 완료 | MCP 서버 (`backend/app/api/mcp_server.py`) |
-| M5: 에이전트 모드 고도화 | 🟡 진행 중 | ask_user, 셀 메모 강제 가드, 차트 이미지 tool_result 주입, 반복 호출 가드 |
+| M5: 에이전트 모드 고도화 | ✅ 완료 | 시니어 분석가 v0.5 — 4-Phase 파이프라인(복잡도 분류→메서드 라우팅→실행→종합), 3-Tier 예산(L1/L2/L3, auto-promotion), 7개 메서드, 34개 도구(ML·Causal·Predict 포함), 세션 간 learnings 누적. 상세: `docs/vibe-eda-agent-pipeline.md` |
 | M6: 리포팅 파이프라인 | ✅ 완료 | LLM 기반 Markdown 생성, 차트 이미지 임베드(`_images/` 폴더), 모델 선택, 진행 단계 트래커. 향후 HTML/PDF 포맷 확장 예정 |
 | M7: 파일럿 | 예정 | 5명 내부 테스트 + 피드백 반영 |
 
@@ -325,6 +325,7 @@
 *Related Docs:*
 - 디자인 가이드: `vibe-eda-design-guide.md`
 - 기능 명세서: `vibe-eda-functional-spec.md`
-- 프로토타입: `vibe-eda-prototype.tsx`
+- 에이전트 파이프라인: `vibe-eda-agent-pipeline.md`
+- 리포팅 파이프라인: `vibe-eda-reporting-pipeline.md`
 
-*Last updated: 2026-04-18*
+*Last updated: 2026-04-26*

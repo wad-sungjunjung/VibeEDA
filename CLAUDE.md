@@ -311,6 +311,5 @@ fig = px.bar(query_1, x='region', y='revenue')
 | 기능 명세 | `docs/vibe-eda-functional-spec.md` |
 | 디자인 가이드 | `docs/vibe-eda-design-guide.md` |
 | API 명세 | `docs/vibe-eda-api-spec.md` |
-| 에이전트 명세 | `docs/vibe-eda-agent-spec.md` |
 | **에이전트 파이프라인 가이드** | `docs/vibe-eda-agent-pipeline.md` |
 | **리포팅 파이프라인 가이드** | `docs/vibe-eda-reporting-pipeline.md` |
