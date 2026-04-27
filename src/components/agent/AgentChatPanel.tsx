@@ -222,8 +222,8 @@ export default function AgentChatPanel() {
     }
   }, [agentChatHistory])
 
-  const refCellObjects = cells.filter((c) => agentRefCells.includes(c.id))
-  const availableCells = cells.filter((c) => !agentRefCells.includes(c.id))
+  const refCellObjects = cells.filter((c) => agentRefCells.includes(c.id) && c.type !== 'sheet')
+  const availableCells = cells.filter((c) => !agentRefCells.includes(c.id) && c.type !== 'sheet')
 
   // 현재 세션이 "물고 있는" 대략적인 토큰량 추정 — 대화 히스토리와
   // 다음 턴에 함께 전송되는 셀 스냅샷(코드 + 메모)을 문자열 길이로 환산.
@@ -450,8 +450,8 @@ export default function AgentChatPanel() {
             const idx = item.idx
             const isLast = idx === agentChatHistory.length - 1
             const isEmptyAssistant = msg.role === 'assistant' && !msg.content
-            // 에이전트가 턴 전환 중 생성한 빈 말풍선은 로딩이 끝나면 숨긴다 (마지막 메시지는 제외)
-            if (isEmptyAssistant && !agentLoading && !isLast) return null
+            // 에이전트가 턴 전환 중 생성한 빈 말풍선은 로딩이 끝나면 숨긴다
+            if (isEmptyAssistant && !agentLoading) return null
             return (
             <div key={msg.id} className={cn('flex gap-2.5', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
               <div

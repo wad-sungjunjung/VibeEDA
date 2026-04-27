@@ -306,7 +306,8 @@ class NotebookState:
 2. **tier 라벨** — `L1`/`L2`/`L3` (답변 분량 가이드)
 3. **`learnings_block`** — 이전 세션의 high-confidence 발견 (1500자 cap, 노트북별)
 4. **`date_block`** — KST 오늘 날짜 + D-1 데이터 컷오프 ("최근 7일" 해석 안내)
-5. **`mart_schema_block`** — 선택 마트 컬럼/타입/카테고리 distinct
+5. **`mart_schema_block`** — 선택 마트 컬럼/타입/카테고리 distinct (Snowflake 마트만)
+5a. **`cell_dataframes_block`** — `selected_marts` 중 실행된 SQL 셀과 이름이 겹치는 항목을 "노트북 셀 DataFrame" 섹션으로 주입. `profile_mart` 금지 + `analyze_output` / Python 변수 직접 참조 가이드 포함. 에러 가드: `_execute_tool` 에서 셀 이름으로 `profile_mart/preview_mart/get_mart_schema` 호출 시 `cell_dataframe_not_mart` 에러 반환.
 6. **`local_files_block`** — 루트 폴더의 CSV/Parquet 프로파일
 7. **`routing_block`** — 메서드 선택 결과 (또는 미선택 시 select_methods 강제 안내)
 8. **`methods_block`** — 메서드별 fragment (`agent_methods.METHOD_FRAGMENTS`)
@@ -337,6 +338,7 @@ class NotebookState:
 ### 10.1 내레이션 강제
 - `turn_index > 0` + tool_use 있는데 텍스트 < `NARRATION_MIN_CHARS=20` → 1회 재요청 (`reset_current_bubble` 후 user 메시지로 강제 지시)
 - 재시도 후에도 짧으면 매 턴 시스템 리마인더 append
+- **pending-guard `continue` 시 bubble 리셋**: pending-guard 가 외부 루프를 `continue` 할 때 이미 스트리밍된 텍스트를 `reset_current_bubble` 로 지운다. 다음 턴 모델이 동일 맺음 문구를 반복해 마지막 단어가 두 번 보이는 현상을 방지.
 
 ### 10.2 반복 / 총량 가드
 - `_norm_key(tool, input)` — 대소문자/공백 정규화 후 JSON 키
@@ -423,6 +425,8 @@ synthesize_report 호출 시:
 | 세션 안전 상한 도달 (예산) | 같은 시도 반복 / 분석 너무 큼 | 새 메시지로 "이어서 분석해줘" 또는 '더 깊게' override |
 | 메모에 볼드/헤더가 들어감 | 프롬프트 위반 | 서버 sanitizer 가 자동 제거 — UI 표시 시점엔 평문 |
 | `Object of type Decimal is not JSON serializable` | (구) Snowflake Decimal 타입 | `_make_json_safe` wrapper 가 모든 tool result sanitize — 발생 안 함 |
+| `cell_dataframe_not_mart` 에러 | 노트북 SQL 셀 이름으로 `profile_mart` 등 호출 | 정상 동작 — 에이전트가 `analyze_output` 또는 Python 변수로 전환 |
+| 에이전트가 셀로 만든 마트를 카탈로그에서 못 찾음 | 실행된 SQL 셀이 `selected_marts` 에 포함돼 있으나 Snowflake 마트로 오인 | `cell_dataframes_block` 이 시스템 프롬프트에 주입되어 자동 구분됨 |
 
 ---
 

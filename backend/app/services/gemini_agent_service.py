@@ -325,6 +325,10 @@ async def run_agent_stream_gemini(
                             lines.append("")
                         lines.append(end_reminder)
                     reminder_text = "\n".join(lines) + "\n\n이 리마인더에 따라 **지금 바로 해당 도구를 호출**해 마무리하세요. 그냥 종료하지 마세요."
+                    # 이번 턴 텍스트가 버블에 이미 흘렀으므로 초기화 — 다음 턴 모델이 같은 맺음
+                    # 문구를 반복하면 마지막 단어가 두 번 보이는 현상 방지.
+                    if text_parts:
+                        yield {"type": "reset_current_bubble"}
                     contents.append(candidate.content)
                     contents.append(types.Content(
                         role="user",

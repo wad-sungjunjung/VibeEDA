@@ -122,6 +122,88 @@ async def _call_claude(api_key: str, model: str, prompt: str) -> list[dict]:
     return json.loads(msg.content[0].text.strip())
 
 
+class EnhanceDescriptionRequest(BaseModel):
+    analysis_theme: str = ""
+    analysis_description: str = ""
+
+
+def _build_enhance_prompt(req: EnhanceDescriptionRequest) -> str:
+    return f"""당신은 데이터 분석 전문가입니다. 아래 분석 내용을 AI 에이전트와 AI 채팅 도우미가 더 잘 이해하고 활용할 수 있도록 개선해주세요.
+
+분석 주제: {req.analysis_theme}
+현재 분석 내용: {req.analysis_description}
+
+개선 지침:
+- 분석 목적(WHY)을 명확히 서술
+- 주요 지표, 차원, 기간을 구체적으로 명시 (알 수 있는 경우)
+- 기대하는 인사이트나 의사결정에 어떻게 활용할지 포함
+- AI가 SQL/Python 코드를 생성할 때 참고할 수 있는 맥락 정보 포함
+- 한국어로 작성, 2~5문장 분량
+
+원문의 의도를 유지하면서 AI가 더 잘 이해할 수 있도록 풍부하게 다시 작성해주세요.
+JSON 형식으로 반환: {{"enhanced": "<개선된 분석 내용>"}}"""
+
+
+async def _call_gemini_text(api_key: str, model: str, prompt: str) -> str:
+    from google import genai
+    from google.genai import types
+    client = genai.Client(api_key=api_key)
+    response = await client.aio.models.generate_content(
+        model=model,
+        contents=prompt,
+        config=types.GenerateContentConfig(temperature=0.3, response_mime_type="application/json"),
+    )
+    return json.loads(response.text.strip())["enhanced"]
+
+
+async def _call_claude_text(api_key: str, model: str, prompt: str) -> str:
+    import anthropic
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+    msg = await client.messages.create(
+        model=model,
+        max_tokens=1024,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return json.loads(msg.content[0].text.strip())["enhanced"]
+
+
+@router.post("/vibe/enhance-description")
+async def enhance_description(
+    req: EnhanceDescriptionRequest,
+    x_gemini_key: str = Header(default="", alias="X-Gemini-Key"),
+    x_anthropic_key: str = Header(default="", alias="X-Anthropic-Key"),
+    x_vibe_model: str = Header(default="", alias="X-Vibe-Model"),
+    x_agent_model: str = Header(default="", alias="X-Agent-Model"),
+):
+    if not req.analysis_description.strip():
+        return {"ok": False, "message": "분석 내용을 먼저 입력해주세요.", "enhanced": ""}
+
+    prompt = _build_enhance_prompt(req)
+    vibe_model = x_vibe_model or settings.default_vibe_model
+    agent_model = x_agent_model or settings.default_agent_model
+
+    try:
+        if vibe_model.startswith("gemini-"):
+            api_key = x_gemini_key or settings.gemini_api_key
+            if not api_key:
+                return {"ok": False, "message": "Gemini API 키가 필요합니다.", "enhanced": ""}
+            enhanced = await _call_gemini_text(api_key, vibe_model, prompt)
+        else:
+            api_key = x_anthropic_key or settings.anthropic_api_key
+            if not api_key:
+                if agent_model.startswith("gemini-"):
+                    api_key = x_gemini_key or settings.gemini_api_key
+                    enhanced = await _call_gemini_text(api_key, agent_model, prompt)
+                else:
+                    return {"ok": False, "message": "Anthropic API 키가 필요합니다.", "enhanced": ""}
+            else:
+                enhanced = await _call_claude_text(api_key, vibe_model, prompt)
+        return {"ok": True, "enhanced": enhanced}
+    except Exception as e:
+        logger.error("Description enhancement failed: %s", e)
+        return {"ok": False, "message": f"개선 실패: {str(e)}", "enhanced": ""}
+
+
 @router.post("/marts/recommend")
 async def recommend_marts(
     req: RecommendRequest,

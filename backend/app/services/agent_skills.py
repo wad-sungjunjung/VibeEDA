@@ -322,8 +322,10 @@ def check_pre_guard(tool_name: str, inp: dict, state: "NotebookState") -> Option
             sql = inp.get("code") or ""
             refs = _extract_referenced_tables(sql)
             selected_lc = {m.lower() for m in state.selected_marts}
+            # 노트북 SQL 셀 DataFrame 은 Snowflake 마트가 아니므로 탐색 체크 제외
+            cell_df_names_lc = {c.name.lower() for c in state.cells if c.type == "sql" and c.executed}
             # 선택된 마트만 체크 대상 (whitelist 위반은 claude_agent 의 별도 가드가 담당)
-            refs_in_scope = refs & selected_lc
+            refs_in_scope = (refs & selected_lc) - cell_df_names_lc
             unexplored = refs_in_scope - set(state.explored_marts)
             if unexplored:
                 return {

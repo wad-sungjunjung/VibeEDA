@@ -238,6 +238,7 @@ export const createNotebook = (data: {
   description?: string
   selected_marts?: string[]
   folder_id?: string | null
+  folder_path?: string | null
 }) => apiFetch<NotebookRow>('/notebooks', { method: 'POST', body: JSON.stringify(data) })
 
 export const getNotebook = (id: string) => apiFetch<NotebookDetail>(`/notebooks/${id}`)
@@ -319,10 +320,16 @@ export const recommendMarts = (data: {
   { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json', ...getLLMHeaders() } as Record<string, string> },
 )
 
+export const enhanceDescription = (data: { analysis_theme: string; analysis_description: string }) =>
+  apiFetch<{ ok: boolean; message?: string; enhanced: string }>(
+    '/vibe/enhance-description',
+    { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json', ...getLLMHeaders() } as Record<string, string> },
+  )
+
 // ─── Execute ─────────────────────────────────────────────────────────────────
 
-export const executeCell = (cellId: string, notebookId: string) =>
-  apiFetch<Record<string, unknown>>(`/execute/${cellId}`, { method: 'POST', body: JSON.stringify({ notebook_id: notebookId }) })
+export const executeCell = (cellId: string, notebookId: string, signal?: AbortSignal) =>
+  apiFetch<Record<string, unknown>>(`/execute/${cellId}`, { method: 'POST', body: JSON.stringify({ notebook_id: notebookId }), signal })
 
 export const resetKernel = (notebookId: string) =>
   apiFetch<{ ok: boolean }>(`/kernel/${notebookId}`, { method: 'DELETE' })

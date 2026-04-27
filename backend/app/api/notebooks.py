@@ -11,6 +11,7 @@ router = APIRouter()
 class NotebookCreate(BaseModel):
     title: str = "새 분석"
     folder_id: Optional[str] = None
+    folder_path: Optional[str] = None
 
 
 class NotebookUpdate(BaseModel):
@@ -27,7 +28,7 @@ def list_notebooks():
 
 @router.post("/notebooks")
 def create_notebook(body: NotebookCreate):
-    return notebook_store.create_notebook(title=body.title, folder_id=body.folder_id)
+    return notebook_store.create_notebook(title=body.title, folder_id=body.folder_id, folder_path=body.folder_path)
 
 
 @router.get("/notebooks/{notebook_id}")

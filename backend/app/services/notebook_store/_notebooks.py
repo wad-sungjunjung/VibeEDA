@@ -87,10 +87,23 @@ def list_notebooks() -> list[dict]:
     return result
 
 
-def create_notebook(title: str = "새 분석", folder_id: Optional[str] = None) -> dict:
+def create_notebook(title: str = "새 분석", folder_id: Optional[str] = None, folder_path: Optional[str] = None) -> dict:
     _ensure_dir()
     nb_id = str(uuid.uuid4())
-    fname = _unique_filename(title)
+    base_fname = _unique_filename(title)
+    if folder_path:
+        fp = Path(folder_path).expanduser()
+        if not fp.is_absolute():
+            fp = _core.NOTEBOOKS_DIR / fp
+        fp = fp.resolve()
+        try:
+            rel_dir = fp.relative_to(_core.NOTEBOOKS_DIR.resolve())
+            fp.mkdir(parents=True, exist_ok=True)
+            fname = str(rel_dir / base_fname)
+        except ValueError:
+            fname = base_fname
+    else:
+        fname = base_fname
     _register_file(nb_id, fname)
     nb = {
         "nbformat": 4,

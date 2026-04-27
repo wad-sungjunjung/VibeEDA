@@ -24,6 +24,7 @@ import {
   HardDrive,
   RefreshCw,
   Upload,
+  FilePlus,
   Check,
   Sun,
   Moon,
@@ -104,6 +105,26 @@ export default function LeftSidebar() {
   const [showModelSettings, setShowModelSettings] = useState(false)
   const [showConnection, setShowConnection] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+
+  const [memUsed, setMemUsed] = useState<number | null>(null)
+  const [memTotal, setMemTotal] = useState<number | null>(null)
+  const [memPeak, setMemPeak] = useState<number | null>(null)
+
+  useEffect(() => {
+    async function fetchMem() {
+      try {
+        const res = await fetch('http://localhost:4750/v1/system/memory')
+        if (!res.ok) return
+        const d = await res.json()
+        setMemUsed(d.used_bytes)
+        setMemTotal(d.total_bytes)
+        setMemPeak(prev => prev === null ? d.used_bytes : Math.max(prev, d.used_bytes))
+      } catch {}
+    }
+    fetchMem()
+    const id = setInterval(fetchMem, 5000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     function onClose() {
@@ -231,8 +252,8 @@ export default function LeftSidebar() {
         })()}
       </div>
 
-      {/* Settings */}
-      <div className="px-3 py-2 border-t border-border-subtle">
+      {/* Settings + Memory */}
+      <div className="px-3 pt-2 pb-2 border-t border-border-subtle">
         <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] text-text-tertiary font-semibold uppercase tracking-wide">
           <Settings size={12} />
           설정
@@ -257,7 +278,49 @@ export default function LeftSidebar() {
         >
           도움말
         </button>
+
       </div>
+
+      {/* Memory bar */}
+      {memUsed !== null && memTotal !== null && (
+        <div className="px-4 pb-2 pt-2 border-t border-border-subtle">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-text-tertiary font-medium">메모리</span>
+            <span className="text-[10px] text-text-tertiary tabular-nums">
+              {(memUsed / 1024 / 1024).toFixed(0)}
+              <span className="text-text-disabled"> / </span>
+              {(memTotal / 1024 / 1024 / 1024).toFixed(1)} GB
+            </span>
+          </div>
+          <div className="relative h-1.5 rounded-full bg-chip overflow-hidden">
+            <div
+              className="absolute left-0 top-0 h-full rounded-full bg-primary transition-all duration-500"
+              style={{ width: `${Math.min((memUsed / memTotal) * 100, 100)}%` }}
+            />
+            {memPeak !== null && (
+              <div
+                className="absolute top-0 h-full w-0.5 bg-warning opacity-70"
+                style={{ left: `${Math.min((memPeak / memTotal) * 100, 100)}%` }}
+                title={`최대: ${(memPeak / 1024 / 1024).toFixed(0)} MB`}
+              />
+            )}
+          </div>
+          {memPeak !== null && (
+            <div className="flex items-center justify-between mt-0.5">
+              <button
+                onClick={() => setMemPeak(null)}
+                title="최대값 초기화"
+                className="text-[9px] text-text-disabled hover:text-danger transition-colors"
+              >
+                초기화
+              </button>
+              <span className="text-[9px] text-text-disabled tabular-nums">
+                최대 {(memPeak / 1024 / 1024).toFixed(0)} MB
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Profile */}
       <div className="h-header flex items-center gap-2 px-4 border-t border-border-subtle">
@@ -813,11 +876,13 @@ function FileTreeNode({
   const [open, setOpen] = useState(depth < 1)
   const [copied, setCopied] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [creatingNb, setCreatingNb] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [fileMenuOpen, setFileMenuOpen] = useState(false)
   const [fileMenuPos, setFileMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const indent = 4 + depth * 10
   const fetchFilesTree = useAppStore((s) => s.fetchFilesTree)
+  const newAnalysisInFolder = useAppStore((s) => s.newAnalysisInFolder)
   const folderFileInputRef = useRef<HTMLInputElement>(null)
 
   async function deleteThisFile() {
@@ -959,6 +1024,23 @@ function FileTreeNode({
               if (folderFileInputRef.current) folderFileInputRef.current.value = ''
             }}
           />
+          <button
+            type="button"
+            title={creatingNb ? '생성 중…' : '이 폴더에 새 분석 만들기'}
+            onClick={async (e) => {
+              e.stopPropagation()
+              if (creatingNb) return
+              setCreatingNb(true)
+              setOpen(true)
+              try { await newAnalysisInFolder(node.path) } finally { setCreatingNb(false) }
+            }}
+            className={cn(
+              'opacity-0 group-hover:opacity-100 p-0.5 text-text-tertiary hover:text-primary transition-opacity shrink-0',
+              creatingNb && 'opacity-100 cursor-wait',
+            )}
+          >
+            <FilePlus size={11} className={cn(creatingNb && 'animate-pulse')} />
+          </button>
           <button
             type="button"
             title={uploading ? '업로드 중…' : '이 폴더에 파일 업로드'}

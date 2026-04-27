@@ -77,6 +77,7 @@ src/
 │                        # SnowflakeConnectionGuard, ConnectionModal, Markdown, UserGuideModal
 ├── store/
 │   ├── useAppStore.ts     # 모든 전역 상태 (Zustand) — 에이전트 세션·리포트 스트림 포함
+│   │                    # executeCell: AbortController(_cellExecControllers) + cancelCell 지원
 │   ├── modelStore.ts      # API 키 + vibe/agent/report 모델 선택 (localStorage persist)
 │   └── connectionStore.ts # Snowflake 연결 정보 (localStorage persist)
 ├── lib/
@@ -111,7 +112,7 @@ backend/
     │   ├── execute.py     # POST /execute/{cell_id}, DELETE /kernel/{nb_id}
     │   ├── folders.py     # /folders CRUD
     │   ├── marts.py       # GET /marts
-    │   ├── recommend.py   # POST /marts/recommend (LLM 기반 마트 추천)
+    │   ├── recommend.py   # POST /marts/recommend (LLM 기반 마트 추천), POST /vibe/enhance-description (AI 편집)
     │   ├── snowflake.py   # POST /snowflake/connect, GET /status, DELETE /connect
     │   ├── report.py      # POST /reports/stream, GET /reports[/{id}[/assets/{f}]], DELETE /reports/{id}
     │   └── mcp_server.py  # MCP 서버 (Claude Code 연동, 별도 프로세스)
@@ -137,6 +138,8 @@ backend/
         ├── agent_predict.py       # [메서드별] fit_trend/forecast(신뢰구간 강제)/detect_anomalies
         ├── agent_learnings.py     # 노트북별 .vibe/learnings/{id}.md 누적·로드 (세션 간 학습)
         ├── claude_agent.py        # Claude Agent tool loop (NotebookState, agent_skills 통합)
+        │                          # _build_cell_dataframes_block: 노트북 SQL 셀 DataFrame 구분 주입
+        │                          # cell_dataframe_not_mart 에러 가드: 셀 이름으로 마트 도구 차단
         ├── claude_vibe_service.py # Claude Vibe Chat
         ├── gemini_agent_service.py # Gemini Agent tool loop (agent_tools/_execute_tool 공유)
         ├── gemini_service.py      # Gemini Vibe Chat

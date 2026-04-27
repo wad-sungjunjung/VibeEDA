@@ -171,7 +171,8 @@ SYNTHESIZE_REPORT_TOOL_CLAUDE: dict = {
         "  exec — 결론·임팩트·다음 액션 (최대 5줄)\n"
         "  ds   — 방법론·결과·한계·재현 정보 (full)\n"
         "  pm   — 의사결정 포인트·옵션·리스크\n\n"
-        "Body MUST cite evidence cell names like `[cell_name]` and include confidence grades from rate_findings. "
+        "Body MUST cite evidence cells using their NAME (from evidence_cell_names field) like `[cell_name]`. "
+        "NEVER use UUIDs as citations. Include confidence grades from rate_findings. "
         "L2 sessions: brief format (~10 lines). L3 sessions: full template."
     ),
     "input_schema": {

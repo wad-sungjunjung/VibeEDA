@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
+import psutil
 
 from app.config import settings
 from app.api.vibe import router as vibe_router
@@ -125,6 +127,23 @@ def system_info():
     _system_info_cache = payload
     _system_info_cache_ts = now
     return payload
+
+
+@app.get("/v1/system/memory")
+def system_memory():
+    try:
+        proc = psutil.Process(os.getpid())
+        rss = proc.memory_info().rss
+        vm = psutil.virtual_memory()
+        return {
+            "used_bytes": rss,
+            "total_bytes": vm.total,
+            "system_used_bytes": vm.used,
+            "system_available_bytes": vm.available,
+        }
+    except Exception:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="memory info unavailable")
 
 
 @app.post("/v1/system/notebooks-dir")

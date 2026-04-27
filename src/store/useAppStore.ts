@@ -57,6 +57,7 @@ import { useModelStore } from '@/store/modelStore'
 
 const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const _vibeControllers = new Map<string, AbortController>()
+const _cellExecControllers = new Map<string, AbortController>()
 let _agentController: AbortController | null = null
 const _pendingSaves = new Map<string, () => void>()
 // 보류 중 vibe 변경의 메타(수락 시점에 채팅 히스토리 엔트리 만들 때 필요).
@@ -363,6 +364,7 @@ interface AppStore {
   fullscreenCellId: string | null
   setFullscreenCellId: (id: string | null) => void
   newAnalysis: () => Promise<void>
+  newAnalysisInFolder: (folderPath: string) => Promise<void>
   loadAnalysis: (id: string) => void
   addCell: (type: CellType, afterId?: string | null) => void
   deleteCell: (id: string) => void
@@ -377,6 +379,7 @@ interface AppStore {
   updateCellMemo: (id: string, memo: string) => void
   cycleCellTypeById: (id: string) => Promise<void>
   executeCell: (id: string) => Promise<void>
+  cancelCell: (id: string) => void
   executeAllCells: () => Promise<void>
   updateCellChatInput: (id: string, input: string) => void
   updateCellChatImages: (id: string, images: ImageAttachment[]) => void
@@ -730,6 +733,45 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
   },
 
+  newAnalysisInFolder: async (folderPath) => {
+    const { histories } = get()
+    set({ creating: true, createError: null })
+    try {
+      const BASE = '새 분석'
+      const existingTitles = new Set(histories.map((h) => h.title))
+      let title = BASE
+      if (existingTitles.has(title)) {
+        let n = 1
+        while (existingTitles.has(`${BASE} ${n}`)) n++
+        title = `${BASE} ${n}`
+      }
+      const nb = await createNotebook({ title, description: '', selected_marts: [], folder_path: folderPath })
+      const newCellId = crypto.randomUUID()
+      const ordering = 1000.0
+      await apiCreateCell(nb.id, { id: newCellId, name: 'query_1', type: 'sql', code: '', memo: '', ordering })
+      const newCell: Cell = {
+        id: newCellId, name: 'query_1', type: 'sql', code: '', memo: '', ordering,
+        splitMode: true, splitDir: 'h', activeTab: 'input', leftTab: 'input', rightTab: 'memo',
+        executed: false, executedAt: null, output: null,
+        chatInput: '', chatImages: [], chatHistory: [], historyOpen: false,
+        insight: null, agentGenerated: false, pendingCode: null,
+      }
+      set({
+        notebookId: nb.id, cells: [newCell], activeCellId: newCellId,
+        analysisTheme: title, analysisDescription: '', selectedMarts: [],
+        agentChatHistory: [], creating: false, metaCollapsed: false,
+        histories: [
+          { id: nb.id, title, date: '방금 전', folderId: null, isCurrent: true },
+          ...histories.map((h) => ({ ...h, isCurrent: false })),
+        ],
+      })
+      await get().fetchFilesTree()
+    } catch (err) {
+      console.error('newAnalysisInFolder failed:', err)
+      set({ creating: false, createError: '서버에 연결할 수 없습니다. 백엔드가 실행 중인지 확인해주세요.' })
+    }
+  },
+
   loadAnalysis: (id) => {
     const { histories } = get()
     const target = histories.find((h) => h.id === id)
@@ -946,12 +988,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     // debounce flush 가 API 호출을 바로 보내므로 약간 대기해 네트워크 정착
     await new Promise((r) => setTimeout(r, 30))
 
+    const controller = new AbortController()
+    _cellExecControllers.set(id, controller)
     set((s) => ({ executingCells: new Set([...s.executingCells, id]) }))
 
     try {
       const { notebookId } = get()
       if (!notebookId) throw new Error('노트북이 선택되지 않았습니다.')
-      const output = await apiExecuteCell(id, notebookId)
+      const output = await apiExecuteCell(id, notebookId, controller.signal)
       const executedAt = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
       set((s) => ({
         executingCells: new Set([...s.executingCells].filter((x) => x !== id)),
@@ -969,6 +1013,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
         ),
       }))
     } catch (err) {
+      _cellExecControllers.delete(id)
+      // AbortError = 사용자가 취소 → UI만 정리하고 토스트/에러 출력 없음
+      if ((err as { name?: string })?.name === 'AbortError') {
+        set((s) => ({ executingCells: new Set([...s.executingCells].filter((x) => x !== id)) }))
+        return
+      }
       const { ApiError } = await import('@/lib/api')
       const { toast } = await import('@/store/useToastStore')
       const detail = err instanceof ApiError ? err.detail : String(err)
@@ -985,7 +1035,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
           c.id === id ? { ...c, executed: true, executedAt, output: errOutput } : c
         ),
       }))
+    } finally {
+      _cellExecControllers.delete(id)
     }
+  },
+
+  cancelCell: (id) => {
+    const ctrl = _cellExecControllers.get(id)
+    if (ctrl) {
+      ctrl.abort()
+      _cellExecControllers.delete(id)
+    }
+    set((s) => ({ executingCells: new Set([...s.executingCells].filter((x) => x !== id)) }))
   },
 
   executeAllCells: async () => {
@@ -1478,6 +1539,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
 
     const isFirstUserMsg = !get().agentChatHistory.some((m) => m.role === 'user')
+    // conversation_history 는 현재 메시지 추가 전 스냅샷이어야 한다.
+    // set() 이후 get() 하면 이미 현재 메시지가 포함돼 백엔드에서 중복 append 됨.
+    const { cells, selectedMarts, martCatalog, analysisTheme, analysisDescription, agentChatHistory: prevHistory, notebookId } = get()
 
     set((s) => ({
       agentChatHistory: [...s.agentChatHistory, userMsg],
@@ -1533,7 +1597,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return
     }
 
-    const { cells, selectedMarts, martCatalog, analysisTheme, analysisDescription, agentChatHistory, notebookId } = get()
     const assistantMsgId = generateId('am')
     set((s) => ({
       agentChatHistory: [
@@ -1566,14 +1629,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
       await streamAgentMessage(
         {
           message,
-          cells: cells.map((c) => ({ id: c.id, name: c.name, type: c.type, code: c.code, executed: c.executed })),
+          cells: cells.filter((c) => c.type !== 'sheet').map((c) => ({ id: c.id, name: c.name, type: c.type, code: c.code, executed: c.executed })),
           selected_marts: selectedMarts,
           mart_metadata: martCatalog
             .filter((m) => selectedMarts.includes(m.key))
             .map((m) => ({ key: m.key, description: m.description, columns: m.columns })),
           analysis_theme: analysisTheme,
           analysis_description: analysisDescription,
-          conversation_history: agentChatHistory
+          conversation_history: prevHistory
             .filter((m) => m.content)
             .map((m) => ({ role: m.role, content: m.content })),
           notebook_id: notebookId,
@@ -1880,7 +1943,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
     } catch (err) {
       const aborted = (err as { name?: string })?.name === 'AbortError'
-      if (!aborted) console.error('Agent stream failed:', err)
+      if (!aborted) {
+        console.error('Agent stream failed:', err)
+        // 빈 마지막 메시지가 있으면 에러 내용으로 채워줌 — 아무것도 안 보이는 상태 방지
+        set((s) => {
+          const history = [...s.agentChatHistory]
+          const lastIdx = history.length - 1
+          if (lastIdx >= 0 && history[lastIdx].role === 'assistant' && !history[lastIdx].content) {
+            history[lastIdx] = { ...history[lastIdx], content: '요청 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' }
+          }
+          return { agentChatHistory: history }
+        })
+      }
     } finally {
       // 안전장치: 종료/에러/abort 와 무관하게 남은 델타가 있으면 flush.
       flushAgentDeltas()

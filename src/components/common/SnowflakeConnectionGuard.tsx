@@ -16,22 +16,23 @@ export default function SnowflakeConnectionGuard() {
   useEffect(() => {
     let cancelled = false
 
-    ;(async () => {
-      // 1차: 현재 연결 상태 확인
+    async function checkAndMaybeReconnect(isInitial: boolean) {
+      // 현재 연결 상태 확인
       let connected = false
       try {
         const r = await fetch(`${API_BASE}/snowflake/status`)
         const d = await r.json()
         connected = !!d.connected
       } catch {
-        // 백엔드 미기동 — 무시
         if (!cancelled) { setPhase('disconnected'); setIsConnected(false) }
         return
       }
       if (cancelled) return
       if (connected) { setPhase('connected'); setIsConnected(true); return }
 
-      // 2차: 저장된 자격 증명이 있으면 자동 재접속 1회 시도
+      // 초기 기동 시에만 자격 증명으로 자동 재접속 시도
+      if (!isInitial) { setPhase('disconnected'); setIsConnected(false); return }
+
       const hasCreds = creds.sfAccount.trim() && creds.sfUser.trim()
       if (!hasCreds) { setPhase('disconnected'); return }
 
@@ -48,7 +49,6 @@ export default function SnowflakeConnectionGuard() {
             warehouse: creds.sfWarehouse,
             database: creds.sfDatabase,
             schema: creds.sfSchema,
-            // 조용한 재접속이 목표 — 캐시된 SSO 토큰이 없거나 만료면 빠르게 실패시킴
             login_timeout: 15,
           }),
         })
@@ -65,9 +65,16 @@ export default function SnowflakeConnectionGuard() {
       } catch {
         if (!cancelled) { setPhase('disconnected'); setIsConnected(false) }
       }
-    })()
+    }
 
-    return () => { cancelled = true }
+    checkAndMaybeReconnect(true)
+
+    // 2분마다 연결 상태 재동기화 (세션 만료 등 감지)
+    const interval = setInterval(() => {
+      if (!cancelled) checkAndMaybeReconnect(false)
+    }, 2 * 60 * 1000)
+
+    return () => { cancelled = true; clearInterval(interval) }
   }, [])
 
   if (phase === 'connected' || phase === 'dismissed' || phase === 'checking') return null

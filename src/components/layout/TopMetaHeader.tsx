@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, Pin, FileSearch, FileText, Search, X, Databa
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
 import { scoreMarts, searchMarts } from '@/data/marts'
-import { recommendMarts, type MartRecommendation } from '@/lib/api'
+import { recommendMarts, enhanceDescription, type MartRecommendation } from '@/lib/api'
 import type { MartMeta } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -70,6 +70,10 @@ export default function TopMetaHeader() {
   const [aiRecommending, setAiRecommending] = useState(false)
   const [aiRecs, setAiRecs] = useState<MartRecommendation[] | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
+
+  // AI 분석 내용 개선 상태
+  const [enhancing, setEnhancing] = useState(false)
+  const [enhanceError, setEnhanceError] = useState<string | null>(null)
 
   // 백그라운드 프리패치
   const prefetchedRecs = useRef<MartRecommendation[] | null>(null)
@@ -141,6 +145,27 @@ export default function TopMetaHeader() {
       setAiError('추천 요청에 실패했습니다.')
     } finally {
       setAiRecommending(false)
+    }
+  }
+
+  async function handleEnhance() {
+    if (!analysisDescription.trim()) {
+      setEnhanceError('분석 내용을 먼저 입력해주세요.')
+      return
+    }
+    setEnhancing(true)
+    setEnhanceError(null)
+    try {
+      const res = await enhanceDescription({ analysis_theme: analysisTheme, analysis_description: analysisDescription })
+      if (res.ok && res.enhanced) {
+        setAnalysisDescription(res.enhanced)
+      } else {
+        setEnhanceError(res.message ?? '개선 실패')
+      }
+    } catch {
+      setEnhanceError('요청에 실패했습니다.')
+    } finally {
+      setEnhancing(false)
     }
   }
 
@@ -236,11 +261,34 @@ export default function TopMetaHeader() {
 
           {/* ── Col 1: 분석 내용 ── */}
           <div className="flex flex-col px-6 pt-3 pb-4 border-r border-border-subtle">
-            <label className="flex items-center gap-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide mb-1.5 shrink-0">
-              <FileSearch size={12} strokeWidth={2} />
-              분석 내용{' '}
-              <span className="text-text-disabled normal-case font-normal">· 상세할수록 좋은 마트를 추천받을 수 있어요</span>
-            </label>
+            <div className="flex items-center justify-between mb-1.5 shrink-0">
+              <label className="flex items-center gap-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide">
+                <FileSearch size={12} strokeWidth={2} />
+                분석 내용{' '}
+                <span className="text-text-disabled normal-case font-normal">· 상세할수록 좋은 마트를 추천받을 수 있어요</span>
+              </label>
+              <button
+                onClick={handleEnhance}
+                disabled={enhancing || !analysisDescription.trim()}
+                title="AI로 분석 내용 개선"
+                className={cn(
+                  'flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold border transition-colors',
+                  enhancing
+                    ? 'border-primary-border text-primary bg-primary-pale cursor-not-allowed'
+                    : 'border-border text-text-secondary hover:border-primary hover:text-primary hover:bg-primary-pale disabled:opacity-40 disabled:cursor-not-allowed'
+                )}
+              >
+                {enhancing ? (
+                  <Loader2 size={11} className="animate-spin" />
+                ) : (
+                  <Sparkles size={11} />
+                )}
+                AI 편집
+              </button>
+            </div>
+            {enhanceError && (
+              <p className="text-[11px] text-danger mb-1">{enhanceError}</p>
+            )}
             <textarea
               className="flex-1 text-[13px] bg-surface border border-border rounded px-3 py-2.5 outline-none resize-none text-text-primary placeholder-text-tertiary leading-relaxed focus:border-primary focus:ring-2 focus:ring-primary-pale"
               style={{ minHeight: '260px' }}

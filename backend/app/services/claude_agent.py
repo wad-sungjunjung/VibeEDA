@@ -452,6 +452,7 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
             c.id: {"name": c.name, "type": c.type, "output": c.output}
             for c in state.cells
         }
+        cells_name_by_id = {c.id: c.name for c in state.cells}
         normalized: list[dict] = []
         all_warnings: list[str] = []
         for f in findings_in:
@@ -460,6 +461,12 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
             norm, warns = agent_synthesis.apply_finding_rules(
                 f, methods=state.methods, cells_by_id=cells_by_id,
             )
+            # UUID 대신 셀 이름을 함께 돌려줘서 synthesize_report 인용 시 이름을 쓰도록 유도
+            norm["evidence_cell_names"] = [
+                cells_name_by_id[cid]
+                for cid in (norm.get("evidence_cell_ids") or [])
+                if cid in cells_name_by_id
+            ]
             normalized.append(norm)
             all_warnings.extend(warns)
         state.findings = normalized
@@ -470,9 +477,11 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
                 "findings": normalized,
                 "downgrades_applied": all_warnings,
                 "instruction": (
-                    "Findings 등급 기록 완료. 이제 self_consistency_check (L3 만) → synthesize_report 순서로 진행."
+                    "Findings 등급 기록 완료. 이제 self_consistency_check (L3 만) → synthesize_report 순서로 진행. "
+                    "synthesize_report body_markdown 에서 셀 인용 시 evidence_cell_names 의 이름을 [cell_name] 형태로 사용하세요. UUID는 절대 포함하지 마세요."
                     if (state.budget and state.budget.tier == "L3")
-                    else "Findings 등급 기록 완료. 이제 synthesize_report 로 마무리하세요."
+                    else "Findings 등급 기록 완료. 이제 synthesize_report 로 마무리하세요. "
+                    "synthesize_report body_markdown 에서 셀 인용 시 evidence_cell_names 의 이름을 [cell_name] 형태로 사용하세요. UUID는 절대 포함하지 마세요."
                 ),
             },
             [],
@@ -553,6 +562,9 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
         body = (inp.get("body_markdown") or "").strip()
         if not body:
             return {"success": False, "error": "body_required"}, []
+        # UUID 형태 인용([xxxxxxxx-xxxx-...])이 body에 포함됐으면 제거
+        import re as _re
+        body = _re.sub(r'\s*\[[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]', '', body)
         next_steps = inp.get("next_steps") or []
         if not isinstance(next_steps, list):
             next_steps = []
@@ -949,6 +961,21 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
 
     if name in ("get_mart_schema", "preview_mart", "profile_mart"):
         mart_key = inp.get("mart_key", "")
+        # 노트북 SQL 셀 DataFrame 를 마트 도구로 조회하려는 시도 차단 — 명확한 가이드 반환
+        executed_sql_cell_names = {c.name for c in state.cells if c.type == "sql" and c.executed}
+        if mart_key in executed_sql_cell_names:
+            cell = next((c for c in state.cells if c.name == mart_key), None)
+            return {
+                "error": "cell_dataframe_not_mart",
+                "message": (
+                    f"'{mart_key}'는 Snowflake 마트가 아니라 노트북의 SQL 셀 실행 결과 DataFrame입니다. "
+                    f"profile_mart/preview_mart/get_mart_schema 를 사용할 수 없습니다. "
+                    f"대신 다음 방법을 사용하세요:\n"
+                    f"1. analyze_output(cell_id='{cell.id if cell else mart_key}') — 통계 요약 조회\n"
+                    f"2. read_cell_output(cell_id='{cell.id if cell else mart_key}') — 출력 직접 확인\n"
+                    f"3. Python 셀에서 변수명 `{mart_key}` 을 직접 사용 (예: `df = {mart_key}`)"
+                ),
+            }, []
         # 선택된 마트 whitelist 체크.
         selected_lc = {m.lower() for m in state.selected_marts}
         if state.selected_marts and mart_key.lower() not in selected_lc:
@@ -1565,8 +1592,50 @@ async def _auto_execute_after_create_or_update(
 
 # ─── System prompt ────────────────────────────────────────────────────────────
 
+def _build_cell_dataframes_block(cell_based: list[str], state: NotebookState) -> str:
+    """선택된 데이터 소스 중 Snowflake 마트가 아닌 노트북 SQL 셀 DataFrame 목록을 프롬프트 블록으로 반환."""
+    if not cell_based:
+        return ""
+    lines = []
+    for name in cell_based:
+        cell = next((c for c in state.cells if c.name == name), None)
+        if cell:
+            # output 이 있으면 컬럼명, 없으면 SQL 코드로 SELECT 컬럼 힌트 제공
+            col_hint = ""
+            if cell.output:
+                cols = cell.output.get("columns") or []
+                if cols:
+                    col_names = [c.get("name", str(c)) if isinstance(c, dict) else str(c) for c in cols[:20]]
+                    col_hint = f"\n  Columns: {', '.join(col_names)}"
+            elif cell.code:
+                # SQL 코드 첫 줄에서 SELECT 컬럼 추출 (간단한 힌트용)
+                code_preview = cell.code.strip()[:300]
+                col_hint = f"\n  SQL: {code_preview.splitlines()[0][:120]}..."
+            lines.append(
+                f"- `{name}` (cell_id: `{cell.id}`) — 노트북 SQL 셀 실행 결과 DataFrame"
+                f"{col_hint}"
+            )
+        else:
+            lines.append(f"- `{name}` — 노트북 SQL 셀 DataFrame")
+    block = (
+        "\n## 노트북 셀 DataFrame (Python 커널 변수로 바로 사용 가능)\n"
+        "아래 DataFrame은 노트북 SQL 셀의 실행 결과로, Python 커널 namespace에 **변수로 이미 적재**되어 있습니다.\n"
+        "**⚠️ 이 데이터는 Snowflake 마트가 아닙니다 — `profile_mart`, `preview_mart`, `get_mart_schema`, `list_available_marts` 사용 금지.**\n"
+        "올바른 사용법:\n"
+        "- `analyze_output(cell_id='...')` 또는 `read_cell_output(cell_id='...')` 로 통계/내용 확인\n"
+        "- Python 셀에서 변수명을 직접 사용: `df = <변수명>` 후 pandas/plotly 분석\n"
+        "- SQL 셀을 새로 만들 필요 없음 — 이미 실행된 DataFrame을 바로 Python에서 활용하라\n\n"
+        + "\n".join(lines) + "\n"
+    )
+    return block
+
+
 def _build_system_prompt(state: NotebookState) -> str:
-    marts = ", ".join(state.selected_marts) if state.selected_marts else "없음"
+    # 실행된 SQL 셀 이름 집합 — selected_marts 중 이 이름과 겹치면 마트가 아닌 셀 DataFrame
+    executed_sql_cell_names = {c.name for c in state.cells if c.type == "sql" and c.executed}
+    cell_based = [m for m in state.selected_marts if m in executed_sql_cell_names]
+    snowflake_marts = [m for m in state.selected_marts if m not in executed_sql_cell_names]
+    marts = ", ".join(snowflake_marts) if snowflake_marts else "없음"
     from . import snowflake_session
     import datetime as _dt
     sf_connected = snowflake_session.is_connected()
@@ -1691,10 +1760,10 @@ You help analysts explore ad platform data by creating, modifying, and executing
 ## Current Analysis
 - Theme: {state.analysis_theme}
 - Description: {state.analysis_description}
-- Data Marts: {marts}
+- Data Marts (Snowflake): {marts}
 - Snowflake: {sf_status}
 - Tier: **{tier}** (예산 한도 자동 적용 — 답변 분량/깊이를 이 티어에 맞춰 조정하세요)
-{date_block}{mart_schema_block}{local_files_block}{learnings_block}{routing_block}{methods_block}{synthesis_block}
+{date_block}{mart_schema_block}{_build_cell_dataframes_block(cell_based, state)}{local_files_block}{learnings_block}{routing_block}{methods_block}{synthesis_block}
 
 ## Tools
 ### 셀 조작
@@ -1794,10 +1863,11 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - 예: 선택 마트가 `dim_shop_base` 뿐인데 "예약수" 를 물어봤다면 → `dim_`은 dimension이라 예약 사실(fact)이 없을 가능성이 큼 → `list_available_marts(filter_keyword='reservation')` → `request_marts` 로 추천
 
 ### 1단계 — **탐색 우선 (Explore-First) — 서버가 강제**
-선택 마트에 대해 **SQL 셀을 처음 만들기 전에 반드시 `profile_mart` 또는 `preview_mart` 를 한 번 이상 호출**해야 한다. 미탐색 마트를 참조하는 SQL 셀 생성은 서버가 `mart_not_explored` 에러로 거부한다.
+Snowflake 마트에 대해 **SQL 셀을 처음 만들기 전에 반드시 `profile_mart` 또는 `preview_mart` 를 한 번 이상 호출**해야 한다. 미탐색 마트를 참조하는 SQL 셀 생성은 서버가 `mart_not_explored` 에러로 거부한다.
 - 선택 마트가 여러 개라면 **한 턴에 `profile_mart` 를 병렬로 호출**해 한 번의 왕복으로 모든 프로파일을 받아라.
 - `profile_mart` 로 NULL 비율·카디널리티·수치 분포를 먼저 봐야 GROUP BY 키 결정·이상치 제외 판단·JOIN 안정성 예측이 가능하다.
 - 이미 주입된 스키마 블록만으로 컬럼을 아는 경우에도 **통계 프로파일은 반드시 확보**하라. 이것이 "눈 감고 쿼리 작성" 을 막는다.
+- **⚠️ 예외 — 노트북 셀 DataFrame**: "노트북 셀 DataFrame" 섹션에 나열된 데이터(`monthly_uv_kpi_select` 등)는 Snowflake 마트가 아니므로 이 탐색 단계 적용 불필요. 대신 `analyze_output` 또는 Python 셀에서 직접 변수 참조.
 
 ### 2단계 — 가설 검증을 위한 가벼운 스크래치
 - 본격적인 셀 생성 전에 의심스러운 부분(예: "이 컬럼에 NULL 이 실제로 얼마나?", "JOIN 키가 정말 유니크한가?", "이 기간에 데이터가 있긴 한가?") 은 **`query_data` 로 즉석 SELECT** 해서 먼저 확인. 셀을 남기지 않으므로 노트북이 깨끗하게 유지됨.
@@ -2207,6 +2277,10 @@ async def run_agent_stream(
                             lines.append("")
                         lines.append(end_reminder)
                     reminder_text = "\n".join(lines) + "\n\n이 리마인더에 따라 **지금 바로 해당 도구를 호출**해 마무리하세요. 그냥 종료하지 마세요."
+                    # 이번 턴 텍스트가 이미 스트리밍됐으므로 버블 초기화 — 다음 턴 모델이 같은
+                    # 맺음 문구를 반복하면 마지막 단어가 두 번 보이는 현상 방지.
+                    if full_text.strip():
+                        yield {"type": "reset_current_bubble"}
                     messages.append({"role": "assistant", "content": _content_to_dict(response.content)})
                     messages.append({
                         "role": "user",

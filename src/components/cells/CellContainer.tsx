@@ -47,6 +47,7 @@ function CellContainer({ cell, index }: Props) {
     updateCellMemo,
     cycleCellTypeById,
     executeCell,
+    cancelCell,
     executingCells,
     vibingCells,
     updateCellChatInput,
@@ -74,6 +75,7 @@ function CellContainer({ cell, index }: Props) {
     updateCellMemo: s.updateCellMemo,
     cycleCellTypeById: s.cycleCellTypeById,
     executeCell: s.executeCell,
+    cancelCell: s.cancelCell,
     executingCells: s.executingCells,
     vibingCells: s.vibingCells,
     updateCellChatInput: s.updateCellChatInput,
@@ -528,14 +530,22 @@ function CellContainer({ cell, index }: Props) {
           {isExecuting && (
             <>
               <div className="absolute inset-0 bg-bg-output z-[30] rounded-md" />
-              <div className="absolute inset-0 z-[40] flex flex-col items-center justify-center gap-1 pointer-events-none">
-                <div className="flex items-center gap-1.5 text-warning-text">
+              <div className="absolute inset-0 z-[40] flex flex-col items-center justify-center gap-2">
+                <div className="flex items-center gap-1.5 text-warning-text pointer-events-none">
                   <Loader2 size={13} className="animate-spin" />
                   <span className="text-[12px] font-semibold">실행 중</span>
                 </div>
-                <span className="font-mono text-[11px] text-warning-text/60">
+                <span className="font-mono text-[11px] text-warning-text/60 pointer-events-none">
                   {(execElapsed / 10).toFixed(1)}s
                 </span>
+                <button
+                  title="실행 취소"
+                  onClick={(e) => { e.stopPropagation(); cancelCell(cell.id) }}
+                  className="mt-1 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-surface border border-border text-text-secondary hover:text-danger hover:border-danger hover:bg-danger-bg transition-colors"
+                >
+                  <Square size={10} />
+                  취소
+                </button>
               </div>
             </>
           )}
@@ -646,14 +656,23 @@ function CellContainer({ cell, index }: Props) {
           {/* Hover actions */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {!isNonExecutable(cell.type) && (
-              <button
-                title={isExecuting ? '실행 중...' : 'Ctrl+Enter로도 실행'}
-                disabled={isExecuting}
-                onClick={(e) => { e.stopPropagation(); executeCell(cell.id) }}
-                className="p-1.5 rounded text-text-secondary transition-colors disabled:cursor-not-allowed enabled:hover:text-primary enabled:hover:bg-primary-light"
-              >
-                {isExecuting ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-              </button>
+              isExecuting ? (
+                <button
+                  title="실행 취소"
+                  onClick={(e) => { e.stopPropagation(); cancelCell(cell.id) }}
+                  className="p-1.5 rounded text-warning transition-colors hover:text-danger hover:bg-danger-bg"
+                >
+                  <Square size={14} />
+                </button>
+              ) : (
+                <button
+                  title="Ctrl+Enter로도 실행"
+                  onClick={(e) => { e.stopPropagation(); executeCell(cell.id) }}
+                  className="p-1.5 rounded text-text-secondary transition-colors hover:text-primary hover:bg-primary-light"
+                >
+                  <Play size={14} />
+                </button>
+              )
             )}
             {isSheetCell && (
               <button

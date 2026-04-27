@@ -81,7 +81,7 @@ router = APIRouter()
 class CellSnapshot(BaseModel):
     id: str
     name: str
-    type: Literal["sql", "python", "markdown"]
+    type: Literal["sql", "python", "markdown", "sheet"]
     code: str
     executed: bool = False
 
@@ -138,7 +138,7 @@ async def agent_stream_endpoint(
         [m.model_dump() for m in req.mart_metadata]
     )
     notebook_state = NotebookState(
-        cells=[CellState(id=c.id, name=c.name, type=c.type, code=c.code, executed=c.executed) for c in req.cells],
+        cells=[CellState(id=c.id, name=c.name, type=c.type, code=c.code, executed=c.executed) for c in req.cells if c.type != "sheet"],
         selected_marts=req.selected_marts,
         mart_metadata=enriched_marts,
         analysis_theme=req.analysis_theme,

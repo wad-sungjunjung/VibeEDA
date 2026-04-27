@@ -291,6 +291,28 @@ export default function App() {
           reorderActiveCell(e.key === 'ArrowUp' ? -1 : 1)
           return
         }
+        // Alt + ←/→ — 활성 셀 분할 모드 순환 (단일 → 좌우 → 상하 → 단일)
+        if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+          const id = s.activeCellId
+          if (!id) return
+          const cell = s.cells.find((c) => c.id === id)
+          if (!cell) return
+          e.preventDefault()
+          const modes = [
+            { splitMode: false, splitDir: 'h' as const },
+            { splitMode: true,  splitDir: 'h' as const },
+            { splitMode: true,  splitDir: 'v' as const },
+          ]
+          const cur = modes.findIndex((m) => m.splitMode === cell.splitMode && m.splitDir === cell.splitDir)
+          const dir = e.key === 'ArrowRight' ? 1 : -1
+          const next = modes[(cur + dir + modes.length) % modes.length]
+          if (!next.splitMode) {
+            s.toggleCellSplitMode(id)
+          } else {
+            s.setCellSplitDir(id, next.splitDir)
+          }
+          return
+        }
         // ↑/↓ — 선택된 패널 변경 (입력/출력/메모/바이브챗)
         if (!e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
           e.preventDefault()
