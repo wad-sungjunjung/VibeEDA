@@ -49,6 +49,9 @@ PYTHON_EXEC_TIMEOUT_SEC = _env_int("AGENT_PYTHON_EXEC_TIMEOUT_SEC", 3600)
 # SQL: Snowflake 큰 마트 집계 1시간 기본 (warehouse 지연 + 큰 윈도우 함수 포함)
 # 절대 hang 방어용 — 5분 이상 걸리면 에이전트 양보 메커니즘으로 백그라운드 처리.
 SQL_EXEC_TIMEOUT_SEC = _env_int("AGENT_SQL_EXEC_TIMEOUT_SEC", 3600)
+# 메서드별 도구 (ML/Causal/Predict): sklearn fit / permutation_importance 등이
+# 동기 호출이라 이벤트 루프를 막을 수 있음. 10분 cap 으로 무한 hang 방어.
+METHOD_TOOL_TIMEOUT_SEC = _env_int("AGENT_METHOD_TOOL_TIMEOUT_SEC", 600)
 # 장기 실행 임계: 이 시간을 넘기면 사용자에게 "아직 실행 중" 신호 발사
 LONG_EXEC_HEARTBEAT_THRESHOLDS_SEC = (30, 120, 300, 900)
 # 완료 후 "X초 걸렸어요" 알림을 띄우는 최소 임계
@@ -402,6 +405,29 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
             }],
         )
 
+    # ─── 메서드별 도구 — 동기 sklearn 호출이라 이벤트 루프를 블로킹할 수 있음.
+    # run_in_executor + asyncio.wait_for 로 thread 위에서 돌리고 timeout cap 적용.
+    async def _run_method_tool(handler, tool_label: str):
+        loop = asyncio.get_event_loop()
+        try:
+            return await asyncio.wait_for(
+                loop.run_in_executor(None, handler, name, inp, state),
+                timeout=METHOD_TOOL_TIMEOUT_SEC,
+            )
+        except asyncio.TimeoutError:
+            logger.error(
+                "%s tool timeout after %ss (name=%s)", tool_label, METHOD_TOOL_TIMEOUT_SEC, name
+            )
+            return {
+                "success": False,
+                "error": "tool_timeout",
+                "message": (
+                    f"`{name}` 도구가 {METHOD_TOOL_TIMEOUT_SEC}초를 넘겨 자동 중단했어요. "
+                    "데이터 양이 너무 크거나 features 가 폭발했을 수 있습니다 — 입력 행/컬럼을 줄여 다시 시도해주세요. "
+                    "환경변수 AGENT_METHOD_TOOL_TIMEOUT_SEC 로 상한을 늘릴 수도 있습니다."
+                ),
+            }, []
+
     # ─── ML 메서드별 도구 (S4) — 'ml' 메서드 미선택 시 거부 ────────────────
     if name in agent_ml.ML_TOOL_NAMES:
         if "ml" not in (state.methods or []):
@@ -413,7 +439,7 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
                     "ml 작업이 필요하면 select_methods 를 다시 호출해 'ml' 을 추가하세요."
                 ),
             }, []
-        return agent_ml.handle_ml_tool(name, inp, state)
+        return await _run_method_tool(agent_ml.handle_ml_tool, "ML")
 
     # ─── Causal/AB 메서드별 도구 (S5) ─────────────────────────────────────
     if name in agent_causal.CAUSAL_TOOL_NAMES:
@@ -427,7 +453,7 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
                     f"현재 선택: {state.methods}. select_methods 를 다시 호출해 메서드를 추가하세요."
                 ),
             }, []
-        return agent_causal.handle_causal_tool(name, inp, state)
+        return await _run_method_tool(agent_causal.handle_causal_tool, "Causal")
 
     # ─── Predict 메서드별 도구 (S6) ───────────────────────────────────────
     if name in agent_predict.PREDICT_TOOL_NAMES:
@@ -440,7 +466,7 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
                     "select_methods 를 다시 호출해 'predict' 를 추가하세요."
                 ),
             }, []
-        return agent_predict.handle_predict_tool(name, inp, state)
+        return await _run_method_tool(agent_predict.handle_predict_tool, "Predict")
 
     # ─── Phase 3: rate_findings ───────────────────────────────────────────
     if name == "rate_findings":

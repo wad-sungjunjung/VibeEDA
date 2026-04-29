@@ -208,9 +208,32 @@ def handle_fit_model(inp: dict, state) -> tuple[dict, list[dict]]:
             "message": f"target='{target}' 컬럼이 DataFrame 에 없습니다. 컬럼: {list(df.columns)[:20]}",
         }, []
 
-    # features 자동 — target 제외 모든 수치/범주
+    # features 자동 — target 제외 모든 수치/범주.
+    # 단, 자동 선택 시 고카디널리티 object/문자열 컬럼은 제외 (id/timestamp 등이 들어가
+    # get_dummies 단계에서 수만 컬럼으로 폭발 → OOM/loky 워커 사망 방지).
+    auto_features_warning: list[str] = []
     if not features_in:
-        features = [c for c in df.columns if c != target]
+        candidates = [c for c in df.columns if c != target]
+        skipped_high_card: list[str] = []
+        features = []
+        for c in candidates:
+            col = df[c]
+            # object/category/string 계열에서 nunique 가 너무 크면 제외
+            if str(col.dtype) in ("object", "string", "category"):
+                try:
+                    nu = int(col.nunique(dropna=True))
+                except Exception:
+                    nu = 0
+                if nu > 50:
+                    skipped_high_card.append(f"{c}({nu})")
+                    continue
+            features.append(c)
+        if skipped_high_card:
+            auto_features_warning.append(
+                f"고카디널리티 컬럼 자동 제외: {skipped_high_card[:10]}"
+                + (" 외" if len(skipped_high_card) > 10 else "")
+                + ". 명시적으로 사용하려면 features 인자에 직접 지정하세요."
+            )
     else:
         features = list(features_in)
 
@@ -233,7 +256,7 @@ def handle_fit_model(inp: dict, state) -> tuple[dict, list[dict]]:
 
     # 너무 작은 샘플 경고
     n = len(df)
-    warnings: list[str] = []
+    warnings: list[str] = list(auto_features_warning)
     if n < 50:
         return {
             "success": False,
@@ -256,6 +279,18 @@ def handle_fit_model(inp: dict, state) -> tuple[dict, list[dict]]:
         # 범주형 자동 인코딩 — get_dummies
         X_enc = pd.get_dummies(X, drop_first=True)
         feature_names = list(X_enc.columns)
+        # 인코딩 후 컬럼 수 상한 (피처 폭발 가드) — 500 초과 시 거부.
+        # 500은 RandomForest n_estimators=100 + 5k 행 기준 메모리·학습시간이 안전한 상한.
+        if len(feature_names) > 500:
+            return {
+                "success": False,
+                "error": "too_many_features_after_encoding",
+                "message": (
+                    f"인코딩 후 컬럼 수 {len(feature_names)}개 (>500). 학습이 매우 느리고 메모리 폭발 위험이 있습니다. "
+                    "고카디널리티 범주형(예: id, timestamp)이 features 에 포함됐을 가능성이 큽니다. "
+                    "features 를 명시적으로 좁혀 다시 호출해주세요."
+                ),
+            }, []
 
         # 시간 누수 가드: time_col 있으면 시간순 분리
         if time_col:
@@ -467,9 +502,11 @@ def handle_feature_importance(inp: dict, state) -> tuple[dict, list[dict]]:
         if sample_n < len(X_test):
             X_test = X_test.sample(sample_n, random_state=42)
             y_test = y_test.loc[X_test.index]
+        # n_jobs=1 — 로컬 단일 프로세스 환경에서 멀티프로세싱은 OOM/loky 워커 사망 리스크가 큼.
+        # METHOD_TOOL_TIMEOUT_SEC 가 절대 cap 으로 동작.
         result = permutation_importance(
             bundle["model"], X_test, y_test,
-            n_repeats=5, random_state=42, n_jobs=-1,
+            n_repeats=5, random_state=42, n_jobs=1,
         )
         names = bundle["feature_names"]
         ranked = sorted(
