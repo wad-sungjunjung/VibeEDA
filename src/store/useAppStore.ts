@@ -1621,6 +1621,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
     let currentAssistantMsgId: string = assistantMsgId
     _agentController = new AbortController()
 
+    // 에이전트가 시작될 때의 notebookId 를 캡처 — 사용자가 도중에 다른 노트북으로 전환해도
+    // 셀/메모 mutation 이벤트는 원래 노트북에만 적용되어야 함.
+    // (백엔드는 이 notebook_id 로 .ipynb 파일에 이미 정확히 저장하므로 UI 만 가드)
+    const agentNotebookId = notebookId
+
     try {
       const tierOverride = get().agentTierOverride
       // 첫 요청에 override 를 한 번 사용하고 비움 (다음 요청에 다시 적용되지 않게).
@@ -1781,6 +1786,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
             }))
           } else if (event.type === 'cell_created') {
             createdCellIds.push(event.cell_id)
+            // 다른 노트북으로 전환된 상태면 in-memory cells / API 호출은 스킵 (백엔드는 원본 노트북에 이미 저장).
+            if (get().notebookId !== agentNotebookId) {
+              pushStep('cell_created', `셀 생성 · ${event.cell_name}`, event.code)
+              return
+            }
             set({ agentStatus: '셀 실행 중' })
             get().addCellFromAgent(
               event.cell_id,
@@ -1814,6 +1824,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
             }
             pushStep('cell_created', `셀 생성 · ${event.cell_name}`, event.code)
           } else if (event.type === 'cell_code_updated') {
+            if (get().notebookId !== agentNotebookId) {
+              pushStep('cell_created', '셀 코드 수정', event.code)
+              return
+            }
             set({ agentStatus: '셀 재실행 중' })
             get().updateCellCode(event.cell_id, event.code)
             if (event.agent_chat_entry) {
@@ -1843,6 +1857,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
           } else if (event.type === 'cell_executed') {
             const executedAt = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
             const isError = event.output?.type === 'error'
+            if (get().notebookId !== agentNotebookId) {
+              enrichLastStep({
+                stepType: isError ? 'error' : 'cell_executed',
+                stepLabel: isError ? '셀 실행 실패' : '셀 실행 완료',
+                stepDetail: isError ? (event.output as { message?: string })?.message ?? '알 수 없는 오류' : undefined,
+              })
+              return
+            }
             set((s) => ({
               agentStatus: '출력 분석 중',
               cells: s.cells.map((c) => {
@@ -1865,6 +1887,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
               stepDetail: isError ? (event.output as { message?: string })?.message ?? '알 수 없는 오류' : undefined,
             })
           } else if (event.type === 'cell_memo_updated') {
+            if (get().notebookId !== agentNotebookId) {
+              pushStep('cell_memo', '인사이트 메모 기록', event.memo)
+              return
+            }
             set((s) => ({
               cells: s.cells.map((c) =>
                 c.id === event.cell_id ? { ...c, memo: event.memo } : c
