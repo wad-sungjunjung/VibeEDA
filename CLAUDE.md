@@ -316,3 +316,41 @@ fig = px.bar(query_1, x='region', y='revenue')
 | API 명세 | `docs/vibe-eda-api-spec.md` |
 | **에이전트 파이프라인 가이드** | `docs/vibe-eda-agent-pipeline.md` |
 | **리포팅 파이프라인 가이드** | `docs/vibe-eda-reporting-pipeline.md` |
+
+## 작업 마무리 — 문서 동기화 & 푸시 자동 판단
+
+작업이 끝날 때마다 사용자가 따로 시키지 않아도 **항상** 이 절차를 수행한다.
+모든 작업 종료 시점(코드 수정, 기능 추가, 버그 수정, 리팩터)에 적용된다.
+
+### 1) 작업 수준 판정
+변경 내용을 다음 4단계로 분류한다.
+
+| 수준 | 정의 | 문서 갱신 | 커밋·푸시 |
+|---|---|---|---|
+| **L0 — 사소** | 오탈자, 주석, 변수명, 포맷팅, 시각적 미세조정 | 불필요 | 사용자가 명시적으로 요청한 경우에만 |
+| **L1 — 버그 수정** | 동작 복구, 회귀 패치 (사용자 노출 동작 변화 없음) | 동작 변경이 명세와 어긋났을 때만 해당 문서 패치 | 코드 변경이 모이면 묶어서 |
+| **L2 — 기능 변경** | 사용자 노출 동작 변경, 단축키 추가, UI 흐름 변경, 새 화면/패널, 스토어 액션 추가 | `functional-spec.md` · 단축키는 `ShortcutsModal` 도 동기화 · 관련 파이프라인 문서 업데이트 | 항상 |
+| **L3 — 구조/계약 변경** | API 추가/시그니처 변경, .ipynb 스키마 변경, 폴더 구조 변경, LLM 파이프라인 단계 추가, 새 모듈/서비스 | 위 + `CLAUDE.md`(아키텍처·기술스택·폴더 구조) + `api-spec.md` + `agent-pipeline.md` / `reporting-pipeline.md` | 항상 |
+
+판정 기준은 *코드 라인 수* 가 아니라 **외부에서 관찰 가능한 변화의 폭** 이다.
+
+### 2) 문서 갱신 체크리스트
+판정에 따라 아래 표에서 해당 항목을 점검·갱신한다. 변화가 없으면 그대로 둔다.
+
+- **API 추가/변경** → `docs/vibe-eda-api-spec.md`
+- **에이전트 파이프라인 단계·도구·예산·가드 변경** → `docs/vibe-eda-agent-pipeline.md`
+- **리포팅 파이프라인 변경** → `docs/vibe-eda-reporting-pipeline.md`
+- **사용자 노출 UI/단축키/모달/플로우** → `docs/vibe-eda-functional-spec.md` + (단축키면) `src/components/common/ShortcutsModal.tsx`
+- **아키텍처·기술 스택·폴더 구조·환경변수** → `CLAUDE.md`
+- **.ipynb 스키마·메타데이터** → `CLAUDE.md` 의 `.ipynb 파일 구조` 섹션
+- **온보딩·디자인 토큰·테마** → `CLAUDE.md` 디자인 시스템 + `docs/vibe-eda-design-guide.md`
+
+### 3) 커밋·푸시
+- **L2/L3 는 작업이 자연스럽게 끝나는 시점마다 커밋 + push**.
+- L1 은 의미 있는 단위로 묶어 커밋. 사용자가 "푸시" 라고 말하지 않아도 동일 세션 내 후속 변경 없이 정리되면 push.
+- 커밋 메시지는 `feat / fix / docs / refactor` prefix + 한국어 요약 1줄, 본문에 변경 항목 bullet, 마지막에 `Co-Authored-By` 트레일러.
+- `--no-verify`, force push, 비밀파일 stage 금지 (기존 안전 규칙 유지).
+- push 직전 `npx tsc --noEmit` 으로 타입체크가 깨끗한지 확인.
+
+### 4) 보고
+응답 끝에는 **(a) 적용한 작업 수준, (b) 갱신한 문서 목록(없으면 "없음"), (c) 커밋 해시 / push 여부** 를 한 줄씩 짧게 알린다. 추가 설명은 사용자가 물을 때만.

@@ -243,6 +243,23 @@ function CellContainer({ cell, index }: Props) {
     }
   }, [fullscreen, setFullscreenCellId])
 
+  // pending 코드(AI 편집) 활성 시: 활성 셀에서 Esc → 거절. 수락은 CodeEditor 의 ⌘/Ctrl+Enter 키맵으로 처리.
+  const isPendingActive = cell.pendingCode != null && !isVibing && isActive
+  useEffect(() => {
+    if (!isPendingActive) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const active = document.activeElement as HTMLElement | null
+      const tag = (active?.tagName || '').toLowerCase()
+      // 메모(input/textarea) 등 일반 입력에 포커스가 있으면 양보
+      if (tag === 'input' || tag === 'textarea') return
+      e.stopPropagation()
+      rejectVibeChange(cell.id)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [isPendingActive, cell.id, rejectVibeChange])
+
   const [naming, setNaming] = useState(false)
   const handleSuggestName = useCallback(async () => {
     if (naming) return
@@ -462,6 +479,10 @@ function CellContainer({ cell, index }: Props) {
         )
       }
       const isPending = cell.pendingCode != null
+      // pending 시: ⌘/Ctrl+Enter → 수락, Esc → 거절 (스트리밍 중에는 비활성)
+      const onRunOrAccept = isPending && !isVibing
+        ? () => acceptVibeChange(cell.id)
+        : (!isNonExecutable(cell.type) ? () => executeCell(cell.id) : undefined)
       return (
         <div
           className={cn(
@@ -476,7 +497,7 @@ function CellContainer({ cell, index }: Props) {
             value={isPending ? (cell.pendingCode ?? '') : cell.code}
             originalCode={isPending ? cell.code : undefined}
             onChange={(v) => { if (!isPending) updateCellCode(cell.id, v) }}
-            onRun={!isNonExecutable(cell.type) ? () => executeCell(cell.id) : undefined}
+            onRun={onRunOrAccept}
             fixedHeight={stretch ? undefined : fixedHeight}
             readOnly={isVibing || isPending}
           />
@@ -487,7 +508,7 @@ function CellContainer({ cell, index }: Props) {
               onClick={(e) => e.stopPropagation()}
             >
               <button
-                title="새 코드로 교체하고 실행"
+                title="새 코드로 교체하고 실행 (⌘/Ctrl+Enter)"
                 onClick={() => acceptVibeChange(cell.id)}
                 className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-success-bg text-success-text border border-success/40 hover:bg-success/15 transition-colors"
               >
@@ -495,7 +516,7 @@ function CellContainer({ cell, index }: Props) {
                 수락
               </button>
               <button
-                title="원본 유지"
+                title="원본 유지 (Esc)"
                 onClick={() => rejectVibeChange(cell.id)}
                 className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-chip text-text-secondary border border-border hover:border-danger hover:text-danger transition-colors"
               >

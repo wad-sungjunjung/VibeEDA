@@ -54,6 +54,13 @@ const SECTIONS = [
     ],
   },
   {
+    title: 'AI 편집 제안 (수락/거절)',
+    shortcuts: [
+      { keys: ['Ctrl/⌘', 'Enter'], desc: '제안된 새 코드 수락 후 실행' },
+      { keys: ['Esc'], desc: '제안 거절 — 원본 유지' },
+    ],
+  },
+  {
     title: '시트 셀',
     shortcuts: [
       { keys: ['Ctrl', 'C'], desc: '복사 (서식 복사 원본 지정)' },
