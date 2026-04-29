@@ -830,7 +830,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     const updated = [...cells]
     updated.splice(afterIndex + 1, 0, newCell)
-    set({ cells: updated, activeCellId: newId })
+    set((s) => ({
+      cells: updated,
+      activeCellId: newId,
+      // 전체화면 모드라면 새 셀로 전체화면도 이동
+      fullscreenCellId: s.fullscreenCellId ? newId : s.fullscreenCellId,
+    }))
 
     apiCreateCell(notebookId, { id: newId, name, type, code: '', memo: '', ordering }).catch(
       (err) => {
