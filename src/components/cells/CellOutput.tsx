@@ -152,7 +152,7 @@ function CellOutput({ cell }: Props) {
     const natH = typeof baseLayout.height === 'number' && baseLayout.height > 0 ? baseLayout.height : 400
     return (
       <div className="relative group/output h-full overflow-auto flex items-center justify-center">
-        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 focus-within:opacity-100 transition-opacity">
           <CopyButton
             label="이미지 복사"
             onCopy={() => copyPlotAsImage(plotDivRef.current?.querySelector('.js-plotly-plot') as HTMLElement | null)}
@@ -192,8 +192,8 @@ function CellOutput({ cell }: Props) {
     const text = output.content
     return (
       <div className="relative group/output h-full overflow-auto bg-surface">
-        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity">
-          <CopyButton label="텍스트 복사" onCopy={() => navigator.clipboard.writeText(text)} />
+        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 focus-within:opacity-100 transition-opacity">
+          <CopyButton label="텍스트 복사" onCopy={() => copyTextRobust(text)} />
         </div>
         <pre className="px-4 py-3 text-[12px] text-text-primary font-mono whitespace-pre-wrap leading-relaxed">
           {text}
@@ -206,8 +206,8 @@ function CellOutput({ cell }: Props) {
     const msg = output.message ?? ''
     return (
       <div className="relative group/output h-full overflow-auto">
-        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity">
-          <CopyButton label="오류 복사" onCopy={() => navigator.clipboard.writeText(msg)} />
+        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 focus-within:opacity-100 transition-opacity">
+          <CopyButton label="오류 복사" onCopy={() => copyTextRobust(msg)} />
         </div>
         <pre className="bg-danger-bg px-4 py-3 text-[12px] text-danger font-mono whitespace-pre-wrap leading-relaxed h-full">
           {msg}
@@ -354,7 +354,7 @@ function TableOutput({
 
   return (
     <div className="relative overflow-hidden group/output flex flex-col h-full">
-      <div className="absolute top-1.5 right-1.5 z-30 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col items-end gap-1">
+      <div className="absolute top-1.5 right-1.5 z-30 opacity-0 group-hover/output:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col items-end gap-1">
         <CopyButton
           label={truncated ? `${rows.length}행 복사` : '표 복사'}
           onCopy={() => copyTextRobust(tableToTSV(cols, rows))}

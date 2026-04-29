@@ -13,6 +13,7 @@ import ApiKeyGuard from '@/components/common/ApiKeyGuard'
 import ReportModal from '@/components/reporting/ReportModal'
 import ReportResult from '@/components/reporting/ReportResult'
 import CellTypePicker from '@/components/common/CellTypePicker'
+import CellPalette from '@/components/common/CellPalette'
 import ToastHost from '@/components/common/ToastHost'
 import { useAppStore } from '@/store/useAppStore'
 import { useModelStore } from '@/store/modelStore'
@@ -30,6 +31,9 @@ export default function App() {
   // showCellPicker 는 window keydown 핸들러(한 번만 등록됨) 에서 최신 값으로 참조하기 위해 ref 로도 보관
   const showCellPickerRef = useRef(false)
   useEffect(() => { showCellPickerRef.current = showCellPicker }, [showCellPicker])
+  const [showCellPalette, setShowCellPalette] = useState(false)
+  const showCellPaletteRef = useRef(false)
+  useEffect(() => { showCellPaletteRef.current = showCellPalette }, [showCellPalette])
 
   // persist 복원이 onRehydrateStorage 에서 이미 <html>.dark 를 적용하지만,
   // 세션 중 토글에도 반응하도록 마운트/변경 시점에 재동기화한다.
@@ -258,6 +262,14 @@ export default function App() {
         }
         return
       }
+      // Cmd/Ctrl + P — 셀 점프 명령창 (브라우저 인쇄 가로채기)
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'p') {
+        const s = useAppStore.getState()
+        if (!s.notebookId) return
+        e.preventDefault()
+        setShowCellPalette(true)
+        return
+      }
       // Cmd/Ctrl + D — 활성 셀 복제 (편집 중에는 CodeMirror 의 단어 선택 확장이라 비활성)
       if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'd') {
         const s = useAppStore.getState()
@@ -484,6 +496,9 @@ export default function App() {
           }}
           onClose={() => setShowCellPicker(false)}
         />
+      )}
+      {showCellPalette && (
+        <CellPalette onClose={() => setShowCellPalette(false)} />
       )}
     </div>
   )
