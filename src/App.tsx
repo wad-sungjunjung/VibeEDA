@@ -258,6 +258,15 @@ export default function App() {
         }
         return
       }
+      // Cmd/Ctrl + D — 활성 셀 복제 (편집 중에는 CodeMirror 의 단어 선택 확장이라 비활성)
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'd') {
+        const s = useAppStore.getState()
+        if (!s.notebookId || !s.activeCellId) return
+        if (isEditingElement(document.activeElement)) return
+        e.preventDefault()
+        s.duplicateCell(s.activeCellId)
+        return
+      }
       // Cmd/Ctrl + L — 활성 셀의 바이브 챗 입력으로 포커스 이동
       if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'l') {
         const s = useAppStore.getState()

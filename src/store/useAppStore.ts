@@ -63,14 +63,30 @@ const _pendingSaves = new Map<string, () => void>()
 // 보류 중 vibe 변경의 메타(수락 시점에 채팅 히스토리 엔트리 만들 때 필요).
 // pendingCode 자체는 cell 에 들어가 있고, 수락 콜백에서 이 메타를 함께 사용한다.
 const _pendingVibeMeta = new Map<string, { userMessage: string; explanation: string }>()
+// 자동 저장 인디케이터 — 진행 중인 debounced 저장 키 집합.
+// 사용자에게 노출되는 카운트는 useAppStore.pendingSaveCount 로 미러링.
+const _savingKeys = new Set<string>()
+function _bumpSavingCount(delta: 1 | -1, key: string) {
+  if (delta === 1) {
+    if (_savingKeys.has(key)) return
+    _savingKeys.add(key)
+  } else {
+    if (!_savingKeys.delete(key)) return
+  }
+  const count = _savingKeys.size
+  const patch: { pendingSaveCount: number; lastSavedAtMs?: number } = { pendingSaveCount: count }
+  if (count === 0 && delta === -1) patch.lastSavedAtMs = Date.now()
+  useAppStore.setState(patch)
+}
 function debounced(key: string, fn: () => void, delay = 800) {
   const t = _debounceTimers.get(key)
   if (t) clearTimeout(t)
   _pendingSaves.set(key, fn)
+  _bumpSavingCount(1, key)
   _debounceTimers.set(key, setTimeout(() => {
     _debounceTimers.delete(key)
     _pendingSaves.delete(key)
-    fn()
+    try { fn() } finally { _bumpSavingCount(-1, key) }
   }, delay))
 }
 function flushDebouncedForCell(cellId: string) {
@@ -82,6 +98,7 @@ function flushDebouncedForCell(cellId: string) {
       const fn = _pendingSaves.get(key)
       _pendingSaves.delete(key)
       try { fn?.() } catch (e) { console.warn('flush failed', key, e) }
+      _bumpSavingCount(-1, key)
     }
   }
 }
@@ -327,6 +344,11 @@ interface AppStore {
   notebookId: string | null
   martCatalog: MartMeta[]
   martsLoading: boolean
+  // 자동 저장 인디케이터: 진행 중인 debounced 저장 키 개수.
+  // 0 이면 idle, >0 이면 "저장 중", 직전에 줄어들면서 0 이 된 시점은 "저장됨".
+  pendingSaveCount: number
+  // 마지막으로 0 이 된 시각(ms) — UI 가 "저장됨" 표시를 일정 시간만 노출할 때 사용.
+  lastSavedAtMs: number | null
   initApp: () => Promise<void>
   refreshMarts: () => Promise<void>
 
@@ -507,6 +529,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   notebookId: null,
   martCatalog: [],
   martsLoading: false,
+  pendingSaveCount: 0,
+  lastSavedAtMs: null,
 
   initApp: async () => {
     set({ loading: true })
@@ -850,9 +874,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   deleteCell: (id) => {
     // Cancel any pending debounced saves for this cell
     const t = _debounceTimers.get(`code-${id}`)
-    if (t) { clearTimeout(t); _debounceTimers.delete(`code-${id}`) }
+    if (t) { clearTimeout(t); _debounceTimers.delete(`code-${id}`); _pendingSaves.delete(`code-${id}`); _bumpSavingCount(-1, `code-${id}`) }
     const tm = _debounceTimers.get(`memo-${id}`)
-    if (tm) { clearTimeout(tm); _debounceTimers.delete(`memo-${id}`) }
+    if (tm) { clearTimeout(tm); _debounceTimers.delete(`memo-${id}`); _pendingSaves.delete(`memo-${id}`); _bumpSavingCount(-1, `memo-${id}`) }
 
     set((s) => ({
       cells: s.cells.filter((c) => c.id !== id),

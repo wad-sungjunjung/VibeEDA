@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ChevronDown, ChevronRight, Pin, FileSearch, FileText, Search, X, Database, Check, Sparkles, Plus, Layers, ChevronLeft, ChevronUp, Play, Loader2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Pin, FileSearch, FileText, Search, X, Database, Check, Sparkles, Plus, Layers, ChevronLeft, ChevronUp, Play, Loader2, Cloud, Telescope } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
 import { scoreMarts, searchMarts } from '@/data/marts'
@@ -20,6 +20,64 @@ function scoreBadgeClass(score: number) {
   if (score >= 3) return 'bg-warning-bg text-warning-text'
   if (score >= 2) return 'bg-warning-bg/70 text-warning'
   return 'bg-chip text-text-disabled'
+}
+
+function RemoteAgentIndicator() {
+  const { agentLoading, agentNotebookId, notebookId, histories, loadAnalysis } = useAppStore(useShallow((s) => ({
+    agentLoading: s.agentLoading,
+    agentNotebookId: s.agentNotebookId,
+    notebookId: s.notebookId,
+    histories: s.histories,
+    loadAnalysis: s.loadAnalysis,
+  })))
+  if (!agentLoading || !agentNotebookId || agentNotebookId === notebookId) return null
+  const title = histories.find((h) => h.id === agentNotebookId)?.title || '다른 분석'
+  return (
+    <button
+      title={`${title} 에서 에이전트 진행 중 — 클릭해서 이동`}
+      onClick={() => loadAnalysis(agentNotebookId)}
+      className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-full border border-primary-border bg-primary-pale text-primary-hover shrink-0 hover:bg-primary-light transition-colors"
+    >
+      <Telescope size={11} />
+      <Loader2 size={10} className="animate-spin" />
+      <span className="max-w-[140px] truncate font-semibold">{title}</span>
+      <span className="text-text-tertiary">에서 진행 중</span>
+    </button>
+  )
+}
+
+function SaveIndicator() {
+  const { pendingSaveCount, lastSavedAtMs, notebookId } = useAppStore(useShallow((s) => ({
+    pendingSaveCount: s.pendingSaveCount,
+    lastSavedAtMs: s.lastSavedAtMs,
+    notebookId: s.notebookId,
+  })))
+  const [showSaved, setShowSaved] = useState(false)
+  useEffect(() => {
+    if (lastSavedAtMs && pendingSaveCount === 0) {
+      setShowSaved(true)
+      const t = setTimeout(() => setShowSaved(false), 1500)
+      return () => clearTimeout(t)
+    }
+  }, [lastSavedAtMs, pendingSaveCount])
+  if (!notebookId) return null
+  if (pendingSaveCount > 0) {
+    return (
+      <div title="자동 저장 중" className="flex items-center gap-1 px-2 py-1 text-[11px] text-text-tertiary shrink-0">
+        <Loader2 size={11} className="animate-spin" />
+        <span>저장 중…</span>
+      </div>
+    )
+  }
+  if (showSaved) {
+    return (
+      <div title="자동 저장됨" className="flex items-center gap-1 px-2 py-1 text-[11px] text-success shrink-0">
+        <Cloud size={11} />
+        <span>저장됨</span>
+      </div>
+    )
+  }
+  return null
 }
 
 export default function TopMetaHeader() {
@@ -228,6 +286,8 @@ export default function TopMetaHeader() {
             onChange={(e) => setAnalysisTheme(e.target.value)}
           />
         )}
+        <RemoteAgentIndicator />
+        <SaveIndicator />
         {(() => {
           const isRunningAll = executingCells.size > 0
           const hasRunnable = cells.some((c) => c.type !== 'markdown')

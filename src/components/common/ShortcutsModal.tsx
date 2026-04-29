@@ -31,6 +31,7 @@ const SECTIONS = [
     shortcuts: [
       { keys: ['Ctrl', 'B'], desc: '셀 추가 (타입 선택 팝업)' },
       { keys: ['← →', 'Enter'], desc: '팝업 내 타입 선택 · 확인 (1~4 키로 바로 선택)' },
+      { keys: ['Ctrl', 'D'], desc: '활성 셀 복제 (커맨드 모드)' },
       { keys: ['Ctrl', 'G'], desc: '에이전트 모드 토글' },
       { keys: ['Ctrl', 'Shift', 'F'], desc: '활성 셀 전체화면 토글' },
     ],
