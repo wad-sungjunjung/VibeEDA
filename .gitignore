@@ -45,3 +45,10 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+# Large media (Github 100MB 제한 회피)
+*.mov
+*.mp4
+*.avi
+*.mkv
+*.webm
