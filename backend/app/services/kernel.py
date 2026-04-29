@@ -1,7 +1,9 @@
 import ast
 import concurrent.futures
 import logging
+import os
 import traceback
+from collections import OrderedDict
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -11,7 +13,11 @@ logger = logging.getLogger(__name__)
 # (LLM 이 차트를 이미지로 보지 못할 뿐, 사용자 노트북 흐름은 막히지 않음)
 KALEIDO_RENDER_TIMEOUT_SEC = 30
 
-_namespaces: dict[str, dict[str, Any]] = {}
+# 노트북별 namespace 는 셀 간 변수 공유(SQL→Python)를 위해 프로세스 메모리에 유지된다.
+# 무제한이면 사용자가 노트북을 자주 열고 닫을수록 RSS 가 단조 증가 → OOM.
+# LRU 로 가장 최근에 사용한 N 개만 유지. 환경변수로 튜닝 가능.
+KERNEL_NAMESPACE_MAX = int(os.environ.get("VIBE_KERNEL_NS_MAX", "20"))
+_namespaces: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
 
 
 def _suppress_plotly_show() -> None:
@@ -58,8 +64,19 @@ def _make_vibe_df(df):
 
 
 def get_namespace(notebook_id: str) -> dict[str, Any]:
-    if notebook_id not in _namespaces:
-        _namespaces[notebook_id] = {}
+    if notebook_id in _namespaces:
+        # LRU: 사용 시 끝으로 이동
+        _namespaces.move_to_end(notebook_id)
+        return _namespaces[notebook_id]
+    _namespaces[notebook_id] = {}
+    # 캡 초과 시 가장 오래된 namespace 제거 — 해당 노트북의 셀 변수는 잃지만,
+    # 다음 실행 시 자동 재생성된다 (SQL 셀은 캐시에서, Python 셀은 코드 재실행).
+    while len(_namespaces) > KERNEL_NAMESPACE_MAX:
+        evicted_id, _ = _namespaces.popitem(last=False)
+        logger.info(
+            "kernel namespace LRU evict: notebook=%s (cap=%d)",
+            evicted_id, KERNEL_NAMESPACE_MAX,
+        )
     return _namespaces[notebook_id]
 
 
@@ -347,8 +364,46 @@ def run_python(notebook_id: str, cell_name: str, code: str) -> dict:
         return {"type": "error", "message": traceback.format_exc()}
 
 
-def run_sql(notebook_id: str, cell_name: str, sql: str) -> dict:
+_CONN_ERROR_PATTERNS = (
+    "authentication token", "expired", "session no longer exists",
+    "session is no longer", "connection is closed", "not connected",
+    "connection reset", "connection aborted", "broken pipe",
+    "ssl", "eof occurred", "operationalerror", "networkerror",
+    "could not connect", "timeout", "network is unreachable",
+)
+
+
+def _looks_like_connection_error(err: BaseException) -> bool:
+    msg = (str(err) or "").lower()
+    name = type(err).__name__.lower()
+    if any(k in name for k in ("operational", "interface", "network", "connection")):
+        return True
+    return any(p in msg for p in _CONN_ERROR_PATTERNS)
+
+
+def _execute_sql_once(sql: str):
+    """단일 시도 — 연결을 새로 받아 SQL 실행 후 raw DataFrame 반환."""
     from .snowflake_session import get_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(sql)
+        return cur.fetch_pandas_all()
+    except Exception:
+        import pandas as _pd
+        cur2 = conn.cursor()
+        try:
+            cur2.execute("ALTER SESSION SET PYTHON_CONNECTOR_QUERY_RESULT_FORMAT = 'JSON'")
+        except Exception:
+            pass
+        cur2.execute(sql)
+        rows_raw = cur2.fetchall()
+        cols = [d[0] for d in (cur2.description or [])]
+        return _pd.DataFrame(rows_raw, columns=cols)
+
+
+def run_sql(notebook_id: str, cell_name: str, sql: str) -> dict:
+    from .snowflake_session import try_silent_reconnect
 
     ns = get_namespace(notebook_id)
 
@@ -356,24 +411,33 @@ def run_sql(notebook_id: str, cell_name: str, sql: str) -> dict:
         import math
         from decimal import Decimal
         import datetime as _dt
-        conn = get_connection()
-        # 세션 ARROW 포맷은 connect()의 session_parameters로 이미 설정됨.
-        # fetch_pandas_all 실패 시에만 새 커서로 JSON 결과 + fetchall 폴백.
+
+        # 1차 시도. 실패가 연결 문제로 보이면 1회 조용히 재접속 후 재시도.
         try:
-            cur = conn.cursor()
-            cur.execute(sql)
-            raw_df = cur.fetch_pandas_all()
-        except Exception:
-            import pandas as _pd
-            cur2 = conn.cursor()
+            raw_df = _execute_sql_once(sql)
+        except Exception as first_err:
+            if not _looks_like_connection_error(first_err):
+                raise
+            if not try_silent_reconnect():
+                return {
+                    "type": "error",
+                    "message": (
+                        "Snowflake 연결이 끊어졌고 자동 재접속에도 실패했습니다.\n"
+                        "왼쪽 사이드바 '연결 관리'에서 다시 로그인해주세요.\n"
+                        f"(원인: {first_err})"
+                    ),
+                }
             try:
-                cur2.execute("ALTER SESSION SET PYTHON_CONNECTOR_QUERY_RESULT_FORMAT = 'JSON'")
-            except Exception:
-                pass
-            cur2.execute(sql)
-            rows_raw = cur2.fetchall()
-            cols = [d[0] for d in (cur2.description or [])]
-            raw_df = _pd.DataFrame(rows_raw, columns=cols)
+                raw_df = _execute_sql_once(sql)
+            except Exception as second_err:
+                return {
+                    "type": "error",
+                    "message": (
+                        "Snowflake 자동 재접속은 성공했지만 재시도 SQL도 실패했습니다.\n"
+                        "쿼리 또는 연결 상태를 확인해주세요.\n"
+                        f"(원인: {second_err})"
+                    ),
+                }
         df = _make_vibe_df(raw_df)
         ns[cell_name] = df
 

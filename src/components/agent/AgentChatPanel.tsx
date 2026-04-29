@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState } from 'react'
-import { Telescope, X, User, ArrowUp, Plus, FileCode, Search, SquarePen, ChevronDown, ChevronRight, Loader2, Wrench, FileCode2, PlayCircle, StickyNote, AlertTriangle, StopCircle, Paperclip, Hourglass, CheckCircle2 } from 'lucide-react'
+import { useRef, useEffect, useState, useMemo, memo } from 'react'
+import { Telescope, X, User, ArrowUp, Plus, FileCode, Search, SquarePen, ChevronDown, ChevronRight, Loader2, Wrench, FileCode2, PlayCircle, StickyNote, AlertTriangle, StopCircle, Paperclip, Hourglass, CheckCircle2, Check } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useModelStore, AGENT_MODELS, getModelContextWindow } from '@/store/modelStore'
@@ -46,6 +46,7 @@ export default function AgentChatPanel() {
     submitAgentMessage,
     cancelAgent,
     toggleAgentRefCell,
+    setAgentRefCells,
     newAgentSession,
   } = useAppStore(useShallow((s) => ({
     cells: s.cells,
@@ -62,6 +63,7 @@ export default function AgentChatPanel() {
     submitAgentMessage: s.submitAgentMessage,
     cancelAgent: s.cancelAgent,
     toggleAgentRefCell: s.toggleAgentRefCell,
+    setAgentRefCells: s.setAgentRefCells,
     newAgentSession: s.newAgentSession,
   })))
   // Tier 분류 + 예산 + 메서드 정보 (별도 셀렉터 — 위 useShallow 가 비대해지지 않게 분리)
@@ -87,17 +89,20 @@ export default function AgentChatPanel() {
     agentMethodRationale: s.agentMethodRationale,
   })))
 
-  // 에이전트 실행 경과 시간 — 스토어의 시작 시각을 기준으로 현재 시각에서 빼서 계산.
-  // 컴포넌트 mount/unmount와 무관하게 올바른 경과 시간이 표시됨.
-  const [, setTick] = useState(0)
+  // 경과 시간 표시는 ElapsedTimer 가 자체 setInterval 로 처리 — 부모 리렌더 방지.
+  // 30초 경과 안내(이전엔 agentElapsed >= 300 으로 체크)는 같은 useEffect 로 한 번만 토글한다.
+  const [longRunWarn, setLongRunWarn] = useState(false)
   useEffect(() => {
-    if (!agentLoading) return
-    const t = setInterval(() => setTick((v) => v + 1), 100)
+    if (!agentLoading || !agentStartedAtMs) {
+      setLongRunWarn(false)
+      return
+    }
+    setLongRunWarn(Date.now() - agentStartedAtMs >= 30_000)
+    const t = setInterval(() => {
+      setLongRunWarn(Date.now() - agentStartedAtMs >= 30_000)
+    }, 1000)
     return () => clearInterval(t)
-  }, [agentLoading])
-  const agentElapsed = agentLoading && agentStartedAtMs
-    ? Math.floor((Date.now() - agentStartedAtMs) / 100)
-    : 0
+  }, [agentLoading, agentStartedAtMs])
 
   const { agentModel, setAgentModel } = useModelStore()
   const sfUser = useConnectionStore((s) => s.sfUser)
@@ -136,26 +141,28 @@ export default function AgentChatPanel() {
     | { kind: 'msg'; msg: typeof agentChatHistory[number]; idx: number }
     | { kind: 'stepGroup'; groupId: string; steps: typeof agentChatHistory }
     | { kind: 'turnGroup'; groupId: string; inner: ChatItem[] }
-  const rawChatItems: ChatItem[] = []
-  for (let i = 0; i < agentChatHistory.length; i++) {
-    const m = agentChatHistory[i]
-    if (m.kind === 'step') {
-      const steps: typeof agentChatHistory = []
-      const groupId = m.id
-      while (i < agentChatHistory.length && agentChatHistory[i].kind === 'step') {
-        steps.push(agentChatHistory[i])
-        i++
-      }
-      i--
-      rawChatItems.push({ kind: 'stepGroup', groupId, steps })
-    } else {
-      rawChatItems.push({ kind: 'msg', msg: m, idx: i })
-    }
-  }
 
-  // 대화가 종료(agentLoading=false)되면, 각 user 턴 내의
-  //   [작업들 + 중간 응답들]을 "턴 묶음" 토글로 접고, **마지막 assistant 응답만** 펼쳐 둔다.
-  const chatItems: ChatItem[] = (() => {
+  // chatItems 빌드는 agentChatHistory + agentLoading 에만 의존 — 매 리렌더 재계산 방지.
+  const chatItems = useMemo<ChatItem[]>(() => {
+    const rawChatItems: ChatItem[] = []
+    for (let i = 0; i < agentChatHistory.length; i++) {
+      const m = agentChatHistory[i]
+      if (m.kind === 'step') {
+        const steps: typeof agentChatHistory = []
+        const groupId = m.id
+        while (i < agentChatHistory.length && agentChatHistory[i].kind === 'step') {
+          steps.push(agentChatHistory[i])
+          i++
+        }
+        i--
+        rawChatItems.push({ kind: 'stepGroup', groupId, steps })
+      } else {
+        rawChatItems.push({ kind: 'msg', msg: m, idx: i })
+      }
+    }
+
+    // 대화가 종료(agentLoading=false)되면, 각 user 턴 내의
+    //   [작업들 + 중간 응답들]을 "턴 묶음" 토글로 접고, **마지막 assistant 응답만** 펼쳐 둔다.
     if (agentLoading) return rawChatItems
     const isAsstMsg = (it: ChatItem) =>
       it.kind === 'msg' && it.msg.role === 'assistant' && !!it.msg.content
@@ -164,18 +171,16 @@ export default function AgentChatPanel() {
     const flushSegment = (endExclusive: number) => {
       const seg = rawChatItems.slice(segmentStart, endExclusive)
       if (seg.length === 0) return
-      // segment 안의 마지막 assistant 응답 위치
       let lastAsstLocalIdx = -1
       for (let i = seg.length - 1; i >= 0; i--) {
         if (isAsstMsg(seg[i])) { lastAsstLocalIdx = i; break }
       }
-      // 마지막 응답이 없거나 항목이 1개뿐이면 그대로
       if (lastAsstLocalIdx < 0 || seg.length === 1) {
         for (const it of seg) result.push(it)
         return
       }
       const earlier = seg.slice(0, lastAsstLocalIdx)
-      const tail = seg.slice(lastAsstLocalIdx)  // 마지막 assistant + 그 뒤 (보통 뒤는 없음)
+      const tail = seg.slice(lastAsstLocalIdx)
       if (earlier.length === 0) {
         for (const it of tail) result.push(it)
         return
@@ -197,7 +202,7 @@ export default function AgentChatPanel() {
     }
     flushSegment(rawChatItems.length)
     return result
-  })()
+  }, [agentChatHistory, agentLoading])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -223,7 +228,8 @@ export default function AgentChatPanel() {
   }, [agentChatHistory])
 
   const refCellObjects = cells.filter((c) => agentRefCells.includes(c.id) && c.type !== 'sheet')
-  const availableCells = cells.filter((c) => !agentRefCells.includes(c.id) && c.type !== 'sheet')
+  // 다중 선택 picker 에서는 이미 선택된 셀도 표시(체크 표시)해야 하므로 모든 셀을 노출한다.
+  const pickerCells = cells.filter((c) => c.type !== 'sheet')
 
   // 현재 세션이 "물고 있는" 대략적인 토큰량 추정 — 대화 히스토리와
   // 다음 턴에 함께 전송되는 셀 스냅샷(코드 + 메모)을 문자열 길이로 환산.
@@ -485,9 +491,8 @@ export default function AgentChatPanel() {
                       <span className="flex items-center gap-2 whitespace-nowrap text-primary-hover">
                         <Loader2 size={12} className="animate-spin" />
                         <span className="text-[12px] font-semibold">{agentStatus ?? '생각 중'}</span>
-                        <span className="font-mono text-[11px] text-primary-hover/60">
-                          {(agentElapsed / 10).toFixed(1)}s
-                        </span>
+                        <ElapsedTimer startedAtMs={agentStartedAtMs} />
+
                         <button
                           title="에이전트 중지"
                           onClick={() => cancelAgent()}
@@ -497,7 +502,7 @@ export default function AgentChatPanel() {
                         </button>
                       </span>
                       {msg.content && <Markdown content={msg.content} />}
-                      {agentElapsed >= 300 && !msg.content && !agentChatHistory.slice(0, idx).some((m) => m.role === 'assistant' && !!m.content) && (
+                      {longRunWarn && !msg.content && !agentChatHistory.slice(0, idx).some((m) => m.role === 'assistant' && !!m.content) && (
                         <div
                           className="flex items-start gap-1.5 text-[11px] leading-relaxed px-2 py-1.5 rounded-md bg-warning-bg/50 border border-dashed border-primary-border text-primary-text"
                         >
@@ -663,27 +668,30 @@ export default function AgentChatPanel() {
 
       {/* Reference cells */}
       <div className={cn('px-4 pt-3 pb-1 border-t', agentChatHistory.length > 0 ? 'border-border-subtle' : 'border-transparent')}>
-        <div className="flex items-center gap-1.5 flex-wrap relative">
+        <div className="flex items-center gap-1.5 relative">
           <span className="text-[10px] text-text-disabled font-medium shrink-0">참조 셀</span>
 
-          {refCellObjects.map((cell) => (
-            <span
-              key={cell.id}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border bg-primary-light border-primary-border text-primary-text"
-            >
-              <FileCode size={9} />
-              {cell.name}
-              <button
-                title="참조 제거"
-                onClick={() => toggleAgentRefCell(cell.id)}
-                className="ml-0.5 hover:text-danger"
+          {/* 칩이 많아져도 줄바꿈하지 않고 가로 스크롤로만 흐른다. */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto hide-scrollbar">
+            {refCellObjects.map((cell) => (
+              <span
+                key={cell.id}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border bg-primary-light border-primary-border text-primary-text shrink-0 whitespace-nowrap"
               >
-                <X size={9} />
-              </button>
-            </span>
-          ))}
+                <FileCode size={9} className="shrink-0" />
+                {cell.name}
+                <button
+                  title="참조 제거"
+                  onClick={() => toggleAgentRefCell(cell.id)}
+                  className="ml-0.5 hover:text-danger shrink-0"
+                >
+                  <X size={9} />
+                </button>
+              </span>
+            ))}
+          </div>
 
-          <div className="relative">
+          <div className="relative shrink-0">
             <button
               title="참조 셀 추가"
               onClick={() => {
@@ -697,54 +705,101 @@ export default function AgentChatPanel() {
               추가
             </button>
 
-            {pickerOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setPickerOpen(false)} />
-                <div className="absolute left-0 bottom-7 z-50 bg-surface border border-border rounded-lg shadow-lg min-w-[200px]">
-                  {/* Search */}
-                  <div className="flex items-center gap-1.5 px-2.5 py-2 border-b border-border-subtle">
-                    <Search size={11} className="text-text-disabled shrink-0" />
-                    <input
-                      ref={pickerInputRef}
-                      className="flex-1 text-[11px] bg-transparent outline-none text-text-primary placeholder-text-disabled"
-                      placeholder="셀 검색..."
-                      value={pickerQuery}
-                      onChange={(e) => setPickerQuery(e.target.value)}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    />
-                    {pickerQuery && (
-                      <button onClick={() => setPickerQuery('')} className="text-text-disabled hover:text-text-secondary">
-                        <X size={10} />
-                      </button>
-                    )}
-                  </div>
-                  {/* Cell list */}
-                  <div className="py-1 max-h-[180px] overflow-y-auto hide-scrollbar">
-                    {availableCells
-                      .filter((c) => c.name.toLowerCase().includes(pickerQuery.toLowerCase()))
-                      .map((cell, idx) => (
-                        <button
-                          key={cell.id}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-chip text-left"
-                          onClick={() => { toggleAgentRefCell(cell.id); setPickerOpen(false); setPickerQuery('') }}
-                        >
-                          <span className="text-[9px] text-text-disabled font-mono shrink-0">[{idx + 1}]</span>
-                          <span className={cn('text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide shrink-0', TYPE_COLORS[cell.type])}>
-                            {cell.type === 'markdown' ? 'MD' : cell.type === 'python' ? 'PY' : cell.type.toUpperCase()}
-                          </span>
-                          <span className="truncate">{cell.name}</span>
+            {pickerOpen && (() => {
+              const filtered = pickerCells.filter((c) => c.name.toLowerCase().includes(pickerQuery.toLowerCase()))
+              const filteredIds = filtered.map((c) => c.id)
+              const allSelected = filteredIds.length > 0 && filteredIds.every((id) => agentRefCells.includes(id))
+              const toggleAll = () => {
+                if (allSelected) {
+                  setAgentRefCells(agentRefCells.filter((id) => !filteredIds.includes(id)))
+                } else {
+                  const merged = Array.from(new Set([...agentRefCells, ...filteredIds]))
+                  setAgentRefCells(merged)
+                }
+              }
+              return (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setPickerOpen(false)} />
+                  <div className="absolute left-0 bottom-7 z-50 bg-surface border border-border rounded-lg shadow-lg min-w-[220px]">
+                    {/* Search */}
+                    <div className="flex items-center gap-1.5 px-2.5 py-2 border-b border-border-subtle">
+                      <Search size={11} className="text-text-disabled shrink-0" />
+                      <input
+                        ref={pickerInputRef}
+                        className="flex-1 text-[11px] bg-transparent outline-none text-text-primary placeholder-text-disabled"
+                        placeholder="셀 검색..."
+                        value={pickerQuery}
+                        onChange={(e) => setPickerQuery(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      />
+                      {pickerQuery && (
+                        <button onClick={() => setPickerQuery('')} className="text-text-disabled hover:text-text-secondary">
+                          <X size={10} />
                         </button>
-                      ))}
-                    {availableCells.filter((c) => c.name.toLowerCase().includes(pickerQuery.toLowerCase())).length === 0 && (
-                      <div className="px-3 py-2 text-[11px] text-text-disabled text-center">검색 결과 없음</div>
+                      )}
+                    </div>
+                    {/* Select-all toggle */}
+                    {filtered.length > 0 && (
+                      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-border-subtle">
+                        <button
+                          onClick={toggleAll}
+                          className="flex items-center gap-1.5 text-[10px] text-text-secondary hover:text-primary"
+                        >
+                          <span
+                            className={cn(
+                              'w-3 h-3 rounded border flex items-center justify-center shrink-0',
+                              allSelected ? 'bg-primary border-primary' : 'border-border'
+                            )}
+                          >
+                            {allSelected && <Check size={9} className="text-white" strokeWidth={3} />}
+                          </span>
+                          <span>{allSelected ? '모두 해제' : '모두 선택'}</span>
+                        </button>
+                        <span className="text-[10px] text-text-disabled">
+                          {refCellObjects.length}/{pickerCells.length}
+                        </span>
+                      </div>
                     )}
+                    {/* Cell list */}
+                    <div className="py-1 max-h-[200px] overflow-y-auto hide-scrollbar">
+                      {filtered.map((cell, idx) => {
+                        const selected = agentRefCells.includes(cell.id)
+                        return (
+                          <button
+                            key={cell.id}
+                            className={cn(
+                              'w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary hover:bg-chip text-left',
+                              selected && 'bg-primary-pale'
+                            )}
+                            onClick={() => toggleAgentRefCell(cell.id)}
+                          >
+                            <span
+                              className={cn(
+                                'w-3 h-3 rounded border flex items-center justify-center shrink-0',
+                                selected ? 'bg-primary border-primary' : 'border-border'
+                              )}
+                            >
+                              {selected && <Check size={9} className="text-white" strokeWidth={3} />}
+                            </span>
+                            <span className="text-[9px] text-text-disabled font-mono shrink-0">[{idx + 1}]</span>
+                            <span className={cn('text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide shrink-0', TYPE_COLORS[cell.type])}>
+                              {cell.type === 'markdown' ? 'MD' : cell.type === 'python' ? 'PY' : cell.type.toUpperCase()}
+                            </span>
+                            <span className="truncate">{cell.name}</span>
+                          </button>
+                        )
+                      })}
+                      {filtered.length === 0 && (
+                        <div className="px-3 py-2 text-[11px] text-text-disabled text-center">검색 결과 없음</div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </>
-            )}
+                </>
+              )
+            })()}
           </div>
 
-          {availableCells.length === 0 && refCellObjects.length === 0 && (
+          {pickerCells.length === 0 && refCellObjects.length === 0 && (
             <span className="text-[10px] text-text-disabled italic">셀이 없습니다</span>
           )}
         </div>
@@ -784,8 +839,9 @@ export default function AgentChatPanel() {
           <textarea
             className="w-full bg-transparent text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none resize-none leading-relaxed overflow-hidden rounded-2xl"
             style={{ minHeight: '56px', height: '56px', padding: '10px 48px 28px 16px' }}
-            placeholder="에이전트에게 노트북 전체에 대해 질문하거나 분석을 요청하세요..."
+            placeholder={agentLoading ? '에이전트 작업 중 — 끝나거나 중지 후 입력해주세요' : '에이전트에게 노트북 전체에 대해 질문하거나 분석을 요청하세요...'}
             value={agentChatInput}
+            disabled={agentLoading}
             onChange={(e) => {
               setAgentChatInput(e.target.value)
               e.target.style.height = '56px'
@@ -794,6 +850,7 @@ export default function AgentChatPanel() {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
+                if (agentLoading) return
                 submitAgentMessage(agentChatInput)
                 e.currentTarget.style.height = '56px'
               }
@@ -829,12 +886,12 @@ export default function AgentChatPanel() {
             </button>
           </div>
           <button
-            title="전송"
-            disabled={!agentChatInput.trim()}
+            title={agentLoading ? '에이전트 작업 중 — 중지 후 다시 보내세요' : '전송'}
+            disabled={agentLoading || !agentChatInput.trim()}
             onClick={() => submitAgentMessage(agentChatInput)}
             className={cn(
               'absolute right-3 bottom-2 w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:cursor-not-allowed text-white z-10',
-              agentChatInput.trim() ? 'bg-primary' : 'bg-border-subtle'
+              !agentLoading && agentChatInput.trim() ? 'bg-primary' : 'bg-border-subtle'
             )}
           >
             <ArrowUp size={16} strokeWidth={2.5} />
@@ -844,3 +901,20 @@ export default function AgentChatPanel() {
     </div>
   )
 }
+
+// 자체 setInterval 로 0.1s 단위 갱신 — 부모 패널 리렌더 유발 안 함.
+// startedAtMs 가 없으면 0.0s 표시.
+const ElapsedTimer = memo(function ElapsedTimer({ startedAtMs }: { startedAtMs: number | null }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!startedAtMs) return
+    const t = setInterval(() => setNow(Date.now()), 100)
+    return () => clearInterval(t)
+  }, [startedAtMs])
+  const elapsed = startedAtMs ? (now - startedAtMs) / 1000 : 0
+  return (
+    <span className="font-mono text-[11px] text-primary-hover/60">
+      {elapsed.toFixed(1)}s
+    </span>
+  )
+})

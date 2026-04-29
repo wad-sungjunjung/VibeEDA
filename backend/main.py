@@ -1,3 +1,7 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -18,7 +22,51 @@ from app.api.files import router as files_router
 import app.services.notebook_store as notebook_store
 from app.services.notebook_store import _ensure_dir
 
-app = FastAPI(title="Vibe EDA API", version="0.3.0")
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── startup ──
+    _ensure_dir()
+    from app.services import category_cache as _cc
+
+    async def _periodic_category_refresh():
+        # 카테고리 캐시 주기적 갱신 — 30분 간격으로 Snowflake last_altered 체크 후
+        # 변경된 마트만 재쿼리. Snowflake 미연결이면 즉시 패스.
+        while True:
+            try:
+                await asyncio.sleep(30 * 60)   # 30분
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, _cc.prewarm_all_marts)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.warning("periodic category refresh failed: %s", e)
+
+    refresh_task = asyncio.create_task(_periodic_category_refresh())
+
+    try:
+        yield
+    finally:
+        # ── shutdown ──
+        # 백그라운드 갱신 태스크 정리
+        refresh_task.cancel()
+        try:
+            await refresh_task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+        # Snowflake 세션 정리 — 서버 종료 시 명시적으로 닫지 않으면
+        # 서버 측에 orphan 세션이 남아 리소스 낭비.
+        try:
+            from app.services import snowflake_session
+            snowflake_session.disconnect()
+        except Exception as e:
+            logger.warning("snowflake disconnect on shutdown failed: %s", e)
+
+
+app = FastAPI(title="Vibe EDA API", version="0.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,27 +92,6 @@ async def _notebook_cache_scope(request, call_next):
         return await call_next(request)
     with notebook_store.request_cache_scope():
         return await call_next(request)
-
-
-@app.on_event("startup")
-async def startup():
-    _ensure_dir()
-    # 카테고리 캐시 주기적 갱신 스케줄러 — 30분 간격으로 Snowflake last_altered 체크 후
-    # 변경된 마트만 재쿼리. Snowflake 미연결이면 즉시 패스.
-    import asyncio as _asyncio
-    from app.services import category_cache as _cc
-
-    async def _periodic_category_refresh():
-        while True:
-            await _asyncio.sleep(30 * 60)   # 30분
-            try:
-                loop = _asyncio.get_event_loop()
-                await loop.run_in_executor(None, _cc.prewarm_all_marts)
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).warning("periodic category refresh failed: %s", e)
-
-    _asyncio.create_task(_periodic_category_refresh())
 
 
 @app.get("/healthz")

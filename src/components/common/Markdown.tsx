@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
@@ -7,7 +8,7 @@ interface Props {
   className?: string
 }
 
-export default function Markdown({ content, className }: Props) {
+function MarkdownImpl({ content, className }: Props) {
   return (
     <div className={cn('vibe-md text-[13px] text-text-primary leading-relaxed break-words [overflow-wrap:anywhere] max-w-full min-w-0', className)}>
       <ReactMarkdown
@@ -76,3 +77,8 @@ export default function Markdown({ content, className }: Props) {
     </div>
   )
 }
+
+const Markdown = memo(MarkdownImpl, (prev, next) =>
+  prev.content === next.content && prev.className === next.className
+)
+export default Markdown

@@ -9,16 +9,41 @@ _lock = threading.Lock()
 
 def is_connected() -> bool:
     global _connection
+    # 락을 최소한만 잡아 참조만 복사. SELECT 1 ping은 락 밖에서 실행해
+    # 네트워크 hang 시 다른 스레드가 블록되는 데드락을 방지한다.
+    with _lock:
+        conn = _connection
+    if conn is None:
+        return False
+    cur = None
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1", timeout=3)
+        return True
+    except Exception:
+        # ping 실패 → 죽은 커넥션 제거. 다른 스레드가 그 사이 새로 connect()
+        # 했으면 _connection 참조가 바뀌어 있으므로 'is conn' 체크로 보호.
+        with _lock:
+            if _connection is conn:
+                _connection = None
+        return False
+    finally:
+        if cur is not None:
+            try:
+                cur.close()
+            except Exception:
+                pass
+
+
+def get_connection():
+    global _connection
     with _lock:
         if _connection is None:
-            return False
-        try:
-            cur = _connection.cursor()
-            cur.execute("SELECT 1", timeout=3)
-            return True
-        except Exception:
-            _connection = None
-            return False
+            raise ValueError(
+                "Snowflake에 연결되지 않았습니다.\n"
+                "왼쪽 사이드바 '연결 관리'에서 연결해주세요."
+            )
+        return _connection
 
 
 def connect(params: dict) -> None:
@@ -53,17 +78,6 @@ def connect(params: dict) -> None:
         _conn_params = params.copy()
 
 
-def get_connection():
-    global _connection
-    with _lock:
-        if _connection is None:
-            raise ValueError(
-                "Snowflake에 연결되지 않았습니다.\n"
-                "왼쪽 사이드바 '연결 관리'에서 연결해주세요."
-            )
-        return _connection
-
-
 def disconnect() -> None:
     global _connection, _conn_params
     with _lock:
@@ -74,6 +88,36 @@ def disconnect() -> None:
                 pass
             _connection = None
         _conn_params = {}
+
+
+def try_silent_reconnect(login_timeout: int = 15) -> bool:
+    """저장된 파라미터로 조용히 재접속 시도.
+
+    externalbrowser SSO 의 캐시된 MFA 토큰(client_store_temporary_credential)
+    이 살아있으면 브라우저 팝업 없이 즉시 재접속된다. 캐시가 만료되어 팝업이
+    필요한 경우 login_timeout 이 차서 False 를 반환한다.
+
+    Returns:
+        True  — 재접속 성공
+        False — 저장된 파라미터 없거나 재접속 실패
+    """
+    global _connection, _conn_params
+    with _lock:
+        params = _conn_params.copy() if _conn_params else None
+    if not params:
+        return False
+
+    # 짧은 login_timeout 으로 시도 — 브라우저 팝업이 떠야 하는 경우 빠르게 포기.
+    retry_params = params.copy()
+    retry_params["login_timeout"] = login_timeout
+    try:
+        connect(retry_params)
+        # 원래 login_timeout 값 보존 (다음 명시적 connect 호출까지)
+        with _lock:
+            _conn_params = params
+        return True
+    except Exception:
+        return False
 
 
 def get_status() -> dict:

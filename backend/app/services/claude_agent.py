@@ -25,8 +25,10 @@ logger = logging.getLogger(__name__)
 STREAM_EVENT_WATCHDOG_SEC = 90
 # stream 종료 후 final_message 회수 타임아웃 (보통 0~수초)
 STREAM_FINAL_MESSAGE_SEC = 30
-# AsyncAnthropic 자체 read timeout (Anthropic SDK 디폴트 600s 명시)
-SDK_READ_TIMEOUT_SEC = 600
+# AsyncAnthropic 자체 read timeout — LLM API 한 번 호출에 5분 상한.
+# tool loop 의 각 turn 마다 새로 시작되므로, 깊은 분석도 turn 수만 늘어날 뿐 영향 없음.
+# 5분 안에 첫 응답이 안 오면 거의 확실하게 hang.
+SDK_READ_TIMEOUT_SEC = 300
 SDK_CONNECT_TIMEOUT_SEC = 10
 # 자동 실행되는 Python/SQL 셀의 커널 실행 타임아웃.
 # 모델링/장기 학습 작업은 시간 단위가 걸릴 수 있으므로 기본값을 넉넉히 잡고,
@@ -42,10 +44,11 @@ def _env_int(name: str, default: int) -> int:
     except ValueError:
         return default
 
-# Python: 모델링/대용량 처리 대비 30분 기본
-PYTHON_EXEC_TIMEOUT_SEC = _env_int("AGENT_PYTHON_EXEC_TIMEOUT_SEC", 1800)
-# SQL: Snowflake 쿼리 5분 기본 (warehouse 지연 포함)
-SQL_EXEC_TIMEOUT_SEC = _env_int("AGENT_SQL_EXEC_TIMEOUT_SEC", 300)
+# Python: 모델링/대용량 처리 대비 1시간 기본 (Colab과 동일하게 셀별 타임아웃은 넉넉히)
+PYTHON_EXEC_TIMEOUT_SEC = _env_int("AGENT_PYTHON_EXEC_TIMEOUT_SEC", 3600)
+# SQL: Snowflake 큰 마트 집계 1시간 기본 (warehouse 지연 + 큰 윈도우 함수 포함)
+# 절대 hang 방어용 — 5분 이상 걸리면 에이전트 양보 메커니즘으로 백그라운드 처리.
+SQL_EXEC_TIMEOUT_SEC = _env_int("AGENT_SQL_EXEC_TIMEOUT_SEC", 3600)
 # 장기 실행 임계: 이 시간을 넘기면 사용자에게 "아직 실행 중" 신호 발사
 LONG_EXEC_HEARTBEAT_THRESHOLDS_SEC = (30, 120, 300, 900)
 # 완료 후 "X초 걸렸어요" 알림을 띄우는 최소 임계
@@ -2086,8 +2089,11 @@ async def run_agent_stream(
     created_cell_ids: list[str] = []
     updated_cell_ids: list[str] = []
     # MAX_TURNS / TOTAL_TOOL_LIMIT 은 더 이상 하드코딩하지 않고 budget 에서 읽음.
-    # tier 별로 L1=5/10, L2=25/60, L3=80/200 — agent_budget.TIER_BUDGETS 참조.
-    MAX_TURNS = budget.max_turns
+    # tier 별로 L1=25/50, L2=125/300, L3=500/1250 — agent_budget.TIER_BUDGETS 참조.
+    # HARD_TURN_CAP: tier 산정 오류·자동 승급으로 budget.max_turns 가 비정상적으로 커지더라도
+    # 절대 이 값을 넘지 않도록 하는 안전망.
+    HARD_TURN_CAP = 250
+    MAX_TURNS = min(budget.max_turns, HARD_TURN_CAP)
     REPEAT_CALL_LIMIT = 3
     TOTAL_TOOL_LIMIT = budget.max_tool_calls
     NARRATION_MIN_CHARS = 20   # 도구 호출 전 내레이션 최소 길이
@@ -2117,7 +2123,7 @@ async def run_agent_stream(
         return f"{tool_name.lower()}:{json.dumps(_norm(inp), sort_keys=True, ensure_ascii=False)}"
 
     try:
-        while turn_index < budget.max_turns:
+        while turn_index < MAX_TURNS:
             # 내레이션 누락 시 1회 재요청 — tool_use만 있고 text가 부족하면 턴을 폐기하고
             # "텍스트 먼저" 강제 지시를 주입해 다시 호출한다.
             retried_for_narration = False
@@ -2509,7 +2515,7 @@ async def run_agent_stream(
             yield {
                 "type": "error",
                 "message": (
-                    f"모델 왕복 상한에 도달했어요 ({budget.tier} 티어, MAX_TURNS={budget.max_turns}). "
+                    f"모델 왕복 상한에 도달했어요 ({budget.tier} 티어, MAX_TURNS={MAX_TURNS}). "
                     f"지금까지 셀 {len(created_cell_ids)}개 생성·{len(updated_cell_ids)}개 수정했습니다. "
                     "남은 분석이 있다면 **새 메시지로 \"이어서 진행해줘\"** 라고 주시거나, "
                     "채팅창의 '더 깊게' 버튼으로 상위 티어로 재시도해주세요."

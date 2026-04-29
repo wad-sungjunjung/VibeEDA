@@ -437,6 +437,7 @@ interface AppStore {
   agentMethodRationale: string | null
   agentRefCells: string[]
   toggleAgentRefCell: (id: string) => void
+  setAgentRefCells: (ids: string[]) => void
   toggleAgentMode: () => void
   setAgentChatInput: (v: string) => void
   submitAgentMessage: (message: string) => void
@@ -508,10 +509,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   initApp: async () => {
     set({ loading: true })
     try {
-      const [notebooks, folders, marts] = await Promise.all([
+      const [notebooks, folders] = await Promise.all([
         getNotebooks(),
         getFolders(),
-        getMarts(),
       ])
 
       const histories: HistoryItem[] = notebooks.map((nb, i) => ({
@@ -528,7 +528,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
         isOpen: f.is_open,
       }))
 
-      set({ histories, folders: folderItems, martCatalog: marts })
+      set({ histories, folders: folderItems })
+
+      // marts는 Snowflake hang 가능성이 있으므로 앱 로딩을 막지 않고 비동기로 로드
+      void get().refreshMarts()
 
       // 리포트 목록도 초기 로드 (실패해도 앱 동작에 영향 없음)
       void get().fetchReports()
@@ -1350,6 +1353,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         : [...s.agentRefCells, id],
     })),
 
+  setAgentRefCells: (ids) => set(() => ({ agentRefCells: ids })),
+
   toggleAgentMode: () => set((s) => ({ agentMode: !s.agentMode })),
   setAgentChatInput: (v) => set({ agentChatInput: v }),
   setAgentChatImages: (images) => set({ agentChatImages: images }),
@@ -1523,6 +1528,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   submitAgentMessage: async (message) => {
     if (!message.trim()) return
+    // 진행 중인 에이전트가 있으면 무시 — UI 도 막지만 단축키/외부 트리거 대비.
+    if (get().agentLoading) return
 
     const { anthropicApiKey, geminiApiKey, agentModel } = useModelStore.getState()
     const isGemini = agentModel.startsWith('gemini-')

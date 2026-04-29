@@ -29,7 +29,7 @@ def list_marts():
             WHERE table_schema = '{schema.upper()}'
               AND table_type = 'BASE TABLE'
             ORDER BY table_name
-        """)
+        """, timeout=10)
         tables = cur.fetchall()
 
         if not tables:
@@ -45,7 +45,7 @@ def list_marts():
             WHERE table_schema = '{schema.upper()}'
               AND table_name IN ({in_clause})
             ORDER BY table_name, ordinal_position
-        """)
+        """, timeout=10)
         col_rows = cur.fetchall()
 
         columns_by_table: dict[str, list[dict]] = {t: [] for t in table_names}

@@ -368,11 +368,16 @@ class NotebookState:
 ### 10.8 프롬프트 캐싱 (Claude 전용)
 시스템 프롬프트 + tools 마지막 항목에 `cache_control: {"type": "ephemeral"}` — 멀티턴 비용/지연 절감.
 
-### 10.9 Stream watchdog
+### 10.9 Stream watchdog & 타임아웃 정책
 - Claude: 단일 stream event 도착 간격 `STREAM_EVENT_WATCHDOG_SEC=90` 초과 시 stall 로 간주 → error 종료
 - Final message 회수 `STREAM_FINAL_MESSAGE_SEC=30`
-- SDK read timeout 600s, connect 10s
+- **SDK read timeout 300s** (LLM API 1회 호출 상한, 5분), connect 10s
 - Gemini: `asyncio.wait_for(generate_content, 300)` — 5분 단일 호출 상한
+- **Tool loop 절대 상한 `HARD_TURN_CAP=50`** — tier 산정 오류·자동 승급으로도 50회 초과 불가 (정상 분석은 L3=15회 내)
+- **셀 실행 타임아웃**:
+  - SQL: `AGENT_SQL_EXEC_TIMEOUT_SEC=3600` (1시간) — 큰 마트 집계 정상 인정
+  - Python: `AGENT_PYTHON_EXEC_TIMEOUT_SEC=3600` (1시간) — 모델링/대용량 처리 인정
+  - 환경변수로 override 가능, 0 또는 음수면 무한 대기
 
 ### 10.10 SSE keepalive
 `_with_keepalive` 가 청크 사이에 `: keepalive\n\n` comment 를 5초마다 끼워 — 모델이 thinking 으로 무송신일 때 프록시·LB idle timeout 방지.

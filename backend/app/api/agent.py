@@ -163,75 +163,85 @@ async def agent_stream_endpoint(
                 blocks.append({"type": "text", "text": text})
 
         run_fn = run_agent_gemini if use_gemini else run_agent_claude
-        async for event in run_fn(
-            api_key=agent_api_key,
-            model=config.agent_model,
-            user_message=req.message,
-            notebook_state=notebook_state,
-            conversation_history=history,
-            images=[{"media_type": img.media_type, "data": img.data} for img in req.images],
-            tier_override=req.tier_override,
-        ):
-            yield f"data: {json.dumps(event, ensure_ascii=False, default=_json_default)}\n\n"
+        try:
+            async for event in run_fn(
+                api_key=agent_api_key,
+                model=config.agent_model,
+                user_message=req.message,
+                notebook_state=notebook_state,
+                conversation_history=history,
+                images=[{"media_type": img.media_type, "data": img.data} for img in req.images],
+                tier_override=req.tier_override,
+            ):
+                yield f"data: {json.dumps(event, ensure_ascii=False, default=_json_default)}\n\n"
 
-            etype = event.get("type")
-            if etype == "message_delta":
-                text = event.get("content", "")
-                assistant_content.append(text)
-                _append_text(text)
-            elif etype == "tool_use":
-                blocks.append({
-                    "type": "tool_use",
-                    "tool": event.get("tool", ""),
-                    "input": event.get("input", {}),
-                })
-            elif etype == "cell_created":
-                created_cell_ids.append(event["cell_id"])
-                blocks.append({
-                    "type": "cell_created",
-                    "cell_id": event.get("cell_id", ""),
-                    "cell_type": event.get("cell_type", ""),
-                    "cell_name": event.get("cell_name", ""),
-                    "code": event.get("code", ""),
-                })
-            elif etype == "cell_code_updated":
-                blocks.append({
-                    "type": "cell_code_updated",
-                    "cell_id": event.get("cell_id", ""),
-                    "code": event.get("code", ""),
-                })
-            elif etype == "cell_executed":
-                out = event.get("output") or {}
-                is_error = out.get("type") == "error"
-                blocks.append({
-                    "type": "cell_executed",
-                    "cell_id": event.get("cell_id", ""),
-                    "is_error": is_error,
-                    "error_message": out.get("message", "") if is_error else "",
-                })
-            elif etype == "cell_memo_updated":
-                blocks.append({
-                    "type": "cell_memo_updated",
-                    "cell_id": event.get("cell_id", ""),
-                    "memo": event.get("memo", ""),
-                })
-            elif etype == "error":
-                blocks.append({
-                    "type": "error",
-                    "message": event.get("message", ""),
-                })
-            elif etype == "complete" and req.notebook_id:
-                # 에이전트 대화 히스토리만 저장. 셀 자체는 프론트엔드가 cell_created 이벤트마다
-                # 이미 POST /cells 로 저장하므로 여기서 중복 저장하지 않는다.
-                try:
-                    notebook_store.add_agent_message(req.notebook_id, "user", req.message)
-                    notebook_store.add_agent_message(
-                        req.notebook_id, "assistant",
-                        "".join(assistant_content), created_cell_ids,
-                        blocks=blocks,
-                    )
-                except Exception as e:
-                    logger.warning("Failed to persist agent session: %s", e)
+                etype = event.get("type")
+                if etype == "message_delta":
+                    text = event.get("content", "")
+                    assistant_content.append(text)
+                    _append_text(text)
+                elif etype == "tool_use":
+                    blocks.append({
+                        "type": "tool_use",
+                        "tool": event.get("tool", ""),
+                        "input": event.get("input", {}),
+                    })
+                elif etype == "cell_created":
+                    created_cell_ids.append(event["cell_id"])
+                    blocks.append({
+                        "type": "cell_created",
+                        "cell_id": event.get("cell_id", ""),
+                        "cell_type": event.get("cell_type", ""),
+                        "cell_name": event.get("cell_name", ""),
+                        "code": event.get("code", ""),
+                    })
+                elif etype == "cell_code_updated":
+                    blocks.append({
+                        "type": "cell_code_updated",
+                        "cell_id": event.get("cell_id", ""),
+                        "code": event.get("code", ""),
+                    })
+                elif etype == "cell_executed":
+                    out = event.get("output") or {}
+                    is_error = out.get("type") == "error"
+                    blocks.append({
+                        "type": "cell_executed",
+                        "cell_id": event.get("cell_id", ""),
+                        "is_error": is_error,
+                        "error_message": out.get("message", "") if is_error else "",
+                    })
+                elif etype == "cell_memo_updated":
+                    blocks.append({
+                        "type": "cell_memo_updated",
+                        "cell_id": event.get("cell_id", ""),
+                        "memo": event.get("memo", ""),
+                    })
+                elif etype == "error":
+                    blocks.append({
+                        "type": "error",
+                        "message": event.get("message", ""),
+                    })
+                elif etype == "complete" and req.notebook_id:
+                    # 에이전트 대화 히스토리만 저장. 셀 자체는 프론트엔드가 cell_created 이벤트마다
+                    # 이미 POST /cells 로 저장하므로 여기서 중복 저장하지 않는다.
+                    try:
+                        notebook_store.add_agent_message(req.notebook_id, "user", req.message)
+                        notebook_store.add_agent_message(
+                            req.notebook_id, "assistant",
+                            "".join(assistant_content), created_cell_ids,
+                            blocks=blocks,
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to persist agent session: %s", e)
+        except asyncio.CancelledError:
+            # 클라이언트 disconnect — 조용히 종료
+            raise
+        except Exception as e:
+            # LLM 타임아웃·내부 오류 — error 이벤트로 클라이언트에 알리고 정상 종료.
+            # 이게 없으면 스트림이 갑자기 끊겨 사용자는 진행 중인지 실패인지 알 수 없다.
+            logger.exception("agent stream failed")
+            err_event = {"type": "error", "message": f"에이전트 실행 중 오류: {e}"}
+            yield f"data: {json.dumps(err_event, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         _with_keepalive(generate()),

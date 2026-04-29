@@ -41,7 +41,11 @@ export default function CellTypePicker({ onSelect, onClose }: Props) {
       e.preventDefault()
       onSelect(OPTIONS[index].type)
     } else if (e.key === 'Escape') {
+      // fullscreen 셀의 document-level Esc 핸들러까지 같이 발화하면
+      // 팝업과 fullscreen 이 한 번에 닫혀버린다. native 전파를 끊어 단계적으로 닫히게 한다.
       e.preventDefault()
+      e.stopPropagation()
+      e.nativeEvent.stopImmediatePropagation()
       onClose()
     } else if (['1', '2', '3', '4'].includes(e.key)) {
       e.preventDefault()

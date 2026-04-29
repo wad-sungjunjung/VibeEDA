@@ -169,6 +169,15 @@ Plotly는 `output.data.plotly_json`으로 전달.
 ### 4.2 `DELETE /kernel/{notebook_id}`
 해당 노트북의 Python 커널 namespace 초기화.
 
+### 4.3 `GET /cells/{notebook_id}/{cell_id}/status`
+셀 실행 상태 조회 — 백그라운드 셀 완료 폴링용. 노트북 파일에 저장된 output 의 존재/타입으로 판단.
+
+**Response 200**
+```json
+{ "status": "unknown" | "done" | "error", "cell_id": "...", "output_type": "table|chart|stdout|markdown" }
+```
+에러 시 `message` 필드 포함. `unknown` 은 아직 실행되지 않았거나 진행 중.
+
 ---
 
 ## 5. Vibe Chat (셀 단위) — `backend/app/api/vibe.py`

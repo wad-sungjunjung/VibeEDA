@@ -193,8 +193,13 @@ async def run_agent_stream_gemini(
             return v
         return f"{tool_name.lower()}:{json.dumps(_norm(inp), sort_keys=True, ensure_ascii=False)}"
 
+    # HARD_TURN_CAP: tier 산정 오류·자동 승급으로 budget.max_turns 가 비정상적으로 커지더라도
+    # 절대 50회를 넘지 않도록 하는 안전망. 정상 분석은 L3=15회 안에 끝난다.
+    HARD_TURN_CAP = 50
+    MAX_TURNS = min(budget.max_turns, HARD_TURN_CAP)
+
     try:
-        while turn_index < budget.max_turns:
+        while turn_index < MAX_TURNS:
             turn = turn_index  # 호환 — 기존 코드가 turn 변수명을 사용
             retried_for_narration = False
             while True:

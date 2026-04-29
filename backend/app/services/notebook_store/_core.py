@@ -147,6 +147,11 @@ def _nb_path(nb_id: str) -> Path:
         p = NOTEBOOKS_DIR / f"{rel}.ipynb"
         if p.exists():
             return p
+        # 신규 생성 직후엔 아직 파일이 없을 수 있다 — 등록된 경로의 부모가 존재하면
+        # 거기 쓰겠다는 의도로 보고 그대로 반환한다. (그렇지 않으면 UUID fallback 으로
+        # 루트에 만들어져 폴더가 무시된다.)
+        if p.parent.exists():
+            return p
     # Fallback: 재귀 스캔으로 metadata.vibe.id 가 일치하는 파일 찾기
     for p in _iter_notebook_paths():
         try:

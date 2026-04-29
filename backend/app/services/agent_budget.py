@@ -63,23 +63,21 @@ class BudgetState:
 # 표는 senior-agent-plan.md 와 동기화.
 TIER_BUDGETS: dict[Tier, dict] = {
     "L1": {
-        "max_turns": 5,
-        "max_tool_calls": 10,
+        "max_turns": 25,
+        "max_tool_calls": 50,
         "estimated_cells": 2,
         "estimated_seconds": 30,
     },
     "L2": {
-        "max_turns": 25,
-        "max_tool_calls": 60,
+        "max_turns": 125,
+        "max_tool_calls": 300,
         "estimated_cells": 8,
         "estimated_seconds": 240,
     },
     "L3": {
-        # S4-S7 에서 ML/Causal/Predict 도구 9개 추가됨 — 다중 메서드 L3 에서 빠듯해
-        # 80→100 turns, 200→250 tool_calls 로 상향 (S7 통합 시 보정).
-        # 다중 메서드 풀 사이클: 라우팅 6 + 가설×3 18 + 차트 12 + 종합 3 + 회복여유 = ~50-70턴
-        "max_turns": 100,
-        "max_tool_calls": 250,
+        # 각 Tier 5배 상향 (사용자 요청). 다중 메서드 풀 사이클 여유 + 회복 폭 확보.
+        "max_turns": 500,
+        "max_tool_calls": 1250,
         "estimated_cells": 22,
         "estimated_seconds": 1000,
     },

@@ -46,6 +46,48 @@ def reset_kernel(notebook_id: str):
     return {"ok": True}
 
 
+@router.get("/cells/{notebook_id}/{cell_id}/status")
+def cell_status(notebook_id: str, cell_id: str):
+    """셀 실행 상태 조회 — 백그라운드로 돌고 있는 셀의 완료 여부를 폴링하기 위한 엔드포인트.
+
+    노트북 파일에 저장된 output 의 존재/타입으로 상태를 판단:
+    - output 없음 / 비어있음 → unknown (아직 한 번도 실행 안 했거나 진행 중)
+    - output.type == "error" → error
+    - 그 외 → done
+
+    실행 시작 시각을 알 수 없어 elapsed_sec 은 반환하지 않는다 (프론트에서 자체 추적).
+    """
+    try:
+        nb = notebook_store.get_notebook(notebook_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Notebook not found")
+    cell = next((c for c in nb["cells"] if c["id"] == cell_id), None)
+    if not cell:
+        raise HTTPException(status_code=404, detail="Cell not found")
+    outputs = cell.get("outputs") or []
+    # vibe 노트북은 outputs[0].data["application/vnd.vibe+json"] 형태
+    vibe_out = None
+    if outputs:
+        try:
+            vibe_out = outputs[0].get("data", {}).get("application/vnd.vibe+json")
+        except Exception:
+            vibe_out = None
+    if not vibe_out:
+        return {"status": "unknown", "cell_id": cell_id}
+    out_type = vibe_out.get("type")
+    if out_type == "error":
+        return {
+            "status": "error",
+            "cell_id": cell_id,
+            "message": vibe_out.get("message", ""),
+        }
+    return {
+        "status": "done",
+        "cell_id": cell_id,
+        "output_type": out_type,
+    }
+
+
 EXPORT_MAX_ROWS = 200_000
 
 

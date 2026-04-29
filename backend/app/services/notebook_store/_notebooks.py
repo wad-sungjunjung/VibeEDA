@@ -94,10 +94,10 @@ def create_notebook(title: str = "새 분석", folder_id: Optional[str] = None, 
     if folder_path:
         fp = Path(folder_path).expanduser()
         if not fp.is_absolute():
-            fp = _core.NOTEBOOKS_DIR / fp
+            fp = NOTEBOOKS_DIR / fp
         fp = fp.resolve()
         try:
-            rel_dir = fp.relative_to(_core.NOTEBOOKS_DIR.resolve())
+            rel_dir = fp.relative_to(NOTEBOOKS_DIR.resolve())
             fp.mkdir(parents=True, exist_ok=True)
             fname = str(rel_dir / base_fname)
         except ValueError:
