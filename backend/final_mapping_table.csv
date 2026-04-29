@@ -1,0 +1,2973 @@
+﻿SI_DO_NAME,SI_GUN_GU_NAME,UP_MYUN_DONG_NAME,final_category,final_score,final_general
+서울특별시,강남구,신사동,PREMIUM,0.6926,False
+서울특별시,강남구,역삼동,NIGHTLIFE,0.6628000000000001,False
+서울특별시,강남구,논현동,NIGHTLIFE,0.6772,False
+서울특별시,강남구,청담동,PREMIUM,0.7089,False
+서울특별시,서초구,서초동,RESIDENTIAL,0.663325,False
+서울특별시,영등포구,여의도동,OFFICE,0.7362,False
+서울특별시,마포구,서교동,NIGHTLIFE,0.6511,False
+서울특별시,강남구,삼성동,OFFICE,0.68245,False
+서울특별시,성동구,성수동2가,NIGHTLIFE,0.62225,False
+서울특별시,강남구,대치동,RESIDENTIAL,0.6929666666666666,False
+서울특별시,용산구,한남동,PREMIUM,0.6619,False
+서울특별시,마포구,연남동,PREMIUM,0.6552,False
+서울특별시,강서구,마곡동,RESIDENTIAL,0.659675,False
+서울특별시,성동구,성수동1가,NIGHTLIFE,0.62225,False
+부산광역시,부산진구,전포동,NIGHTLIFE,0.66785,False
+인천광역시,연수구,송도동,CAMPUS,0.67716,False
+서울특별시,용산구,이태원동,NIGHTLIFE,0.6583,False
+서울특별시,송파구,잠실동,RESIDENTIAL,0.6812333333333335,False
+서울특별시,송파구,방이동,PREMIUM,0.6592,False
+부산광역시,수영구,민락동,PREMIUM,0.6713,False
+서울특별시,서초구,반포동,RESIDENTIAL,0.67522,False
+서울특별시,서초구,방배동,RESIDENTIAL,0.6738999999999999,False
+부산광역시,부산진구,부전동,NIGHTLIFE,0.68265,False
+부산광역시,해운대구,우동,TOURIST,0.6533333333333333,False
+서울특별시,관악구,봉천동,NIGHTLIFE,0.5990142857142857,False
+서울특별시,송파구,송파동,PREMIUM,0.69235,False
+부산광역시,수영구,광안동,TOURIST,0.658075,False
+서울특별시,강남구,도곡동,OFFICE,0.6333,False
+서울특별시,마포구,합정동,NIGHTLIFE,0.6614,False
+부산광역시,해운대구,중동,OFFICE,0.66965,False
+서울특별시,마포구,망원동,CAMPUS,0.60285,False
+서울특별시,용산구,한강로2가,OFFICE,0.6668,False
+서울특별시,중구,신당동,NIGHTLIFE,0.6447499999999999,False
+경기도,성남시 분당구,정자동,RESIDENTIAL,0.75025,False
+서울특별시,광진구,화양동,NIGHTLIFE,0.6737,False
+울산광역시,남구,달동,OFFICE,0.7079,False
+서울특별시,마포구,동교동,CAMPUS,0.61548125,False
+서울특별시,서초구,양재동,OFFICE,0.62195,False
+경기도,안산시 단원구,고잔동,OFFICE,0.6758,False
+경기도,성남시 분당구,삼평동,OFFICE,0.7194,False
+서울특별시,송파구,문정동,OFFICE,0.756,False
+서울특별시,동작구,사당동,RESIDENTIAL,0.6712,False
+경기도,하남시,망월동,RESIDENTIAL,0.6532928571428572,False
+서울특별시,용산구,한강로3가,OFFICE,0.6668,False
+경기도,수원시 팔달구,인계동,OFFICE,0.6708,False
+인천광역시,부평구,부평동,OFFICE,0.72165,False
+서울특별시,구로구,구로동,OFFICE,0.67882,False
+서울특별시,관악구,신림동,NIGHTLIFE,0.6714,False
+인천광역시,남동구,구월동,OFFICE,0.68105,False
+서울특별시,양천구,목동,RESIDENTIAL,0.6999000000000001,False
+서울특별시,광진구,자양동,CAMPUS,0.61815,False
+서울특별시,송파구,신천동,RESIDENTIAL,0.6828222222222222,False
+경기도,수원시 영통구,영통동,RESIDENTIAL,0.6696666666666666,False
+서울특별시,서대문구,창천동,RESIDENTIAL,0.6118857142857143,False
+충청남도,천안시 서북구,불당동,RESIDENTIAL,0.6651,False
+경기도,성남시 분당구,백현동,OFFICE,0.6959,False
+경기도,안양시 동안구,호계동,RESIDENTIAL,0.6888333333333333,False
+제주특별자치도,제주시,노형동,NIGHTLIFE,0.6574,False
+제주특별자치도,제주시,애월읍,OFFICE,0.6023,False
+부산광역시,연제구,연산동,RESIDENTIAL,0.63895,False
+경기도,수원시 영통구,이의동,RESIDENTIAL,0.6819916666666667,False
+서울특별시,용산구,용산동2가,PREMIUM,0.6721,False
+제주특별자치도,제주시,연동,NIGHTLIFE,0.6586,False
+경기도,안양시 동안구,관양동,OFFICE,0.68,False
+서울특별시,노원구,상계동,RESIDENTIAL,0.7010875,False
+서울특별시,서대문구,연희동,TOURIST,0.615,False
+경기도,화성시,반송동,RESIDENTIAL,0.6154137931034483,False
+인천광역시,서구,청라동,RESIDENTIAL,0.6962,False
+서울특별시,종로구,관철동,TOURIST,0.6479647058823529,False
+부산광역시,수영구,남천동,PREMIUM,0.6239,False
+서울특별시,서초구,잠원동,NIGHTLIFE,0.6577,False
+대전광역시,서구,둔산동,RESIDENTIAL,0.6682333333333333,False
+서울특별시,송파구,가락동,RESIDENTIAL,0.6998333333333333,False
+경기도,고양시 일산동구,장항동,OFFICE,0.72355,False
+부산광역시,기장군,기장읍,OFFICE,0.6743,False
+서울특별시,마포구,상암동,OFFICE,0.6388,False
+경기도,의정부시,의정부동,NIGHTLIFE,0.6804,False
+부산광역시,남구,대연동,RESIDENTIAL,0.6388199999999999,False
+대전광역시,유성구,봉명동,RESIDENTIAL,0.6262846153846154,False
+경기도,남양주시,다산동,OFFICE,0.7084,False
+서울특별시,강동구,성내동,CAMPUS,0.5945333333333332,False
+서울특별시,강동구,천호동,NIGHTLIFE,0.6645666666666666,False
+경기도,고양시 일산동구,정발산동,PREMIUM,0.669,False
+제주특별자치도,제주시,이도이동,TOURIST,0.6590692307692307,False
+부산광역시,강서구,명지동,RESIDENTIAL,0.6448499999999999,False
+대구광역시,수성구,두산동,OFFICE,0.6311,False
+서울특별시,중구,을지로3가,NIGHTLIFE,0.6743,False
+서울특별시,영등포구,문래동2가,OFFICE,0.6908,False
+서울특별시,마포구,상수동,CAMPUS,0.61548125,False
+대구광역시,수성구,범어동,RESIDENTIAL,0.7156750000000001,False
+경기도,성남시 분당구,서현동,OFFICE,0.7222500000000001,False
+서울특별시,광진구,구의동,CAMPUS,0.6416333333333334,False
+제주특별자치도,서귀포시,안덕면,TOURIST,0.7572,False
+서울특별시,송파구,석촌동,OFFICE,0.6933,False
+서울특별시,강서구,화곡동,RESIDENTIAL,0.6460142857142858,False
+부산광역시,동래구,명륜동,RESIDENTIAL,0.6315,False
+서울특별시,강북구,수유동,NIGHTLIFE,0.6383333333333333,False
+서울특별시,마포구,도화동,CAMPUS,0.573,True
+제주특별자치도,제주시,구좌읍,OFFICE,0.6098,False
+서울특별시,마포구,공덕동,OFFICE,0.6073,False
+서울특별시,용산구,한강로1가,OFFICE,0.6668,False
+경기도,성남시 수정구,창곡동,NIGHTLIFE,0.6532176470588235,False
+경상남도,창원시 성산구,상남동,NIGHTLIFE,0.6666,False
+서울특별시,금천구,가산동,OFFICE,0.7071,False
+제주특별자치도,제주시,한림읍,OFFICE,0.6135,False
+제주특별자치도,제주시,조천읍,GENERAL,0.2903,False
+대구광역시,동구,신천동,RESIDENTIAL,0.6528666666666667,False
+경상남도,양산시,물금읍,RESIDENTIAL,0.6179,False
+서울특별시,광진구,중곡동,CAMPUS,0.6088,False
+경기도,고양시 일산동구,백석동,OFFICE,0.7378,False
+경기도,부천시 원미구,중동,RESIDENTIAL,0.7280800000000001,False
+울산광역시,남구,삼산동,OFFICE,0.7233,False
+서울특별시,은평구,갈현동,RESIDENTIAL,0.65405,False
+경기도,김포시,구래동,OFFICE,0.6871,False
+경기도,시흥시,배곧동,RESIDENTIAL,0.7142999999999999,False
+경기도,성남시 분당구,야탑동,RESIDENTIAL,0.6799,False
+경기도,성남시 중원구,성남동,NIGHTLIFE,0.7044,False
+서울특별시,종로구,명륜4가,TOURIST,0.6479647058823529,False
+광주광역시,서구,치평동,OFFICE,0.7495,False
+경기도,고양시 일산서구,대화동,OFFICE,0.7334,False
+서울특별시,노원구,공릉동,OFFICE,0.6128,False
+경기도,안양시 만안구,안양동,OFFICE,0.6562222222222222,False
+서울특별시,용산구,남영동,TOURIST,0.6083,False
+서울특별시,성동구,행당동,RESIDENTIAL,0.6595,False
+제주특별자치도,서귀포시,성산읍,TOURIST,0.7487,False
+서울특별시,동대문구,장안동,CAMPUS,0.6127,False
+서울특별시,강남구,개포동,RESIDENTIAL,0.63495,False
+경기도,시흥시,정왕동,OFFICE,0.5968,False
+경기도,파주시,야당동,OFFICE,0.6352,False
+경상북도,경주시,황남동,TOURIST,0.709,False
+부산광역시,해운대구,좌동,RESIDENTIAL,0.72915,False
+서울특별시,종로구,관훈동,TOURIST,0.6479647058823529,False
+서울특별시,종로구,청진동,TOURIST,0.6479647058823529,False
+부산광역시,금정구,장전동,CAMPUS,0.6222000000000001,False
+광주광역시,광산구,수완동,RESIDENTIAL,0.6421,False
+서울특별시,강북구,미아동,NIGHTLIFE,0.6319,False
+서울특별시,양천구,신정동,RESIDENTIAL,0.7261666666666667,False
+제주특별자치도,서귀포시,색달동,TOURIST,0.6778235294117647,False
+서울특별시,영등포구,영등포동3가,OFFICE,0.67855,False
+인천광역시,중구,운서동,OFFICE,0.7178,False
+서울특별시,동작구,노량진동,OFFICE,0.64215,False
+경기도,남양주시,별내동,CAMPUS,0.62805,False
+대전광역시,중구,대흥동,TOURIST,0.635,False
+서울특별시,중랑구,면목동,NIGHTLIFE,0.6042666666666666,False
+서울특별시,종로구,동숭동,TOURIST,0.6479647058823529,False
+경기도,평택시,비전동,RESIDENTIAL,0.6336999999999999,False
+경기도,용인시 기흥구,보정동,RESIDENTIAL,0.6749,False
+제주특별자치도,서귀포시,서귀동,TOURIST,0.6778235294117647,False
+충청남도,천안시 서북구,두정동,RESIDENTIAL,0.6481642857142857,False
+서울특별시,광진구,군자동,NIGHTLIFE,0.6159,False
+부산광역시,동구,초량동,TOURIST,0.7118,False
+서울특별시,영등포구,문래동3가,OFFICE,0.6908,False
+부산광역시,동래구,온천동,RESIDENTIAL,0.6612,False
+서울특별시,중랑구,상봉동,NIGHTLIFE,0.643,False
+경기도,수원시 영통구,하동,RESIDENTIAL,0.6819916666666667,False
+충청북도,청주시 청원구,율량동,OFFICE,0.5974875,False
+경기도,군포시,산본동,OFFICE,0.67345,False
+인천광역시,서구,원당동,RESIDENTIAL,0.6692,False
+부산광역시,해운대구,송정동,TOURIST,0.7133,False
+인천광역시,미추홀구,주안동,NIGHTLIFE,0.63715,False
+서울특별시,강남구,수서동,OFFICE,0.7303,False
+서울특별시,중구,황학동,NIGHTLIFE,0.6306,False
+인천광역시,중구,중산동,TOURIST,0.6587583333333333,False
+서울특별시,종로구,익선동,TOURIST,0.6479647058823529,False
+경기도,김포시,장기동,RESIDENTIAL,0.6960500000000001,False
+경기도,평택시,고덕동,OFFICE,0.6938,False
+서울특별시,중구,명동2가,TOURIST,0.6624,False
+서울특별시,종로구,당주동,TOURIST,0.6479647058823529,False
+서울특별시,중구,태평로1가,NIGHTLIFE,0.6285866666666667,False
+경기도,의정부시,민락동,RESIDENTIAL,0.6607733333333333,False
+대구광역시,남구,대명동,CAMPUS,0.6208111111111111,False
+부산광역시,기장군,일광읍,TOURIST,0.6932,False
+서울특별시,중구,저동2가,NIGHTLIFE,0.6285866666666667,False
+광주광역시,광산구,쌍암동,GENERAL,0.5570238095238095,False
+경기도,수원시 팔달구,장안동,RESIDENTIAL,0.6567700000000001,False
+경기도,고양시 덕양구,화정동,RESIDENTIAL,0.7037500000000001,False
+서울특별시,용산구,이촌동,PREMIUM,0.57935,False
+서울특별시,중구,장충동2가,PREMIUM,0.618,False
+서울특별시,강서구,등촌동,RESIDENTIAL,0.6518333333333334,False
+서울특별시,동대문구,회기동,PREMIUM,0.6208,False
+인천광역시,남동구,논현동,OFFICE,0.67055,False
+경기도,수원시 팔달구,신풍동,RESIDENTIAL,0.6567700000000001,False
+충청남도,천안시 동남구,신부동,GENERAL,0.5534235294117648,False
+경기도,양주시,옥정동,RESIDENTIAL,0.6598999999999999,False
+경기도,성남시 분당구,구미동,OFFICE,0.7161500000000001,False
+서울특별시,도봉구,창동,RESIDENTIAL,0.58524,False
+인천광역시,연수구,동춘동,OFFICE,0.6791666666666667,False
+경기도,용인시 처인구,역북동,CAMPUS,0.6604,False
+부산광역시,사상구,괘법동,OFFICE,0.6516,False
+경기도,광명시,일직동,OFFICE,0.7304,False
+제주특별자치도,서귀포시,표선면,TOURIST,0.7314,False
+서울특별시,영등포구,당산동3가,OFFICE,0.70035,False
+서울특별시,강남구,압구정동,PREMIUM,0.6932,False
+서울특별시,성북구,동선동1가,CAMPUS,0.638,False
+광주광역시,광산구,월계동,GENERAL,0.5570238095238095,False
+대구광역시,중구,삼덕동3가,NIGHTLIFE,0.6647,False
+서울특별시,중구,북창동,NIGHTLIFE,0.6285866666666667,False
+서울특별시,중구,남대문로5가,NIGHTLIFE,0.6285866666666667,False
+경기도,수원시 권선구,금곡동,RESIDENTIAL,0.6451,False
+충청북도,청주시 흥덕구,복대동,CAMPUS,0.63315,False
+경기도,성남시 분당구,수내동,RESIDENTIAL,0.7448,False
+경기도,화성시,오산동,RESIDENTIAL,0.6154137931034483,False
+충청북도,청주시 청원구,오창읍,OFFICE,0.6441,False
+서울특별시,마포구,용강동,CAMPUS,0.5685,True
+서울특별시,종로구,통인동,TOURIST,0.6479647058823529,False
+경기도,남양주시,화도읍,OFFICE,0.7078,False
+대전광역시,서구,탄방동,RESIDENTIAL,0.6567,False
+제주특별자치도,제주시,삼도이동,TOURIST,0.6590692307692307,False
+부산광역시,북구,화명동,RESIDENTIAL,0.6857666666666667,False
+대전광역시,서구,갈마동,NIGHTLIFE,0.6364,False
+서울특별시,성동구,마장동,CAMPUS,0.5172,True
+서울특별시,성북구,동선동2가,CAMPUS,0.638,False
+경기도,수원시 영통구,원천동,RESIDENTIAL,0.6793,False
+부산광역시,사하구,하단동,GENERAL,0.50735,False
+대구광역시,중구,삼덕동1가,NIGHTLIFE,0.6647,False
+서울특별시,강남구,일원동,OFFICE,0.61965,False
+부산광역시,남구,용호동,CAMPUS,0.614025,False
+경기도,화성시,송동,RESIDENTIAL,0.6154137931034483,False
+인천광역시,서구,가정동,RESIDENTIAL,0.7044666666666667,False
+경기도,화성시,영천동,RESIDENTIAL,0.6154137931034483,False
+인천광역시,계양구,계산동,NIGHTLIFE,0.64395,False
+경기도,성남시 분당구,판교동,PREMIUM,0.6202,False
+경기도,파주시,와동동,OFFICE,0.6352,False
+대구광역시,중구,대봉동,RESIDENTIAL,0.63295,False
+부산광역시,북구,덕천동,GENERAL,0.5515333333333333,False
+경기도,용인시 수지구,풍덕천동,RESIDENTIAL,0.7072,False
+서울특별시,은평구,진관동,OFFICE,0.7032,False
+경기도,파주시,탄현면,TOURIST,0.6848,False
+강원특별자치도,강릉시,교동,NIGHTLIFE,0.6473,False
+대전광역시,유성구,도룡동,RESIDENTIAL,0.6262846153846154,False
+서울특별시,송파구,삼전동,OFFICE,0.6964,False
+강원특별자치도,원주시,무실동,RESIDENTIAL,0.6447,False
+경기도,김포시,양촌읍,OFFICE,0.6592,False
+대구광역시,중구,공평동,RESIDENTIAL,0.6376916666666667,False
+경기도,화성시,향남읍,OFFICE,0.7432,False
+경기도,수원시 팔달구,북수동,RESIDENTIAL,0.6567700000000001,False
+부산광역시,기장군,정관읍,OFFICE,0.6565,False
+서울특별시,구로구,신도림동,OFFICE,0.6758,False
+서울특별시,은평구,응암동,OFFICE,0.6379,False
+서울특별시,종로구,재동,TOURIST,0.6479647058823529,False
+서울특별시,동작구,상도동,RESIDENTIAL,0.643025,False
+서울특별시,중구,초동,NIGHTLIFE,0.6285866666666667,False
+대전광역시,유성구,관평동,CAMPUS,0.688,False
+서울특별시,용산구,후암동,TOURIST,0.6563,False
+경상남도,진주시,충무공동,OFFICE,0.6878,False
+경기도,구리시,수택동,NIGHTLIFE,0.6884333333333333,False
+부산광역시,영도구,동삼동,CAMPUS,0.6194666666666667,True
+제주특별자치도,서귀포시,대정읍,GENERAL,0.292,False
+경기도,수원시 영통구,매탄동,RESIDENTIAL,0.6628000000000001,False
+강원특별자치도,강릉시,초당동,TOURIST,0.7214,False
+경상남도,진주시,평거동,CAMPUS,0.7019,False
+서울특별시,중구,다동,NIGHTLIFE,0.6285866666666667,False
+서울특별시,중구,충무로1가,NIGHTLIFE,0.6285866666666667,False
+서울특별시,종로구,계동,TOURIST,0.6479647058823529,False
+서울특별시,동대문구,전농동,RESIDENTIAL,0.63805,False
+서울특별시,종로구,창신동,TOURIST,0.6354333333333333,False
+서울특별시,금천구,독산동,OFFICE,0.635025,False
+서울특별시,서대문구,대현동,RESIDENTIAL,0.6118857142857143,False
+서울특별시,종로구,낙원동,TOURIST,0.6479647058823529,False
+경기도,수원시 팔달구,매산로1가,RESIDENTIAL,0.6567700000000001,False
+서울특별시,성동구,옥수동,PREMIUM,0.6119,False
+서울특별시,중구,을지로2가,NIGHTLIFE,0.6743,False
+대구광역시,달성군,다사읍,RESIDENTIAL,0.6505,False
+서울특별시,영등포구,영등포동4가,OFFICE,0.67855,False
+인천광역시,미추홀구,용현동,OFFICE,0.59385,False
+서울특별시,마포구,대흥동,CAMPUS,0.6121,False
+경기도,남양주시,와부읍,OFFICE,0.6617,False
+대구광역시,수성구,수성동4가,RESIDENTIAL,0.6949666666666667,False
+전북특별자치도,전주시 완산구,효자동3가,RESIDENTIAL,0.6374,False
+대전광역시,서구,도안동,CAMPUS,0.6445,False
+서울특별시,마포구,염리동,RESIDENTIAL,0.6049,False
+서울특별시,마포구,성산동,CAMPUS,0.59375,False
+서울특별시,종로구,체부동,TOURIST,0.6479647058823529,False
+부산광역시,동래구,사직동,RESIDENTIAL,0.7050000000000001,False
+충청북도,청주시 상당구,용암동,RESIDENTIAL,0.63825,False
+경상북도,포항시 남구,효자동,TOURIST,0.6762642857142858,False
+강원특별자치도,강릉시,강문동,TOURIST,0.6762,False
+경기도,용인시 수지구,상현동,RESIDENTIAL,0.7679333333333332,False
+경기도,김포시,운양동,RESIDENTIAL,0.6823,False
+광주광역시,동구,동명동,PREMIUM,0.6228,False
+경기도,하남시,신장동,OFFICE,0.6798,False
+서울특별시,용산구,원효로1가,OFFICE,0.61415,False
+서울특별시,광진구,광장동,CAMPUS,0.5766,False
+서울특별시,강동구,길동,NIGHTLIFE,0.6587,False
+경기도,수원시 장안구,율전동,RESIDENTIAL,0.62147,False
+서울특별시,중구,소공동,NIGHTLIFE,0.6655,False
+대구광역시,수성구,황금동,RESIDENTIAL,0.69755,False
+인천광역시,중구,을왕동,TOURIST,0.6587583333333333,False
+울산광역시,남구,신정동,OFFICE,0.65408,False
+서울특별시,동대문구,제기동,OFFICE,0.6252,False
+경상북도,경주시,사정동,TOURIST,0.6624217391304348,False
+서울특별시,마포구,신수동,RESIDENTIAL,0.641,False
+서울특별시,영등포구,신길동,RESIDENTIAL,0.6822333333333334,False
+광주광역시,동구,장동,TOURIST,0.620676923076923,False
+서울특별시,중구,태평로2가,NIGHTLIFE,0.6285866666666667,False
+경기도,시흥시,은행동,RESIDENTIAL,0.7149,False
+부산광역시,동래구,안락동,RESIDENTIAL,0.66745,False
+서울특별시,중구,충무로3가,NIGHTLIFE,0.6285866666666667,False
+경기도,수원시 장안구,정자동,RESIDENTIAL,0.6817333333333333,False
+광주광역시,남구,봉선동,RESIDENTIAL,0.65395,False
+대구광역시,달서구,월성동,RESIDENTIAL,0.739,False
+경기도,성남시 분당구,운중동,OFFICE,0.6531,False
+대구광역시,중구,동문동,RESIDENTIAL,0.6376916666666667,False
+경기도,용인시 수지구,죽전동,RESIDENTIAL,0.7078000000000001,False
+서울특별시,강서구,방화동,OFFICE,0.6577333333333333,False
+인천광역시,연수구,연수동,OFFICE,0.6342666666666666,False
+강원특별자치도,춘천시,퇴계동,CAMPUS,0.6918,False
+세종특별자치시,,나성동,RESIDENTIAL,0.6562708333333334,False
+서울특별시,용산구,동자동,OFFICE,0.62136875,False
+제주특별자치도,제주시,한경면,TOURIST,0.8156,False
+부산광역시,연제구,거제동,RESIDENTIAL,0.674025,False
+제주특별자치도,제주시,아라일동,TOURIST,0.6590692307692307,False
+경기도,부천시 원미구,상동,OFFICE,0.70445,False
+경기도,고양시 덕양구,동산동,RESIDENTIAL,0.6780571428571429,False
+서울특별시,동작구,흑석동,CAMPUS,0.5267,True
+서울특별시,종로구,누하동,TOURIST,0.6479647058823529,False
+충청북도,청주시 서원구,산남동,CAMPUS,0.5911,True
+서울특별시,광진구,능동,NIGHTLIFE,0.6008,False
+서울특별시,종로구,종로5가,NIGHTLIFE,0.67195,False
+경상남도,김해시,장유동,RESIDENTIAL,0.6664666666666667,False
+경기도,화성시,봉담읍,GENERAL,0.3399,False
+서울특별시,금천구,시흥동,RESIDENTIAL,0.5789799999999999,False
+경기도,안양시 동안구,평촌동,RESIDENTIAL,0.7302,False
+대구광역시,북구,동천동,OFFICE,0.6445,False
+서울특별시,종로구,명륜2가,TOURIST,0.6479647058823529,False
+대구광역시,달서구,상인동,RESIDENTIAL,0.6957666666666666,False
+경기도,용인시 수지구,동천동,OFFICE,0.7673,False
+경기도,용인시 기흥구,중동,RESIDENTIAL,0.5946933333333333,False
+강원특별자치도,원주시,반곡동,RESIDENTIAL,0.633348,False
+서울특별시,송파구,오금동,RESIDENTIAL,0.6938,False
+강원특별자치도,원주시,단계동,NIGHTLIFE,0.6719,False
+서울특별시,중구,을지로6가,NIGHTLIFE,0.6743,False
+서울특별시,중구,서소문동,NIGHTLIFE,0.6285866666666667,False
+경기도,김포시,풍무동,RESIDENTIAL,0.6604,False
+서울특별시,은평구,대조동,NIGHTLIFE,0.6282,False
+서울특별시,중구,필동2가,TOURIST,0.6764,False
+울산광역시,동구,일산동,OFFICE,0.6258,False
+충청북도,청주시 흥덕구,가경동,CAMPUS,0.6808,False
+광주광역시,서구,쌍촌동,RESIDENTIAL,0.6426000000000001,False
+충청남도,아산시,탕정면,RESIDENTIAL,0.6381,False
+경기도,김포시,고촌읍,OFFICE,0.6474,False
+서울특별시,성북구,성북동,CAMPUS,0.6155,False
+서울특별시,종로구,내수동,TOURIST,0.6479647058823529,False
+경기도,수원시 권선구,권선동,OFFICE,0.7235,False
+경기도,고양시 일산동구,풍동,OFFICE,0.6957083333333333,False
+인천광역시,남동구,만수동,RESIDENTIAL,0.6730666666666667,False
+경상북도,영덕군,강구면,TOURIST,0.758,False
+경기도,수원시 영통구,신동,RESIDENTIAL,0.6819916666666667,False
+서울특별시,동대문구,이문동,CAMPUS,0.57865,False
+서울특별시,종로구,통의동,TOURIST,0.6479647058823529,False
+대전광역시,서구,관저동,RESIDENTIAL,0.6497999999999999,False
+서울특별시,영등포구,양평동4가,OFFICE,0.6396,False
+인천광역시,서구,당하동,RESIDENTIAL,0.6708,False
+서울특별시,노원구,중계동,RESIDENTIAL,0.6855,False
+서울특별시,영등포구,당산동6가,OFFICE,0.70035,False
+서울특별시,성동구,도선동,RESIDENTIAL,0.6122705882352941,False
+경기도,파주시,동패동,OFFICE,0.6352,False
+부산광역시,중구,부평동2가,TOURIST,0.7045,False
+경상북도,포항시 북구,두호동,OFFICE,0.6311,False
+인천광역시,부평구,삼산동,RESIDENTIAL,0.7238500000000001,False
+서울특별시,종로구,필운동,TOURIST,0.6479647058823529,False
+경기도,광명시,철산동,RESIDENTIAL,0.705425,False
+서울특별시,종로구,세종로,TOURIST,0.6479647058823529,False
+경기도,가평군,설악면,OFFICE,0.6119,False
+서울특별시,중구,충무로2가,NIGHTLIFE,0.6285866666666667,False
+대구광역시,중구,동인동4가,NIGHTLIFE,0.6296,False
+경상남도,창원시 성산구,용호동,RESIDENTIAL,0.625825,False
+경기도,포천시,소흘읍,OFFICE,0.6966,False
+충청북도,청주시 흥덕구,봉명동,CAMPUS,0.6033,False
+전라남도,여수시,학동,TOURIST,0.6336481481481481,False
+서울특별시,종로구,안국동,TOURIST,0.6479647058823529,False
+서울특별시,중구,명동1가,TOURIST,0.6624,False
+경기도,수원시 영통구,망포동,RESIDENTIAL,0.7703,False
+서울특별시,동작구,신대방동,NIGHTLIFE,0.6417999999999999,False
+서울특별시,중구,중림동,OFFICE,0.6127,False
+전라남도,여수시,웅천동,TOURIST,0.6336481481481481,False
+서울특별시,강동구,고덕동,RESIDENTIAL,0.73865,False
+충청북도,청주시 흥덕구,오송읍,CAMPUS,0.6884,False
+부산광역시,해운대구,재송동,OFFICE,0.6515500000000001,False
+경기도,용인시 수지구,성복동,RESIDENTIAL,0.7685,False
+서울특별시,강동구,명일동,RESIDENTIAL,0.7537,False
+대구광역시,달서구,감삼동,RESIDENTIAL,0.663,False
+경기도,남양주시,진접읍,OFFICE,0.6815,False
+경기도,의왕시,학의동,RESIDENTIAL,0.5898,False
+경상남도,거제시,고현동,OFFICE,0.7304,False
+충청북도,청주시 상당구,북문로2가,RESIDENTIAL,0.5930692307692308,False
+서울특별시,성북구,안암동5가,OFFICE,0.6357,False
+인천광역시,부평구,갈산동,OFFICE,0.69235,False
+대구광역시,중구,봉산동,RESIDENTIAL,0.6376916666666667,False
+제주특별자치도,서귀포시,중문동,TOURIST,0.7249,False
+전라남도,목포시,상동,CAMPUS,0.6304,False
+강원특별자치도,속초시,교동,TOURIST,0.6785,False
+경기도,화성시,산척동,RESIDENTIAL,0.6154137931034483,False
+서울특별시,서대문구,남가좌동,CAMPUS,0.5991,False
+서울특별시,동대문구,용두동,CAMPUS,0.5475,True
+서울특별시,중구,회현동1가,TOURIST,0.6598,False
+강원특별자치도,속초시,조양동,TOURIST,0.6927,False
+서울특별시,서대문구,홍제동,RESIDENTIAL,0.6263333333333333,False
+광주광역시,북구,용봉동,CAMPUS,0.5859,True
+경기도,고양시 일산동구,식사동,RESIDENTIAL,0.6556,False
+서울특별시,종로구,종로1가,NIGHTLIFE,0.67195,False
+전라남도,나주시,빛가람동,TOURIST,0.633,False
+대구광역시,수성구,상동,GENERAL,0.3968,False
+서울특별시,종로구,내자동,TOURIST,0.6479647058823529,False
+서울특별시,종로구,삼청동,TOURIST,0.7143,False
+경기도,광명시,하안동,RESIDENTIAL,0.7088,False
+서울특별시,중구,남창동,NIGHTLIFE,0.6285866666666667,False
+경기도,용인시 수지구,고기동,RESIDENTIAL,0.7381909090909091,False
+부산광역시,부산진구,양정동,OFFICE,0.61545,False
+충청남도,천안시 서북구,성정동,NIGHTLIFE,0.6516,False
+부산광역시,금정구,구서동,CAMPUS,0.6612,False
+강원특별자치도,속초시,대포동,TOURIST,0.7223,False
+충청북도,충주시,연수동,OFFICE,0.7281,False
+경상남도,진주시,가좌동,GENERAL,0.5770700000000001,False
+경기도,화성시,남양읍,OFFICE,0.6638,False
+전라남도,순천시,조례동,TOURIST,0.589225,False
+경기도,성남시 분당구,금곡동,OFFICE,0.7522,False
+세종특별자치시,,어진동,RESIDENTIAL,0.6562708333333334,False
+경기도,하남시,덕풍동,RESIDENTIAL,0.7212,False
+경상남도,김해시,삼계동,OFFICE,0.6030842105263158,False
+서울특별시,종로구,부암동,PREMIUM,0.5506,False
+서울특별시,도봉구,쌍문동,RESIDENTIAL,0.59685,False
+서울특별시,중랑구,묵동,CAMPUS,0.5710999999999999,False
+경기도,부천시,중동,RESIDENTIAL,0.6560892857142857,False
+경상남도,창원시 마산회원구,양덕동,RESIDENTIAL,0.61225,False
+경기도,파주시,목동동,OFFICE,0.6352,False
+대전광역시,서구,만년동,CAMPUS,0.5158,True
+대구광역시,달성군,유가읍,CAMPUS,0.6804,False
+서울특별시,성북구,정릉동,CAMPUS,0.623325,False
+대구광역시,북구,고성동3가,GENERAL,0.4203,True
+제주특별자치도,서귀포시,남원읍,TOURIST,0.7533,False
+대구광역시,달서구,진천동,RESIDENTIAL,0.6886,False
+서울특별시,종로구,신문로2가,TOURIST,0.6479647058823529,False
+제주특별자치도,서귀포시,법환동,TOURIST,0.6778235294117647,False
+대구광역시,수성구,만촌동,RESIDENTIAL,0.7386333333333334,False
+경기도,이천시,창전동,TOURIST,0.6549,False
+경상북도,포항시 남구,오천읍,TOURIST,0.6364,False
+세종특별자치시,,조치원읍,RESIDENTIAL,0.6562708333333334,False
+서울특별시,중구,인현동1가,NIGHTLIFE,0.6285866666666667,False
+울산광역시,남구,무거동,TOURIST,0.6443,False
+경기도,용인시 처인구,양지면,RESIDENTIAL,0.6022,False
+제주특별자치도,제주시,일도이동,TOURIST,0.6590692307692307,False
+서울특별시,관악구,남현동,NIGHTLIFE,0.6044,False
+서울특별시,종로구,신문로1가,TOURIST,0.6479647058823529,False
+경상남도,김해시,관동동,OFFICE,0.6030842105263158,False
+서울특별시,성북구,길음동,RESIDENTIAL,0.6931,False
+경기도,안산시 단원구,대부북동,OFFICE,0.7033416666666668,False
+서울특별시,중구,흥인동,NIGHTLIFE,0.6285866666666667,False
+서울특별시,강서구,내발산동,RESIDENTIAL,0.659675,False
+경기도,남양주시,호평동,OFFICE,0.6801,False
+인천광역시,연수구,옥련동,TOURIST,0.63585,False
+서울특별시,강남구,자곡동,RESIDENTIAL,0.6700681818181818,False
+서울특별시,종로구,돈의동,TOURIST,0.6479647058823529,False
+제주특별자치도,제주시,건입동,TOURIST,0.6939,False
+서울특별시,강동구,암사동,RESIDENTIAL,0.6869,False
+서울특별시,성동구,하왕십리동,RESIDENTIAL,0.6122705882352941,False
+서울특별시,종로구,권농동,TOURIST,0.6479647058823529,False
+울산광역시,중구,태화동,RESIDENTIAL,0.6295,False
+대구광역시,달서구,두류동,NIGHTLIFE,0.6113500000000001,False
+대전광역시,유성구,지족동,RESIDENTIAL,0.6262846153846154,False
+경기도,고양시 덕양구,성사동,OFFICE,0.67735,False
+충청남도,천안시 동남구,청당동,GENERAL,0.5534235294117648,False
+부산광역시,중구,부평동1가,TOURIST,0.7045,False
+울산광역시,북구,송정동,RESIDENTIAL,0.669,False
+경기도,고양시 덕양구,원흥동,RESIDENTIAL,0.6780571428571429,False
+경기도,파주시,금촌동,OFFICE,0.6894,False
+경기도,화성시,새솔동,RESIDENTIAL,0.669,False
+서울특별시,서대문구,충정로3가,RESIDENTIAL,0.6118857142857143,False
+대구광역시,수성구,지산동,OFFICE,0.62835,False
+서울특별시,도봉구,방학동,RESIDENTIAL,0.6351333333333334,False
+경기도,광주시,곤지암읍,TOURIST,0.7247,False
+대구광역시,북구,칠성동2가,OFFICE,0.6068,False
+서울특별시,은평구,녹번동,OFFICE,0.627,False
+경기도,안양시 동안구,비산동,RESIDENTIAL,0.7227666666666667,False
+경기도,성남시 수정구,신흥동,NIGHTLIFE,0.6957333333333334,False
+서울특별시,중구,수하동,NIGHTLIFE,0.6285866666666667,False
+경기도,양평군,서종면,TOURIST,0.7882,False
+경기도,평택시,죽백동,OFFICE,0.657788,False
+강원특별자치도,강릉시,포남동,OFFICE,0.6386499999999999,False
+경상남도,창원시 의창구,중동,GENERAL,0.5170714285714285,False
+부산광역시,서구,암남동,TOURIST,0.7237,False
+서울특별시,영등포구,당산동1가,OFFICE,0.70035,False
+경기도,의정부시,호원동,OFFICE,0.6396,False
+경기도,용인시 처인구,김량장동,RESIDENTIAL,0.6186071428571428,False
+경기도,이천시,부발읍,OFFICE,0.691,False
+서울특별시,은평구,불광동,NIGHTLIFE,0.6245499999999999,False
+전라남도,여수시,돌산읍,TOURIST,0.7593,False
+서울특별시,중구,무교동,NIGHTLIFE,0.6285866666666667,False
+경기도,고양시 일산동구,마두동,RESIDENTIAL,0.7238,False
+서울특별시,성동구,금호동4가,RESIDENTIAL,0.6231333333333334,False
+경기도,파주시,문산읍,OFFICE,0.6598,False
+경기도,고양시 덕양구,지축동,RESIDENTIAL,0.6780571428571429,False
+광주광역시,서구,화정동,RESIDENTIAL,0.698,False
+경기도,오산시,원동,OFFICE,0.6421375,False
+대구광역시,수성구,신매동,RESIDENTIAL,0.6784826086956521,False
+서울특별시,종로구,평창동,CAMPUS,0.5589,False
+전라남도,담양군,담양읍,TOURIST,0.7194,False
+서울특별시,동대문구,답십리동,CAMPUS,0.60015,False
+서울특별시,성동구,금호동3가,RESIDENTIAL,0.6231333333333334,False
+대구광역시,남구,봉덕동,CAMPUS,0.6145333333333333,False
+경기도,평택시,평택동,OFFICE,0.657788,False
+서울특별시,영등포구,문래동4가,OFFICE,0.6908,False
+강원특별자치도,원주시,지정면,RESIDENTIAL,0.6486,False
+전북특별자치도,전주시 완산구,효자동2가,RESIDENTIAL,0.6374,False
+서울특별시,성북구,삼선동5가,CAMPUS,0.6278,False
+충청남도,태안군,안면읍,TOURIST,0.7608,False
+경기도,수원시 권선구,호매실동,RESIDENTIAL,0.7003,False
+대구광역시,북구,산격동,OFFICE,0.5716749999999999,False
+부산광역시,남구,문현동,OFFICE,0.6278,False
+대구광역시,중구,남산동,RESIDENTIAL,0.639675,False
+대전광역시,중구,은행동,RESIDENTIAL,0.5973117647058823,False
+대전광역시,유성구,궁동,RESIDENTIAL,0.6262846153846154,False
+경상남도,김해시,내동,OFFICE,0.6030842105263158,False
+경기도,안산시 상록구,사동,OFFICE,0.6781,False
+경상북도,구미시,원평동,TOURIST,0.6777,False
+부산광역시,동구,범일동,TOURIST,0.6498666666666667,False
+부산광역시,수영구,수영동,OFFICE,0.6311,False
+서울특별시,은평구,역촌동,RESIDENTIAL,0.6755,False
+부산광역시,수영구,망미동,RESIDENTIAL,0.6833,False
+광주광역시,남구,진월동,RESIDENTIAL,0.7076,False
+충청남도,천안시 서북구,쌍용동,RESIDENTIAL,0.6496666666666667,False
+대전광역시,중구,선화동,RESIDENTIAL,0.5973117647058823,False
+경기도,안성시,공도읍,OFFICE,0.6369,False
+서울특별시,용산구,보광동,OFFICE,0.6515,False
+경상남도,창원시 진해구,석동,RESIDENTIAL,0.6538,False
+제주특별자치도,제주시,용담이동,TOURIST,0.6590692307692307,False
+전라남도,여수시,중앙동,TOURIST,0.7268,False
+서울특별시,중구,인현동2가,NIGHTLIFE,0.6285866666666667,False
+강원특별자치도,속초시,중앙동,TOURIST,0.7047875,False
+강원특별자치도,강릉시,송정동,TOURIST,0.731,False
+부산광역시,기장군,장안읍,OFFICE,0.6651,False
+서울특별시,종로구,수송동,TOURIST,0.6479647058823529,False
+대구광역시,중구,삼덕동2가,NIGHTLIFE,0.6647,False
+대전광역시,유성구,죽동,RESIDENTIAL,0.6262846153846154,False
+부산광역시,기장군,철마면,GENERAL,0.3963,False
+경기도,고양시 덕양구,삼송동,OFFICE,0.7112499999999999,False
+경기도,용인시 기흥구,구갈동,RESIDENTIAL,0.6122,False
+울산광역시,북구,매곡동,RESIDENTIAL,0.6740625,False
+서울특별시,서대문구,북가좌동,RESIDENTIAL,0.6398999999999999,False
+서울특별시,송파구,장지동,OFFICE,0.7408,False
+강원특별자치도,춘천시,석사동,CAMPUS,0.6653,False
+경기도,용인시 수지구,신봉동,RESIDENTIAL,0.7427,False
+경기도,수원시 권선구,서둔동,GENERAL,0.4197,True
+제주특별자치도,제주시,용담일동,TOURIST,0.6590692307692307,False
+경기도,용인시 기흥구,고매동,RESIDENTIAL,0.5946933333333333,False
+광주광역시,서구,금호동,RESIDENTIAL,0.65525,False
+경기도,수원시 팔달구,매산로2가,RESIDENTIAL,0.6567700000000001,False
+제주특별자치도,서귀포시,강정동,TOURIST,0.6778235294117647,False
+경상남도,김해시,외동,OFFICE,0.6030842105263158,False
+경기도,평택시,서정동,OFFICE,0.7029,False
+경기도,남양주시,조안면,TOURIST,0.7266,False
+대전광역시,서구,괴정동,OFFICE,0.6424,False
+경기도,화성시,진안동,RESIDENTIAL,0.646,False
+경기도,성남시 수정구,시흥동,OFFICE,0.6427,False
+강원특별자치도,평창군,봉평면,TOURIST,0.7716,False
+서울특별시,중구,정동,NIGHTLIFE,0.6285866666666667,False
+경상북도,포항시 북구,장성동,OFFICE,0.64818,False
+서울특별시,종로구,숭인동,TOURIST,0.6276999999999999,False
+인천광역시,부평구,청천동,OFFICE,0.62385,False
+서울특별시,강남구,세곡동,RESIDENTIAL,0.747,False
+서울특별시,종로구,혜화동,CAMPUS,0.6306,False
+서울특별시,강북구,번동,CAMPUS,0.5495,False
+제주특별자치도,서귀포시,서홍동,TOURIST,0.6371,False
+서울특별시,구로구,개봉동,RESIDENTIAL,0.6473333333333334,False
+서울특별시,성북구,하월곡동,RESIDENTIAL,0.6272,False
+전북특별자치도,전주시 덕진구,송천동2가,RESIDENTIAL,0.61995,False
+전라남도,순천시,연향동,TOURIST,0.589225,False
+서울특별시,종로구,운니동,TOURIST,0.6479647058823529,False
+서울특별시,용산구,갈월동,OFFICE,0.62136875,False
+경기도,광주시,경안동,OFFICE,0.6261,False
+서울특별시,종로구,소격동,TOURIST,0.6479647058823529,False
+서울특별시,구로구,고척동,OFFICE,0.6469499999999999,False
+인천광역시,서구,석남동,OFFICE,0.6925666666666667,False
+전라남도,순천시,왕지동,TOURIST,0.589225,False
+제주특별자치도,서귀포시,동홍동,RESIDENTIAL,0.6387,False
+경기도,양주시,장흥면,TOURIST,0.7202,False
+경기도,시흥시,대야동,OFFICE,0.6518,False
+강원특별자치도,고성군,토성면,TOURIST,0.7536,False
+경기도,안산시 단원구,선부동,OFFICE,0.7066333333333333,False
+대구광역시,북구,침산동,RESIDENTIAL,0.5889333333333333,False
+경기도,평택시,합정동,OFFICE,0.657788,False
+서울특별시,용산구,용문동,CAMPUS,0.5309,True
+서울특별시,양천구,신월동,RESIDENTIAL,0.6530142857142858,False
+경상남도,창원시 성산구,중앙동,OFFICE,0.6545,False
+인천광역시,부평구,십정동,OFFICE,0.65095,False
+경기도,과천시,갈현동,RESIDENTIAL,0.7291,False
+충청북도,청주시 서원구,분평동,RESIDENTIAL,0.6468,False
+서울특별시,용산구,청파동2가,CAMPUS,0.6319,False
+경기도,평택시,용이동,RESIDENTIAL,0.6096,False
+충청남도,천안시 동남구,신방동,GENERAL,0.4171,True
+경상남도,김해시,대청동,OFFICE,0.6030842105263158,False
+부산광역시,부산진구,범천동,OFFICE,0.6561,False
+경기도,용인시 기흥구,영덕동,RESIDENTIAL,0.6832,False
+서울특별시,용산구,용산동3가,PREMIUM,0.6721,False
+전라남도,순천시,해룡면,OFFICE,0.6288,False
+충청남도,아산시,배방읍,OFFICE,0.6082,False
+충청남도,보령시,신흑동,TOURIST,0.582875,False
+제주특별자치도,제주시,용담삼동,TOURIST,0.6590692307692307,False
+경상북도,구미시,산동읍,RESIDENTIAL,0.6527,False
+광주광역시,서구,마륵동,RESIDENTIAL,0.6426000000000001,False
+대구광역시,달서구,이곡동,OFFICE,0.6185,False
+서울특별시,중랑구,중화동,NIGHTLIFE,0.6045,False
+대구광역시,동구,신암동,RESIDENTIAL,0.6208400000000001,False
+전북특별자치도,전주시 완산구,고사동,RESIDENTIAL,0.6488894736842105,False
+경기도,화성시,능동,RESIDENTIAL,0.6154137931034483,False
+충청북도,청주시 흥덕구,강서동,CAMPUS,0.6354500000000001,False
+경기도,안산시 상록구,이동,OFFICE,0.6818,False
+서울특별시,종로구,관수동,TOURIST,0.6479647058823529,False
+서울특별시,서대문구,냉천동,RESIDENTIAL,0.6118857142857143,False
+경기도,광주시,남한산성면,TOURIST,0.7868,False
+서울특별시,중구,을지로4가,NIGHTLIFE,0.6743,False
+부산광역시,사하구,괴정동,RESIDENTIAL,0.649625,False
+경기도,안산시 상록구,본오동,OFFICE,0.6553,False
+경기도,용인시 처인구,포곡읍,GENERAL,0.3759,False
+강원특별자치도,양양군,강현면,TOURIST,0.7782,False
+제주특별자치도,제주시,일도일동,TOURIST,0.6590692307692307,False
+전라남도,광양시,광양읍,TOURIST,0.6731,False
+인천광역시,중구,덕교동,TOURIST,0.6587583333333333,False
+서울특별시,성동구,금호동1가,RESIDENTIAL,0.6231333333333334,False
+충청남도,서산시,읍내동,GENERAL,0.5169066666666666,False
+경기도,하남시,미사동,RESIDENTIAL,0.7276666666666666,False
+경기도,의정부시,신곡동,RESIDENTIAL,0.64845,False
+서울특별시,용산구,청파동3가,CAMPUS,0.6319,False
+울산광역시,북구,진장동,RESIDENTIAL,0.6740625,False
+강원특별자치도,춘천시,동내면,GENERAL,0.4048,True
+경기도,하남시,창우동,RESIDENTIAL,0.6532928571428572,False
+대구광역시,중구,문화동,RESIDENTIAL,0.6376916666666667,False
+경기도,광명시,광명동,RESIDENTIAL,0.6688714285714286,False
+강원특별자치도,속초시,동명동,TOURIST,0.712,False
+강원특별자치도,속초시,영랑동,TOURIST,0.73,False
+경기도,고양시 덕양구,행신동,RESIDENTIAL,0.717325,False
+서울특별시,종로구,창성동,TOURIST,0.6479647058823529,False
+인천광역시,강화군,강화읍,OFFICE,0.7134,False
+제주특별자치도,서귀포시,대포동,TOURIST,0.6778235294117647,False
+울산광역시,북구,명촌동,RESIDENTIAL,0.6740625,False
+서울특별시,종로구,공평동,TOURIST,0.6479647058823529,False
+경상남도,창원시 진해구,용원동,RESIDENTIAL,0.6121846153846154,False
+강원특별자치도,원주시,단구동,RESIDENTIAL,0.618,False
+대구광역시,동구,효목동,RESIDENTIAL,0.63225,False
+대전광역시,유성구,원신흥동,RESIDENTIAL,0.628,False
+경기도,시흥시,물왕동,RESIDENTIAL,0.638325,False
+울산광역시,울주군,서생면,TOURIST,0.7644,False
+서울특별시,마포구,창전동,CAMPUS,0.61548125,False
+경기도,수원시 팔달구,화서동,RESIDENTIAL,0.65055,False
+인천광역시,계양구,작전동,OFFICE,0.6557999999999999,False
+서울특별시,중랑구,망우동,OFFICE,0.62435,False
+서울특별시,성북구,석관동,RESIDENTIAL,0.62,False
+대구광역시,중구,종로1가,RESIDENTIAL,0.6376916666666667,False
+인천광역시,강화군,화도면,TOURIST,0.804,False
+강원특별자치도,강릉시,성남동,TOURIST,0.6762,False
+서울특별시,영등포구,양평동2가,OFFICE,0.6396,False
+울산광역시,북구,호계동,RESIDENTIAL,0.6740625,False
+서울특별시,성동구,홍익동,RESIDENTIAL,0.6122705882352941,False
+대전광역시,중구,오류동,OFFICE,0.6296,False
+대구광역시,북구,태전동,OFFICE,0.6892,False
+경상북도,경주시,용강동,OFFICE,0.6491,False
+경기도,부천시 원미구,심곡동,NIGHTLIFE,0.6555333333333334,False
+대구광역시,달서구,본리동,RESIDENTIAL,0.6524,False
+서울특별시,성북구,동소문동2가,RESIDENTIAL,0.6272,False
+경상북도,구미시,송정동,OFFICE,0.6061,False
+서울특별시,종로구,종로6가,NIGHTLIFE,0.67195,False
+부산광역시,중구,중앙동4가,TOURIST,0.6961,False
+서울특별시,중구,장충동1가,PREMIUM,0.618,False
+강원특별자치도,평창군,대관령면,TOURIST,0.7336,False
+경상북도,포항시 북구,양덕동,OFFICE,0.64818,False
+경기도,고양시 덕양구,향동동,RESIDENTIAL,0.6780571428571429,False
+경기도,구리시,갈매동,CAMPUS,0.6367,False
+서울특별시,영등포구,당산동4가,OFFICE,0.70035,False
+서울특별시,강동구,둔촌동,RESIDENTIAL,0.7035499999999999,False
+부산광역시,사하구,당리동,RESIDENTIAL,0.6455,False
+경기도,과천시,중앙동,RESIDENTIAL,0.6752,False
+제주특별자치도,제주시,도남동,TOURIST,0.6590692307692307,False
+서울특별시,용산구,서계동,OFFICE,0.62136875,False
+강원특별자치도,강릉시,주문진읍,TOURIST,0.7201,False
+경기도,고양시 덕양구,신원동,RESIDENTIAL,0.6780571428571429,False
+대전광역시,서구,월평동,OFFICE,0.6352000000000001,False
+대구광역시,중구,종로2가,RESIDENTIAL,0.6376916666666667,False
+인천광역시,미추홀구,관교동,RESIDENTIAL,0.6141,False
+부산광역시,금정구,부곡동,RESIDENTIAL,0.6633,False
+충청북도,충주시,호암동,OFFICE,0.592624,False
+충청남도,홍성군,홍북읍,OFFICE,0.6699,False
+강원특별자치도,속초시,노학동,TOURIST,0.6493,False
+경상남도,김해시,주촌면,RESIDENTIAL,0.6579,False
+경기도,화성시,목동,RESIDENTIAL,0.6154137931034483,False
+부산광역시,사상구,주례동,CAMPUS,0.5977666666666667,True
+대구광역시,달서구,신당동,OFFICE,0.6319,False
+경기도,파주시,문발동,OFFICE,0.6352,False
+제주특별자치도,제주시,우도면,TOURIST,0.7995,False
+서울특별시,영등포구,양평동5가,OFFICE,0.6396,False
+부산광역시,부산진구,개금동,RESIDENTIAL,0.6383333333333333,False
+대구광역시,달서구,장기동,RESIDENTIAL,0.635,False
+서울특별시,종로구,원서동,TOURIST,0.6479647058823529,False
+경기도,고양시 일산서구,덕이동,OFFICE,0.7397,False
+경상북도,경산시,옥산동,GENERAL,0.5529666666666666,False
+경기도,이천시,중리동,TOURIST,0.6432,False
+강원특별자치도,춘천시,신북읍,RESIDENTIAL,0.6658,False
+경기도,가평군,청평면,TOURIST,0.7439,False
+경기도,수원시 권선구,곡반정동,OFFICE,0.6592333333333333,False
+서울특별시,성북구,종암동,OFFICE,0.6185,False
+서울특별시,서대문구,홍은동,RESIDENTIAL,0.5912,False
+울산광역시,울주군,범서읍,RESIDENTIAL,0.6301,False
+경상남도,양산시,동면,RESIDENTIAL,0.6241,False
+서울특별시,종로구,종로2가,NIGHTLIFE,0.67195,False
+경기도,광명시,소하동,OFFICE,0.67875,False
+대구광역시,중구,교동,RESIDENTIAL,0.6376916666666667,False
+부산광역시,사하구,다대동,OFFICE,0.63975,False
+인천광역시,남동구,간석동,OFFICE,0.669675,False
+충청남도,천안시 서북구,성성동,RESIDENTIAL,0.6481642857142857,False
+서울특별시,영등포구,영등포동7가,OFFICE,0.67855,False
+경기도,하남시,풍산동,RESIDENTIAL,0.6532928571428572,False
+전라남도,목포시,옥암동,TOURIST,0.6462,False
+인천광역시,남동구,서창동,RESIDENTIAL,0.6718,False
+인천광역시,부평구,산곡동,RESIDENTIAL,0.7717,False
+인천광역시,서구,심곡동,RESIDENTIAL,0.6725869565217392,False
+서울특별시,노원구,월계동,CAMPUS,0.5288666666666667,True
+경상북도,구미시,진평동,RESIDENTIAL,0.576092,False
+인천광역시,강화군,길상면,TOURIST,0.7513,False
+대구광역시,서구,평리동,RESIDENTIAL,0.59195,False
+부산광역시,중구,남포동2가,TOURIST,0.7045,False
+제주특별자치도,제주시,이도일동,TOURIST,0.6590692307692307,False
+인천광역시,서구,마전동,RESIDENTIAL,0.6891,False
+경상북도,포항시 북구,죽도동,NIGHTLIFE,0.6797,False
+경기도,포천시,이동면,TOURIST,0.7422,False
+경기도,양주시,만송동,GENERAL,0.57445,False
+경기도,시흥시,장곡동,RESIDENTIAL,0.7194,False
+경기도,가평군,상면,GENERAL,0.268,False
+경상남도,창원시 의창구,사림동,GENERAL,0.5170714285714285,False
+경상남도,진주시,하대동,RESIDENTIAL,0.6092,False
+경상남도,창원시 마산회원구,합성동,GENERAL,0.5309,False
+서울특별시,강서구,공항동,OFFICE,0.6611,False
+경상남도,양산시,중부동,OFFICE,0.5939384615384615,False
+서울특별시,종로구,가회동,TOURIST,0.7305,False
+광주광역시,서구,농성동,RESIDENTIAL,0.6160000000000001,False
+인천광역시,중구,신포동,OFFICE,0.6877,False
+경기도,평택시,포승읍,OFFICE,0.6859,False
+울산광역시,남구,옥동,RESIDENTIAL,0.6468,False
+경기도,파주시,서패동,OFFICE,0.6352,False
+제주특별자치도,제주시,도두일동,TOURIST,0.6590692307692307,False
+대구광역시,중구,덕산동,RESIDENTIAL,0.6376916666666667,False
+충청남도,서산시,예천동,GENERAL,0.5169066666666666,False
+경상남도,창원시 마산합포구,산호동,OFFICE,0.6497,False
+경상남도,거제시,상동동,TOURIST,0.63465,False
+경상북도,구미시,옥계동,RESIDENTIAL,0.576092,False
+강원특별자치도,춘천시,후평동,CAMPUS,0.6298333333333334,False
+제주특별자치도,서귀포시,상예동,TOURIST,0.6778235294117647,False
+서울특별시,중구,순화동,NIGHTLIFE,0.6285866666666667,False
+경기도,화성시,반월동,RESIDENTIAL,0.6469,False
+제주특별자치도,서귀포시,서호동,TOURIST,0.6778235294117647,False
+경기도,평택시,팽성읍,OFFICE,0.6612,False
+경기도,이천시,마장면,GENERAL,0.3712999999999999,False
+대전광역시,대덕구,송촌동,GENERAL,0.4124,True
+부산광역시,중구,중앙동7가,TOURIST,0.6961,False
+서울특별시,종로구,서린동,TOURIST,0.6479647058823529,False
+경기도,군포시,당동,RESIDENTIAL,0.6526333333333333,False
+경상북도,포항시 남구,이동,TOURIST,0.6762642857142858,False
+서울특별시,중랑구,신내동,RESIDENTIAL,0.64085,False
+서울특별시,중구,충무로4가,NIGHTLIFE,0.6285866666666667,False
+경기도,수원시 팔달구,고등동,OFFICE,0.6754,False
+경기도,평택시,동삭동,RESIDENTIAL,0.6912,False
+경상북도,경산시,사동,GENERAL,0.5529666666666666,False
+경기도,용인시 처인구,모현읍,CAMPUS,0.6302,False
+서울특별시,성동구,용답동,CAMPUS,0.5185,True
+서울특별시,송파구,거여동,RESIDENTIAL,0.7112,False
+경기도,수원시 장안구,송죽동,RESIDENTIAL,0.6031,False
+서울특별시,종로구,옥인동,TOURIST,0.6479647058823529,False
+경기도,안양시 만안구,석수동,GENERAL,0.51245,False
+경상북도,칠곡군,동명면,TOURIST,0.7454,False
+경기도,고양시 덕양구,도내동,RESIDENTIAL,0.6780571428571429,False
+경기도,수원시 팔달구,우만동,RESIDENTIAL,0.63105,False
+충청남도,당진시,읍내동,GENERAL,0.5622499999999999,False
+경기도,양평군,옥천면,TOURIST,0.7332,False
+경기도,용인시 기흥구,신갈동,GENERAL,0.4022,True
+대전광역시,유성구,상대동,RESIDENTIAL,0.6316,False
+경상남도,거제시,아주동,OFFICE,0.6552,False
+서울특별시,용산구,효창동,CAMPUS,0.5141,False
+서울특별시,종로구,사직동,NIGHTLIFE,0.6546,False
+제주특별자치도,제주시,아라이동,TOURIST,0.6590692307692307,False
+경기도,하남시,감일동,RESIDENTIAL,0.6872,False
+경기도,수원시 팔달구,남수동,RESIDENTIAL,0.6567700000000001,False
+서울특별시,성북구,장위동,CAMPUS,0.5506666666666667,True
+경상남도,진주시,초전동,GENERAL,0.5770700000000001,False
+전라남도,화순군,화순읍,CAMPUS,0.6063,False
+서울특별시,영등포구,당산동5가,OFFICE,0.70035,False
+전라남도,광양시,중동,GENERAL,0.5718416666666667,False
+부산광역시,동구,수정동,TOURIST,0.646975,False
+경기도,구리시,인창동,RESIDENTIAL,0.6794,False
+대구광역시,동구,율하동,RESIDENTIAL,0.6195090909090909,False
+서울특별시,마포구,아현동,RESIDENTIAL,0.6148,False
+전라남도,무안군,삼향읍,RESIDENTIAL,0.6037,False
+서울특별시,마포구,마포동,CAMPUS,0.61548125,False
+대구광역시,북구,학정동,OFFICE,0.6005695652173914,False
+서울특별시,도봉구,도봉동,OFFICE,0.7062999999999999,False
+울산광역시,울주군,삼남읍,OFFICE,0.6331,False
+세종특별자치시,,보람동,RESIDENTIAL,0.6562708333333334,False
+서울특별시,종로구,인사동,TOURIST,0.6479647058823529,False
+울산광역시,울주군,언양읍,OFFICE,0.6261,False
+서울특별시,중구,광희동1가,NIGHTLIFE,0.6504,False
+경기도,수원시 권선구,구운동,RESIDENTIAL,0.6081,False
+강원특별자치도,강릉시,사천면,TOURIST,0.7673,False
+경상북도,경주시,황성동,RESIDENTIAL,0.6179,False
+전라남도,여수시,봉산동,TOURIST,0.6336481481481481,False
+서울특별시,동대문구,청량리동,NIGHTLIFE,0.6165,False
+전라남도,여수시,종화동,TOURIST,0.6336481481481481,False
+경상남도,남해군,삼동면,TOURIST,0.7878,False
+서울특별시,중구,주교동,NIGHTLIFE,0.6285866666666667,False
+경상남도,합천군,삼가면,RESIDENTIAL,0.6673,False
+강원특별자치도,강릉시,견소동,TOURIST,0.6762,False
+경기도,김포시,대곶면,OFFICE,0.7081,False
+전라남도,구례군,구례읍,TOURIST,0.7028,False
+경기도,이천시,증포동,RESIDENTIAL,0.6406,False
+강원특별자치도,강릉시,홍제동,GENERAL,0.3677,False
+울산광역시,중구,성남동,RESIDENTIAL,0.5905333333333334,False
+대구광역시,달서구,용산동,OFFICE,0.68355,False
+경기도,수원시 권선구,세류동,OFFICE,0.7068333333333333,False
+경상북도,포항시 북구,흥해읍,OFFICE,0.6207,False
+전북특별자치도,전주시 완산구,다가동4가,RESIDENTIAL,0.6488894736842105,False
+서울특별시,동작구,대방동,RESIDENTIAL,0.689,False
+경기도,화성시,석우동,RESIDENTIAL,0.6154137931034483,False
+경상남도,창원시 의창구,도계동,GENERAL,0.5170714285714285,False
+경상남도,거제시,옥포동,TOURIST,0.71355,False
+대구광역시,달서구,호산동,RESIDENTIAL,0.6645130434782608,False
+경기도,양평군,용문면,OFFICE,0.6334,False
+경기도,수원시 장안구,영화동,TOURIST,0.6618,False
+충청북도,청주시 서원구,사창동,CAMPUS,0.6421,False
+경기도,오산시,궐동,OFFICE,0.6421375,False
+경기도,남양주시,평내동,RESIDENTIAL,0.6863,False
+경기도,안산시 단원구,원곡동,OFFICE,0.7486,False
+경기도,광주시,역동,GENERAL,0.58930625,False
+경기도,동두천시,지행동,GENERAL,0.5643375,False
+경상남도,창원시 마산합포구,해운동,TOURIST,0.5817,False
+서울특별시,영등포구,대림동,OFFICE,0.6479666666666667,False
+경기도,고양시 일산서구,주엽동,RESIDENTIAL,0.75015,False
+서울특별시,노원구,하계동,RESIDENTIAL,0.66785,False
+대구광역시,수성구,중동,RESIDENTIAL,0.6429,False
+대전광역시,대덕구,중리동,CAMPUS,0.6249,False
+서울특별시,강북구,우이동,OFFICE,0.6115,False
+강원특별자치도,동해시,천곡동,OFFICE,0.6723,False
+경기도,화성시,안녕동,RESIDENTIAL,0.6154137931034483,False
+강원특별자치도,강릉시,임당동,TOURIST,0.6762,False
+부산광역시,부산진구,당감동,RESIDENTIAL,0.6545333333333333,False
+경기도,평택시,이충동,OFFICE,0.657788,False
+인천광역시,미추홀구,학익동,OFFICE,0.648,False
+서울특별시,중구,만리동1가,NIGHTLIFE,0.6285866666666667,False
+대구광역시,북구,복현동,RESIDENTIAL,0.647,False
+서울특별시,중구,무학동,NIGHTLIFE,0.6285866666666667,False
+강원특별자치도,춘천시,동면,RESIDENTIAL,0.6033,False
+서울특별시,성북구,성북동1가,CAMPUS,0.6155,False
+대전광역시,유성구,문지동,RESIDENTIAL,0.6262846153846154,False
+서울특별시,마포구,노고산동,CAMPUS,0.61548125,False
+제주특별자치도,제주시,오라이동,TOURIST,0.6590692307692307,False
+경기도,광주시,신현동,RESIDENTIAL,0.6281,False
+서울특별시,구로구,오류동,CAMPUS,0.56135,False
+서울특별시,서초구,신원동,RESIDENTIAL,0.6613722222222223,False
+광주광역시,남구,양림동,RESIDENTIAL,0.6334,False
+경기도,광주시,초월읍,GENERAL,0.3091,False
+경기도,동두천시,생연동,GENERAL,0.48019999999999996,False
+강원특별자치도,홍천군,홍천읍,TOURIST,0.6955,False
+경상남도,남해군,미조면,TOURIST,0.7396,False
+서울특별시,종로구,사간동,TOURIST,0.6479647058823529,False
+경기도,파주시,광탄면,GENERAL,0.2709,False
+전북특별자치도,전주시 완산구,교동,RESIDENTIAL,0.6488894736842105,False
+경상남도,김해시,율하동,OFFICE,0.6030842105263158,False
+서울특별시,강서구,염창동,RESIDENTIAL,0.6898,False
+경기도,성남시 수정구,태평동,NIGHTLIFE,0.657475,False
+서울특별시,서대문구,미근동,RESIDENTIAL,0.6118857142857143,False
+충청북도,청주시 상당구,서문동,RESIDENTIAL,0.5930692307692308,False
+부산광역시,영도구,청학동,TOURIST,0.7137,False
+부산광역시,해운대구,반여동,RESIDENTIAL,0.7174,False
+경상북도,김천시,율곡동,OFFICE,0.6376,False
+경기도,평택시,안중읍,OFFICE,0.6869,False
+경상남도,김해시,삼방동,OFFICE,0.6030842105263158,False
+대전광역시,유성구,반석동,RESIDENTIAL,0.6262846153846154,False
+충청북도,청주시 서원구,남이면,GENERAL,0.3838,False
+서울특별시,성동구,송정동,CAMPUS,0.5554,True
+경상남도,거제시,일운면,TOURIST,0.7395,False
+경상북도,경주시,노동동,TOURIST,0.6624217391304348,False
+경상남도,창원시 성산구,대원동,RESIDENTIAL,0.625825,False
+전북특별자치도,익산시,모현동1가,CAMPUS,0.6733,False
+서울특별시,성북구,동소문동5가,RESIDENTIAL,0.6272,False
+충청남도,아산시,모종동,OFFICE,0.601864705882353,False
+경기도,수원시 장안구,조원동,RESIDENTIAL,0.6384,False
+충청남도,당진시,수청동,GENERAL,0.5622499999999999,False
+대구광역시,중구,동성로2가,RESIDENTIAL,0.6376916666666667,False
+경상남도,진주시,칠암동,GENERAL,0.5770700000000001,False
+대전광역시,유성구,어은동,RESIDENTIAL,0.6262846153846154,False
+서울특별시,중구,을지로1가,NIGHTLIFE,0.6743,False
+대구광역시,동구,봉무동,RESIDENTIAL,0.6195090909090909,False
+광주광역시,북구,두암동,CAMPUS,0.6359,False
+서울특별시,서대문구,충정로2가,RESIDENTIAL,0.6118857142857143,False
+강원특별자치도,태백시,황지동,TOURIST,0.7226,False
+경상남도,거제시,장목면,TOURIST,0.7977,False
+서울특별시,동작구,상도1동,RESIDENTIAL,0.643025,False
+충청남도,아산시,용화동,OFFICE,0.601864705882353,False
+경기도,평택시,세교동,RESIDENTIAL,0.698,False
+경기도,오산시,수청동,OFFICE,0.6421375,False
+인천광역시,중구,북성동1가,TOURIST,0.6587583333333333,False
+인천광역시,미추홀구,도화동,GENERAL,0.5292,False
+경상북도,구미시,황상동,RESIDENTIAL,0.576092,False
+서울특별시,종로구,견지동,TOURIST,0.6479647058823529,False
+경기도,광주시,퇴촌면,TOURIST,0.7397,False
+전라남도,목포시,산정동,RESIDENTIAL,0.6484,False
+강원특별자치도,원주시,중앙동,TOURIST,0.6599,False
+경기도,광주시,송정동,RESIDENTIAL,0.6479,False
+서울특별시,종로구,묘동,TOURIST,0.6479647058823529,False
+경상남도,사천시,사천읍,TOURIST,0.6731,False
+경기도,양평군,양평읍,OFFICE,0.6776,False
+충청북도,단양군,단양읍,TOURIST,0.724,False
+경기도,남양주시,수석동,OFFICE,0.67578125,False
+서울특별시,동대문구,신설동,OFFICE,0.6151,False
+광주광역시,서구,동천동,RESIDENTIAL,0.7224,False
+경상남도,창원시 의창구,북면,RESIDENTIAL,0.6265,False
+경기도,의왕시,내손동,RESIDENTIAL,0.7169,False
+충청남도,천안시 서북구,백석동,RESIDENTIAL,0.7107,False
+광주광역시,광산구,신가동,RESIDENTIAL,0.6221,False
+인천광역시,서구,왕길동,RESIDENTIAL,0.6725869565217392,False
+경기도,이천시,신둔면,OFFICE,0.6438,False
+경기도,부천시,상동,RESIDENTIAL,0.6560892857142857,False
+경상남도,창원시 의창구,봉곡동,GENERAL,0.5170714285714285,False
+서울특별시,강남구,율현동,RESIDENTIAL,0.6700681818181818,False
+강원특별자치도,홍천군,서면,GENERAL,0.3687,False
+서울특별시,종로구,효제동,TOURIST,0.6479647058823529,False
+울산광역시,중구,성안동,GENERAL,0.4059,True
+서울특별시,영등포구,영등포동6가,OFFICE,0.67855,False
+경기도,안성시,석정동,OFFICE,0.5664,False
+경기도,성남시 수정구,상적동,NIGHTLIFE,0.6532176470588235,False
+대구광역시,달성군,현풍읍,GENERAL,0.3669,False
+대구광역시,달성군,가창면,GENERAL,0.2688,False
+충청남도,아산시,방축동,OFFICE,0.601864705882353,False
+대구광역시,서구,내당동,CAMPUS,0.5965333333333334,False
+전북특별자치도,전주시 완산구,전동,RESIDENTIAL,0.6488894736842105,False
+충청남도,태안군,태안읍,TOURIST,0.7059,False
+경상남도,김해시,봉황동,OFFICE,0.6030842105263158,False
+충청남도,공주시,신관동,TOURIST,0.6815,False
+서울특별시,종로구,적선동,TOURIST,0.6479647058823529,False
+제주특별자치도,서귀포시,호근동,TOURIST,0.6778235294117647,False
+충청남도,홍성군,홍성읍,TOURIST,0.6544,False
+울산광역시,중구,우정동,TOURIST,0.6481,False
+부산광역시,강서구,신호동,GENERAL,0.3123,False
+경상북도,구미시,봉곡동,RESIDENTIAL,0.576092,False
+경기도,과천시,별양동,RESIDENTIAL,0.7048,False
+대전광역시,유성구,장대동,RESIDENTIAL,0.6262846153846154,False
+경기도,시흥시,능곡동,OFFICE,0.6635,False
+대구광역시,북구,구암동,OFFICE,0.6321,False
+대구광역시,동구,각산동,RESIDENTIAL,0.6195090909090909,False
+충청북도,청주시 청원구,내덕동,OFFICE,0.63435,False
+대전광역시,동구,소제동,CAMPUS,0.60455625,False
+전북특별자치도,전주시 덕진구,금암동,CAMPUS,0.5787,False
+경상남도,창원시 의창구,서상동,GENERAL,0.5170714285714285,False
+서울특별시,종로구,팔판동,TOURIST,0.6479647058823529,False
+전라남도,여수시,교동,TOURIST,0.6336481481481481,False
+서울특별시,중구,쌍림동,NIGHTLIFE,0.6285866666666667,False
+대구광역시,중구,동일동,RESIDENTIAL,0.6376916666666667,False
+서울특별시,영등포구,문래동6가,OFFICE,0.6908,False
+경기도,남양주시,오남읍,OFFICE,0.663,False
+대구광역시,동구,신서동,RESIDENTIAL,0.6195090909090909,False
+서울특별시,중구,봉래동2가,NIGHTLIFE,0.6285866666666667,False
+강원특별자치도,속초시,청호동,TOURIST,0.73,False
+경기도,가평군,가평읍,TOURIST,0.699,False
+대전광역시,서구,도마동,GENERAL,0.50785,False
+경기도,성남시 분당구,율동,RESIDENTIAL,0.7197727272727273,False
+서울특별시,중구,남대문로4가,NIGHTLIFE,0.6285866666666667,False
+인천광역시,중구,경동,TOURIST,0.6587583333333333,False
+경기도,김포시,걸포동,OFFICE,0.6777,False
+경기도,고양시 덕양구,용두동,RESIDENTIAL,0.6780571428571429,False
+대전광역시,중구,유천동,RESIDENTIAL,0.6226,False
+경상북도,포항시 남구,대잠동,TOURIST,0.6762642857142858,False
+경상북도,경주시,노서동,TOURIST,0.6624217391304348,False
+대전광역시,유성구,신성동,GENERAL,0.3884999999999999,False
+서울특별시,종로구,봉익동,TOURIST,0.6479647058823529,False
+경상북도,경산시,하양읍,CAMPUS,0.7131,False
+충청남도,당진시,신평면,GENERAL,0.3193,False
+강원특별자치도,양양군,양양읍,TOURIST,0.6993,False
+광주광역시,서구,광천동,GENERAL,0.4051,True
+강원특별자치도,동해시,묵호진동,TOURIST,0.70769,False
+경상남도,양산시,평산동,OFFICE,0.6354,False
+광주광역시,광산구,하남동,GENERAL,0.3923999999999999,False
+경상북도,경주시,신평동,TOURIST,0.6624217391304348,False
+경기도,오산시,외삼미동,OFFICE,0.6421375,False
+경상남도,김해시,어방동,OFFICE,0.6030842105263158,False
+부산광역시,부산진구,초읍동,GENERAL,0.4013,True
+부산광역시,중구,중앙동2가,TOURIST,0.6961,False
+경기도,안산시 단원구,초지동,OFFICE,0.6739,False
+대구광역시,중구,계산동2가,RESIDENTIAL,0.6376916666666667,False
+경상남도,김해시,신문동,OFFICE,0.6030842105263158,False
+울산광역시,중구,남외동,RESIDENTIAL,0.5905333333333334,False
+서울특별시,종로구,와룡동,TOURIST,0.6479647058823529,False
+충청북도,진천군,덕산읍,GENERAL,0.3862,False
+광주광역시,북구,문흥동,RESIDENTIAL,0.65195,False
+강원특별자치도,양양군,현남면,TOURIST,0.7882,False
+서울특별시,강동구,상일동,RESIDENTIAL,0.76905,False
+경기도,시흥시,산현동,RESIDENTIAL,0.638325,False
+경기도,안성시,원곡면,OFFICE,0.6266,False
+경기도,군포시,금정동,OFFICE,0.6694,False
+부산광역시,사하구,장림동,OFFICE,0.70255,False
+서울특별시,중구,산림동,NIGHTLIFE,0.6285866666666667,False
+경상북도,경주시,북군동,TOURIST,0.6624217391304348,False
+경기도,하남시,감이동,RESIDENTIAL,0.6532928571428572,False
+서울특별시,중구,충무로5가,NIGHTLIFE,0.6285866666666667,False
+강원특별자치도,횡성군,둔내면,GENERAL,0.2997999999999999,False
+충청북도,청주시 청원구,우암동,OFFICE,0.616,False
+경상북도,포항시 남구,상도동,TOURIST,0.6762642857142858,False
+경기도,용인시 기흥구,마북동,RESIDENTIAL,0.7075,False
+전북특별자치도,익산시,부송동,GENERAL,0.5517310344827586,False
+서울특별시,종로구,화동,TOURIST,0.6479647058823529,False
+광주광역시,북구,신용동,RESIDENTIAL,0.6809,False
+경상북도,구미시,남통동,RESIDENTIAL,0.576092,False
+서울특별시,종로구,명륜3가,TOURIST,0.6479647058823529,False
+광주광역시,광산구,송정동,TOURIST,0.6575,False
+서울특별시,송파구,마천동,RESIDENTIAL,0.6860999999999999,False
+부산광역시,북구,만덕동,RESIDENTIAL,0.6558333333333333,False
+서울특별시,용산구,용산동6가,PREMIUM,0.6721,False
+대구광역시,중구,동산동,RESIDENTIAL,0.6376916666666667,False
+경기도,광주시,태전동,GENERAL,0.58930625,False
+경상남도,하동군,화개면,TOURIST,0.7892,False
+광주광역시,광산구,장덕동,GENERAL,0.5570238095238095,False
+서울특별시,용산구,원효로3가,OFFICE,0.61415,False
+경상북도,문경시,모전동,GENERAL,0.5214,False
+대구광역시,중구,남성로,RESIDENTIAL,0.6376916666666667,False
+경상남도,창원시 진해구,자은동,RESIDENTIAL,0.7092,False
+인천광역시,강화군,내가면,TOURIST,0.7701,False
+서울특별시,서대문구,북아현동,CAMPUS,0.5548,True
+세종특별자치시,,부강면,RESIDENTIAL,0.6562708333333334,False
+대구광역시,달성군,옥포읍,RESIDENTIAL,0.6443,False
+충청남도,공주시,반포면,TOURIST,0.7547,False
+서울특별시,종로구,누상동,TOURIST,0.6479647058823529,False
+인천광역시,강화군,선원면,GENERAL,0.399,False
+경기도,시흥시,군자동,RESIDENTIAL,0.631,False
+경상북도,칠곡군,북삼읍,GENERAL,0.4095,True
+광주광역시,북구,운암동,RESIDENTIAL,0.6707000000000001,False
+경기도,양평군,양서면,GENERAL,0.3137,False
+인천광역시,연수구,청학동,OFFICE,0.6305,False
+경기도,의정부시,장암동,RESIDENTIAL,0.6968,False
+경기도,김포시,통진읍,OFFICE,0.7301,False
+경기도,용인시 처인구,이동읍,OFFICE,0.6377,False
+경상북도,김천시,신음동,GENERAL,0.43600909090909085,False
+대구광역시,동구,용수동,RESIDENTIAL,0.6195090909090909,False
+경기도,안산시 상록구,월피동,OFFICE,0.7173,False
+세종특별자치시,,아름동,RESIDENTIAL,0.6562708333333334,False
+경기도,화성시,서신면,GENERAL,0.3571999999999999,False
+경기도,고양시 일산서구,일산동,RESIDENTIAL,0.7390666666666666,False
+충청남도,부여군,부여읍,TOURIST,0.6943,False
+서울특별시,동대문구,휘경동,CAMPUS,0.52325,True
+대구광역시,북구,대현동,RESIDENTIAL,0.5951,False
+경기도,양주시,고암동,GENERAL,0.57445,False
+제주특별자치도,제주시,삼도일동,TOURIST,0.6590692307692307,False
+서울특별시,종로구,효자동,TOURIST,0.6479647058823529,False
+강원특별자치도,양양군,손양면,TOURIST,0.7779,False
+대구광역시,달서구,송현동,RESIDENTIAL,0.6645,False
+경기도,수원시 권선구,고색동,OFFICE,0.6592333333333333,False
+서울특별시,송파구,풍납동,CAMPUS,0.48260000000000003,False
+경기도,오산시,세교동,OFFICE,0.6421375,False
+울산광역시,울주군,온산읍,OFFICE,0.6487,False
+강원특별자치도,원주시,행구동,GENERAL,0.3831,False
+충청남도,천안시 동남구,유량동,GENERAL,0.5534235294117648,False
+경기도,구리시,교문동,NIGHTLIFE,0.67435,False
+대구광역시,수성구,수성동2가,RESIDENTIAL,0.6949666666666667,False
+경기도,여주시,가남읍,OFFICE,0.6447,False
+서울특별시,중구,필동1가,TOURIST,0.6764,False
+경상남도,거제시,장평동,OFFICE,0.6712,False
+전북특별자치도,전주시 완산구,중화산동2가,TOURIST,0.62785,False
+부산광역시,부산진구,연지동,RESIDENTIAL,0.6592,False
+경기도,양주시,삼숭동,GENERAL,0.57445,False
+경기도,구리시,토평동,RESIDENTIAL,0.6785,False
+충청북도,제천시,백운면,TOURIST,0.7914,False
+경기도,수원시 팔달구,남창동,RESIDENTIAL,0.6567700000000001,False
+경기도,평택시,신장동,PREMIUM,0.7032,False
+경기도,김포시,하성면,OFFICE,0.6527,False
+경상남도,창원시 마산회원구,내서읍,OFFICE,0.644,False
+광주광역시,북구,일곡동,RESIDENTIAL,0.6455,False
+경기도,의정부시,고산동,RESIDENTIAL,0.7371,False
+서울특별시,은평구,신사동,RESIDENTIAL,0.64655,False
+충청북도,제천시,장락동,GENERAL,0.5625647058823529,False
+경상북도,안동시,옥동,GENERAL,0.3993,False
+대구광역시,중구,완전동,RESIDENTIAL,0.6376916666666667,False
+경기도,광주시,목현동,GENERAL,0.58930625,False
+경기도,성남시 수정구,고등동,RESIDENTIAL,0.6194,False
+경기도,파주시,다율동,OFFICE,0.6352,False
+서울특별시,영등포구,영등포동1가,OFFICE,0.67855,False
+경상남도,김해시,진영읍,OFFICE,0.6347,False
+부산광역시,중구,남포동6가,TOURIST,0.7045,False
+대구광역시,중구,동성로3가,RESIDENTIAL,0.6376916666666667,False
+충청남도,논산시,취암동,OFFICE,0.6528,False
+대구광역시,북구,연경동,OFFICE,0.6005695652173914,False
+충청남도,아산시,온천동,OFFICE,0.601864705882353,False
+경기도,양주시,백석읍,OFFICE,0.6583,False
+경기도,고양시 덕양구,덕은동,RESIDENTIAL,0.6780571428571429,False
+경상남도,창원시 성산구,가음동,RESIDENTIAL,0.625825,False
+서울특별시,중구,예장동,NIGHTLIFE,0.6285866666666667,False
+경기도,김포시,월곶면,TOURIST,0.7403,False
+대구광역시,중구,포정동,RESIDENTIAL,0.6376916666666667,False
+서울특별시,서대문구,대신동,RESIDENTIAL,0.6118857142857143,False
+인천광역시,중구,인현동,TOURIST,0.6587583333333333,False
+강원특별자치도,고성군,죽왕면,TOURIST,0.7922,False
+경상남도,진주시,상대동,CAMPUS,0.6515,False
+제주특별자치도,제주시,외도이동,TOURIST,0.6590692307692307,False
+인천광역시,중구,신생동,TOURIST,0.6587583333333333,False
+울산광역시,동구,방어동,OFFICE,0.6198,False
+부산광역시,금정구,남산동,GENERAL,0.4055,True
+경상남도,창원시 성산구,귀산동,RESIDENTIAL,0.625825,False
+경기도,의정부시,금오동,RESIDENTIAL,0.6607733333333333,False
+광주광역시,북구,양산동,RESIDENTIAL,0.6455,False
+전북특별자치도,전주시 덕진구,덕진동1가,TOURIST,0.6342,False
+경상북도,경산시,정평동,GENERAL,0.5529666666666666,False
+충청북도,청주시 상당구,용담동,RESIDENTIAL,0.5930692307692308,False
+경기도,고양시 덕양구,행주외동,RESIDENTIAL,0.6780571428571429,False
+경상남도,창원시 의창구,소답동,GENERAL,0.5170714285714285,False
+서울특별시,성북구,동선동4가,CAMPUS,0.638,False
+강원특별자치도,강릉시,연곡면,TOURIST,0.7657,False
+경기도,양평군,강하면,TOURIST,0.7675,False
+서울특별시,영등포구,영등포동,OFFICE,0.67855,False
+경기도,안산시 단원구,신길동,OFFICE,0.7026,False
+서울특별시,강동구,강일동,RESIDENTIAL,0.8068,False
+충청북도,청주시 서원구,죽림동,CAMPUS,0.6077636363636363,False
+전라남도,영광군,영광읍,OFFICE,0.6177,False
+인천광역시,계양구,용종동,RESIDENTIAL,0.6505916666666667,False
+충청북도,충주시,중앙탑면,RESIDENTIAL,0.6046,False
+경상북도,칠곡군,왜관읍,OFFICE,0.7163,False
+서울특별시,용산구,원효로2가,OFFICE,0.61415,False
+제주특별자치도,제주시,도두이동,TOURIST,0.6590692307692307,False
+부산광역시,사하구,신평동,GENERAL,0.5171,False
+강원특별자치도,속초시,금호동,TOURIST,0.7235,False
+대전광역시,유성구,전민동,CAMPUS,0.6488,False
+부산광역시,중구,남포동5가,TOURIST,0.7045,False
+울산광역시,울주군,상북면,GENERAL,0.263,False
+경기도,의왕시,포일동,RESIDENTIAL,0.5898,False
+경기도,성남시 수정구,수진동,NIGHTLIFE,0.6953,False
+서울특별시,영등포구,양평동1가,OFFICE,0.6396,False
+강원특별자치도,삼척시,갈천동,GENERAL,0.5076999999999999,False
+서울특별시,성북구,안암동1가,OFFICE,0.6357,False
+인천광역시,중구,운남동,TOURIST,0.6587583333333333,False
+경상북도,영주시,가흥동,OFFICE,0.6296999999999999,False
+울산광역시,북구,정자동,RESIDENTIAL,0.6740625,False
+경기도,시흥시,계수동,RESIDENTIAL,0.638325,False
+제주특별자치도,제주시,외도일동,TOURIST,0.6590692307692307,False
+대구광역시,달서구,도원동,RESIDENTIAL,0.6871,False
+경기도,의왕시,청계동,RESIDENTIAL,0.6128,False
+강원특별자치도,춘천시,삼천동,CAMPUS,0.58904,False
+경기도,부천시 소사구,옥길동,RESIDENTIAL,0.6847,False
+울산광역시,동구,전하동,OFFICE,0.6506000000000001,False
+경기도,군포시,부곡동,RESIDENTIAL,0.6526333333333333,False
+대구광역시,달서구,본동,RESIDENTIAL,0.6279,False
+인천광역시,서구,불로동,RESIDENTIAL,0.6725869565217392,False
+대구광역시,달서구,죽전동,OFFICE,0.6196,False
+경기도,화성시,청계동,RESIDENTIAL,0.6154137931034483,False
+경상북도,구미시,고아읍,RESIDENTIAL,0.6112,False
+경상북도,경주시,황오동,TOURIST,0.6827,False
+경상북도,구미시,형곡동,RESIDENTIAL,0.6658,False
+인천광역시,서구,가좌동,OFFICE,0.602025,False
+경기도,용인시 기흥구,보라동,GENERAL,0.4087,True
+경기도,하남시,감북동,RESIDENTIAL,0.6524,False
+전라남도,순천시,오천동,TOURIST,0.589225,False
+부산광역시,중구,창선동1가,TOURIST,0.7027555555555556,False
+제주특별자치도,서귀포시,하예동,TOURIST,0.6778235294117647,False
+부산광역시,부산진구,가야동,OFFICE,0.6018,False
+대구광역시,달서구,대곡동,RESIDENTIAL,0.6645130434782608,False
+서울특별시,종로구,종로4가,NIGHTLIFE,0.67195,False
+강원특별자치도,철원군,동송읍,OFFICE,0.6241,False
+경상북도,포항시 남구,구룡포읍,TOURIST,0.738,False
+경상북도,안동시,운흥동,TOURIST,0.6069833333333333,False
+경기도,화성시 동탄구,반송동,RESIDENTIAL,0.6154137931034483,False
+경기도,시흥시,신천동,NIGHTLIFE,0.6907,False
+강원특별자치도,원주시,우산동,TOURIST,0.6737,False
+충청남도,논산시,내동,GENERAL,0.5839866666666667,False
+대구광역시,중구,대신동,TOURIST,0.6129,False
+전라남도,해남군,해남읍,TOURIST,0.6618,False
+경기도,남양주시,진건읍,OFFICE,0.637,False
+경기도,시흥시,장현동,RESIDENTIAL,0.638325,False
+경기도,의왕시,삼동,RESIDENTIAL,0.5898,False
+서울특별시,중구,오장동,NIGHTLIFE,0.6285866666666667,False
+경상북도,포항시 북구,항구동,OFFICE,0.64818,False
+경기도,양주시,광사동,GENERAL,0.57445,False
+경상북도,영주시,풍기읍,CAMPUS,0.6299,False
+강원특별자치도,강릉시,강동면,TOURIST,0.7484,False
+부산광역시,부산진구,부암동,NIGHTLIFE,0.6779,False
+경기도,고양시 일산동구,중산동,OFFICE,0.66385,False
+서울특별시,중구,수표동,NIGHTLIFE,0.6285866666666667,False
+서울특별시,중구,을지로5가,NIGHTLIFE,0.6743,False
+인천광역시,서구,검암동,RESIDENTIAL,0.6725869565217392,False
+부산광역시,동래구,명장동,RESIDENTIAL,0.6638,False
+대구광역시,서구,비산동,TOURIST,0.5908166666666667,False
+경기도,화성시,방교동,RESIDENTIAL,0.6154137931034483,False
+경상북도,김천시,부곡동,GENERAL,0.43600909090909085,False
+경상남도,통영시,도남동,TOURIST,0.6869133333333333,False
+인천광역시,중구,항동7가,TOURIST,0.6587583333333333,False
+인천광역시,옹진군,영흥면,TOURIST,0.77,False
+경기도,안산시 상록구,성포동,RESIDENTIAL,0.6844,False
+강원특별자치도,원주시,문막읍,OFFICE,0.6856,False
+부산광역시,북구,구포동,TOURIST,0.5980333333333333,False
+서울특별시,용산구,동빙고동,OFFICE,0.62136875,False
+울산광역시,중구,옥교동,RESIDENTIAL,0.5905333333333334,False
+경기도,남양주시,별내면,CAMPUS,0.62805,False
+부산광역시,중구,영주동,TOURIST,0.70455,False
+강원특별자치도,춘천시,효자동,CAMPUS,0.6257666666666667,False
+서울특별시,강서구,외발산동,RESIDENTIAL,0.659675,False
+경기도,포천시,일동면,OFFICE,0.6092,False
+서울특별시,영등포구,당산동2가,OFFICE,0.70035,False
+경기도,오산시,오산동,OFFICE,0.6421375,False
+경기도,수원시 팔달구,팔달로1가,RESIDENTIAL,0.6567700000000001,False
+경기도,용인시 기흥구,동백동,RESIDENTIAL,0.6905666666666667,False
+경기도,이천시,관고동,TOURIST,0.6521,False
+경기도,화성시 동탄구,여울동,RESIDENTIAL,0.6154137931034483,False
+경기도,의정부시,용현동,RESIDENTIAL,0.6607733333333333,False
+경상북도,경주시,하동,TOURIST,0.6624217391304348,False
+경기도,양주시,덕계동,GENERAL,0.57445,False
+광주광역시,동구,서석동,TOURIST,0.620676923076923,False
+경기도,고양시 일산서구,탄현동,OFFICE,0.7237,False
+인천광역시,중구,내동,TOURIST,0.6587583333333333,False
+충청남도,아산시,음봉면,GENERAL,0.357,False
+경상남도,창원시 진해구,경화동,RESIDENTIAL,0.6217,False
+경기도,광주시,도척면,GENERAL,0.3969,False
+경상남도,양산시,하북면,TOURIST,0.76,False
+경기도,안산시 단원구,화정동,OFFICE,0.7033416666666668,False
+경상북도,청도군,청도읍,OFFICE,0.6108,False
+광주광역시,북구,신안동,TOURIST,0.6792,False
+경상북도,구미시,인의동,RESIDENTIAL,0.576092,False
+경기도,용인시 기흥구,농서동,RESIDENTIAL,0.5946933333333333,False
+충청남도,서산시,부석면,GENERAL,0.3749,False
+경기도,화성시,장지동,RESIDENTIAL,0.6154137931034483,False
+부산광역시,서구,서대신동3가,CAMPUS,0.6018333333333333,False
+경기도,양주시,광적면,OFFICE,0.6872,False
+경상북도,경주시,천군동,TOURIST,0.6624217391304348,False
+인천광역시,동구,송림동,TOURIST,0.65102,False
+대구광역시,남구,이천동,RESIDENTIAL,0.6234,False
+경상북도,경산시,중산동,GENERAL,0.5529666666666666,False
+서울특별시,성북구,동선동3가,CAMPUS,0.638,False
+경기도,고양시 덕양구,원당동,RESIDENTIAL,0.6780571428571429,False
+대구광역시,달성군,화원읍,OFFICE,0.6433,False
+대전광역시,동구,가오동,CAMPUS,0.60455625,False
+부산광역시,중구,신창동1가,TOURIST,0.7027555555555556,False
+강원특별자치도,춘천시,죽림동,CAMPUS,0.58904,False
+경상북도,울진군,죽변면,TOURIST,0.7578,False
+서울특별시,마포구,신공덕동,CAMPUS,0.61548125,False
+강원특별자치도,원주시,관설동,RESIDENTIAL,0.633348,False
+경기도,용인시 처인구,남동,RESIDENTIAL,0.6186071428571428,False
+전라남도,여수시,소라면,GENERAL,0.3968,False
+경기도,용인시 처인구,양지읍,RESIDENTIAL,0.6022,False
+경상북도,안동시,풍천면,OFFICE,0.6214,False
+서울특별시,용산구,용산동5가,PREMIUM,0.6721,False
+대구광역시,수성구,시지동,RESIDENTIAL,0.6784826086956521,False
+충청남도,보령시,오천면,TOURIST,0.7623,False
+경기도,부천시 원미구,역곡동,CAMPUS,0.5542,False
+대구광역시,동구,동호동,RESIDENTIAL,0.6195090909090909,False
+경기도,광주시,능평동,GENERAL,0.3982,False
+강원특별자치도,춘천시,조양동,CAMPUS,0.58904,False
+경상남도,함양군,함양읍,OFFICE,0.6269,False
+대전광역시,동구,중동,CAMPUS,0.60455625,False
+대전광역시,유성구,구암동,RESIDENTIAL,0.6262846153846154,False
+경기도,의정부시,가능동,CAMPUS,0.6475,False
+서울특별시,종로구,연건동,TOURIST,0.6479647058823529,False
+세종특별자치시,,다정동,RESIDENTIAL,0.6562708333333334,False
+강원특별자치도,춘천시,온의동,CAMPUS,0.58904,False
+경기도,시흥시,조남동,RESIDENTIAL,0.638325,False
+서울특별시,성동구,금호동2가,RESIDENTIAL,0.6231333333333334,False
+전라남도,여수시,소호동,TOURIST,0.6336481481481481,False
+서울특별시,마포구,당인동,CAMPUS,0.61548125,False
+충청남도,보령시,동대동,TOURIST,0.582875,False
+서울특별시,종로구,중학동,TOURIST,0.6479647058823529,False
+경기도,의정부시,낙양동,RESIDENTIAL,0.6607733333333333,False
+경기도,용인시 처인구,남사읍,OFFICE,0.6376,False
+경상남도,양산시,상북면,GENERAL,0.3352,False
+충청북도,청주시 흥덕구,비하동,CAMPUS,0.6104545454545455,False
+제주특별자치도,제주시,이호일동,TOURIST,0.6590692307692307,False
+경상남도,창원시 성산구,귀곡동,RESIDENTIAL,0.625825,False
+경기도,동두천시,탑동동,GENERAL,0.5643375,False
+대전광역시,중구,문화동,GENERAL,0.51065,False
+충청북도,청주시 상당구,영동,RESIDENTIAL,0.5930692307692308,False
+경기도,수원시 장안구,연무동,CAMPUS,0.5449,True
+광주광역시,서구,풍암동,GENERAL,0.4061,True
+인천광역시,중구,송학동3가,TOURIST,0.6587583333333333,False
+대구광역시,중구,남일동,RESIDENTIAL,0.6376916666666667,False
+서울특별시,중구,남대문로3가,NIGHTLIFE,0.6285866666666667,False
+경기도,성남시 분당구,대장동,RESIDENTIAL,0.7197727272727273,False
+제주특별자치도,서귀포시,회수동,TOURIST,0.6778235294117647,False
+경기도,수원시 장안구,천천동,RESIDENTIAL,0.62147,False
+경기도,과천시,과천동,GENERAL,0.4066,True
+전북특별자치도,전주시 완산구,서신동,GENERAL,0.3712,False
+전북특별자치도,전주시 완산구,다가동3가,RESIDENTIAL,0.6488894736842105,False
+경상북도,포항시 북구,환호동,OFFICE,0.64818,False
+경기도,부천시 오정구,작동,RESIDENTIAL,0.6477428571428572,False
+충청남도,태안군,남면,GENERAL,0.248,False
+강원특별자치도,강릉시,옥천동,NIGHTLIFE,0.7023,False
+대전광역시,유성구,용산동,RESIDENTIAL,0.6262846153846154,False
+서울특별시,종로구,평동,TOURIST,0.6479647058823529,False
+경기도,성남시 분당구,석운동,RESIDENTIAL,0.7197727272727273,False
+전북특별자치도,부안군,변산면,TOURIST,0.7542,False
+세종특별자치시,,금남면,RESIDENTIAL,0.6562708333333334,False
+부산광역시,영도구,영선동4가,TOURIST,0.7158500000000001,False
+울산광역시,중구,반구동,OFFICE,0.6257999999999999,False
+경상남도,양산시,북정동,OFFICE,0.5939384615384615,False
+대전광역시,동구,용전동,CAMPUS,0.6475,False
+대구광역시,중구,전동,RESIDENTIAL,0.6376916666666667,False
+경상남도,통영시,욕지면,TOURIST,0.7709,False
+서울특별시,종로구,이화동,TOURIST,0.6473,False
+전북특별자치도,전주시 덕진구,덕진동2가,TOURIST,0.6342,False
+경기도,수원시 권선구,오목천동,OFFICE,0.6592333333333333,False
+서울특별시,종로구,도렴동,TOURIST,0.6479647058823529,False
+경기도,여주시,북내면,TOURIST,0.7676,False
+충청북도,청주시 흥덕구,운천동,CAMPUS,0.6104545454545455,False
+전라남도,여수시,문수동,TOURIST,0.622,False
+대전광역시,대덕구,석봉동,OFFICE,0.6607,False
+경기도,부천시,심곡동,RESIDENTIAL,0.6560892857142857,False
+경기도,수원시 권선구,탑동,OFFICE,0.6592333333333333,False
+경기도,성남시 수정구,복정동,OFFICE,0.6543,False
+대구광역시,수성구,범물동,RESIDENTIAL,0.7202999999999999,False
+부산광역시,동래구,복천동,RESIDENTIAL,0.6708153846153846,False
+경상남도,거창군,거창읍,RESIDENTIAL,0.6363,False
+경기도,의정부시,산곡동,RESIDENTIAL,0.6607733333333333,False
+경기도,오산시,부산동,OFFICE,0.6421375,False
+대전광역시,유성구,덕명동,RESIDENTIAL,0.6262846153846154,False
+충청북도,충주시,안림동,OFFICE,0.592624,False
+부산광역시,영도구,영선동1가,TOURIST,0.7158500000000001,False
+부산광역시,동래구,수안동,RESIDENTIAL,0.6708153846153846,False
+경기도,남양주시,퇴계원읍,OFFICE,0.6985,False
+경기도,고양시 덕양구,행주내동,RESIDENTIAL,0.6780571428571429,False
+경기도,군포시,당정동,RESIDENTIAL,0.6526333333333333,False
+경기도,수원시 팔달구,매산로3가,RESIDENTIAL,0.6567700000000001,False
+광주광역시,동구,대인동,TOURIST,0.620676923076923,False
+대구광역시,수성구,욱수동,RESIDENTIAL,0.6784826086956521,False
+서울특별시,종로구,청운동,TOURIST,0.6479647058823529,False
+경기도,수원시 장안구,파장동,RESIDENTIAL,0.6603,False
+경상북도,포항시 남구,대도동,TOURIST,0.6762642857142858,False
+경기도,양주시,덕정동,GENERAL,0.57445,False
+충청남도,천안시 동남구,봉명동,OFFICE,0.6088,False
+경기도,부천시 원미구,춘의동,OFFICE,0.6571,False
+전라남도,여수시,여서동,TOURIST,0.6592,False
+광주광역시,북구,본촌동,RESIDENTIAL,0.6422962962962963,False
+전북특별자치도,익산시,영등동,CAMPUS,0.64635,False
+대구광역시,중구,동인동1가,NIGHTLIFE,0.6296,False
+제주특별자치도,제주시,오등동,TOURIST,0.6590692307692307,False
+대구광역시,수성구,수성동3가,RESIDENTIAL,0.6949666666666667,False
+대전광역시,동구,대동,TOURIST,0.6347,False
+경상남도,창원시 성산구,남양동,RESIDENTIAL,0.625825,False
+충청북도,청주시 상당구,남문로2가,RESIDENTIAL,0.5930692307692308,False
+광주광역시,광산구,신창동,RESIDENTIAL,0.6281,False
+인천광역시,미추홀구,숭의동,OFFICE,0.582,False
+제주특별자치도,제주시,오라삼동,TOURIST,0.6590692307692307,False
+전라남도,담양군,봉산면,TOURIST,0.8178,False
+경기도,하남시,춘궁동,GENERAL,0.3370999999999999,False
+전라남도,무안군,무안읍,TOURIST,0.7058,False
+전북특별자치도,군산시,조촌동,RESIDENTIAL,0.6038,False
+대구광역시,동구,지묘동,RESIDENTIAL,0.6195090909090909,False
+제주특별자치도,서귀포시,하효동,TOURIST,0.6778235294117647,False
+전북특별자치도,전주시 완산구,중앙동3가,TOURIST,0.6894,False
+제주특별자치도,제주시,내도동,TOURIST,0.6590692307692307,False
+강원특별자치도,춘천시,우두동,CAMPUS,0.58904,False
+경기도,용인시 기흥구,공세동,RESIDENTIAL,0.5946933333333333,False
+경기도,여주시,오학동,GENERAL,0.3898,False
+부산광역시,중구,대청동2가,TOURIST,0.7003,False
+서울특별시,마포구,구수동,CAMPUS,0.61548125,False
+경기도,광주시,쌍령동,GENERAL,0.3622999999999999,False
+광주광역시,북구,중흥동,RESIDENTIAL,0.64405,False
+경상북도,경주시,동천동,TOURIST,0.6938,False
+대구광역시,북구,국우동,OFFICE,0.6532,False
+경기도,용인시 기흥구,서천동,RESIDENTIAL,0.5946933333333333,False
+서울특별시,중구,회현동2가,TOURIST,0.6598,False
+경상북도,포항시 남구,연일읍,RESIDENTIAL,0.6214,False
+서울특별시,중구,남산동2가,NIGHTLIFE,0.6285866666666667,False
+부산광역시,중구,부평동3가,TOURIST,0.7045,False
+충청북도,진천군,진천읍,OFFICE,0.6003,False
+서울특별시,중구,필동3가,TOURIST,0.6764,False
+강원특별자치도,강릉시,안현동,TOURIST,0.6762,False
+부산광역시,영도구,봉래동2가,TOURIST,0.68445,False
+대전광역시,대덕구,오정동,CAMPUS,0.5517,True
+부산광역시,강서구,대저2동,GENERAL,0.589,False
+광주광역시,동구,불로동,TOURIST,0.620676923076923,False
+대구광역시,중구,수동,RESIDENTIAL,0.6376916666666667,False
+강원특별자치도,강릉시,용강동,TOURIST,0.6762,False
+대구광역시,수성구,수성동1가,RESIDENTIAL,0.6949666666666667,False
+충청남도,아산시,둔포면,GENERAL,0.3984999999999999,False
+경기도,양평군,강상면,OFFICE,0.6108,False
+경기도,김포시,마산동,RESIDENTIAL,0.6776,False
+경기도,화성시,팔탄면,OFFICE,0.6568,False
+전북특별자치도,전주시 덕진구,만성동,RESIDENTIAL,0.6075,False
+경기도,파주시,상지석동,OFFICE,0.6352,False
+충청남도,예산군,예산읍,TOURIST,0.6986,False
+경기도,구리시,아천동,RESIDENTIAL,0.6785,False
+전라남도,담양군,고서면,GENERAL,0.2812,False
+경상북도,포항시 남구,해도동,NIGHTLIFE,0.71495,False
+강원특별자치도,횡성군,우천면,CAMPUS,0.6114,False
+전북특별자치도,군산시,월명동,TOURIST,0.7125,False
+경기도,김포시,사우동,OFFICE,0.6194,False
+경기도,용인시 처인구,삼가동,CAMPUS,0.6027,False
+경상북도,상주시,무양동,GENERAL,0.5363791666666666,False
+강원특별자치도,강릉시,입암동,TOURIST,0.6762,False
+경상남도,통영시,광도면,OFFICE,0.701,False
+경기도,부천시 소사구,송내동,RESIDENTIAL,0.6843,False
+광주광역시,동구,계림동,TOURIST,0.6417999999999999,False
+경기도,용인시 처인구,백암면,NIGHTLIFE,0.6027,False
+충청북도,보은군,보은읍,OFFICE,0.6189,False
+경기도,시흥시,월곶동,TOURIST,0.688,False
+충청남도,천안시 동남구,안서동,GENERAL,0.5534235294117648,False
+전북특별자치도,군산시,수송동,RESIDENTIAL,0.6507,False
+대구광역시,북구,서변동,OFFICE,0.6005695652173914,False
+전북특별자치도,순창군,순창읍,OFFICE,0.6368,False
+충청북도,제천시,모산동,GENERAL,0.5625647058823529,False
+제주특별자치도,서귀포시,하원동,TOURIST,0.6778235294117647,False
+경상북도,경주시,내남면,GENERAL,0.4148,True
+충청북도,청주시 상당구,북문로1가,RESIDENTIAL,0.5930692307692308,False
+경기도,안성시,옥산동,OFFICE,0.5664,False
+강원특별자치도,강릉시,지변동,TOURIST,0.6762,False
+경상남도,남해군,남해읍,TOURIST,0.675,False
+경기도,파주시,법원읍,OFFICE,0.6892,False
+전라남도,담양군,수북면,RESIDENTIAL,0.6064,False
+경기도,광주시,중대동,GENERAL,0.58930625,False
+경기도,고양시 일산동구,성석동,OFFICE,0.6957083333333333,False
+경상남도,창원시 마산회원구,회원동,RESIDENTIAL,0.6729,False
+전북특별자치도,군산시,신창동,TOURIST,0.5893444444444444,False
+서울특별시,구로구,항동,RESIDENTIAL,0.6133,False
+울산광역시,동구,화정동,OFFICE,0.6236,False
+경기도,성남시 분당구,궁내동,RESIDENTIAL,0.7197727272727273,False
+경기도,여주시,점봉동,GENERAL,0.5664416666666666,False
+충청남도,천안시 동남구,병천면,TOURIST,0.7037,False
+경기도,파주시,조리읍,OFFICE,0.6084,False
+경상남도,함양군,안의면,GENERAL,0.284,False
+경상북도,영천시,조교동,GENERAL,0.55230625,False
+경기도,평택시,통복동,OFFICE,0.6567,False
+경기도,평택시,진위면,OFFICE,0.672,False
+충청북도,청주시 상당구,문의면,TOURIST,0.7401,False
+경상남도,창원시 마산합포구,진동면,GENERAL,0.3585,False
+경기도,남양주시,삼패동,OFFICE,0.67578125,False
+전북특별자치도,남원시,천거동,GENERAL,0.5627043478260869,False
+강원특별자치도,삼척시,남양동,NIGHTLIFE,0.604,False
+서울특별시,영등포구,도림동,OFFICE,0.6531,False
+경기도,여주시,상거동,GENERAL,0.5664416666666666,False
+경기도,의왕시,오전동,RESIDENTIAL,0.6559,False
+충청남도,당진시,대덕동,GENERAL,0.5622499999999999,False
+경상북도,경산시,진량읍,GENERAL,0.3582999999999999,False
+충청북도,청주시 청원구,주중동,OFFICE,0.5974875,False
+울산광역시,북구,천곡동,RESIDENTIAL,0.6740625,False
+서울특별시,성북구,보문동4가,OFFICE,0.6132,False
+경기도,용인시 처인구,유방동,RESIDENTIAL,0.6186071428571428,False
+경기도,파주시,월롱면,OFFICE,0.6674,False
+경기도,여주시,연라동,GENERAL,0.5664416666666666,False
+대구광역시,수성구,매호동,RESIDENTIAL,0.6784826086956521,False
+경상북도,경주시,충효동,TOURIST,0.6624217391304348,False
+광주광역시,동구,지산동,TOURIST,0.6352,False
+경상남도,진주시,신안동,CAMPUS,0.6305,False
+충청남도,공주시,금성동,TOURIST,0.5812937499999999,False
+인천광역시,연수구,선학동,GENERAL,0.3941,False
+서울특별시,용산구,서빙고동,OFFICE,0.6445,False
+충청북도,청주시 서원구,미평동,CAMPUS,0.6077636363636363,False
+대구광역시,동구,덕곡동,RESIDENTIAL,0.6195090909090909,False
+대구광역시,군위군,군위읍,GENERAL,0.3618,False
+충청남도,아산시,염치읍,TOURIST,0.7521,False
+충청남도,공주시,사곡면,TOURIST,0.8047,False
+대전광역시,서구,가수원동,RESIDENTIAL,0.6752,False
+대전광역시,서구,용문동,OFFICE,0.6233,False
+인천광역시,부평구,부개동,OFFICE,0.6927,False
+경상남도,창원시 진해구,풍호동,GENERAL,0.3866,False
+서울특별시,강서구,가양동,RESIDENTIAL,0.6622666666666667,False
+경상북도,안동시,서부동,TOURIST,0.6069833333333333,False
+서울특별시,종로구,연지동,TOURIST,0.6479647058823529,False
+경기도,용인시 처인구,고림동,RESIDENTIAL,0.6186071428571428,False
+세종특별자치시,,소담동,RESIDENTIAL,0.6562708333333334,False
+세종특별자치시,,고운동,RESIDENTIAL,0.6562708333333334,False
+인천광역시,계양구,임학동,RESIDENTIAL,0.6505916666666667,False
+전라남도,영암군,영암읍,GENERAL,0.3528,False
+충청북도,청주시 서원구,개신동,CAMPUS,0.6077636363636363,False
+강원특별자치도,영월군,영월읍,OFFICE,0.6814,False
+서울특별시,영등포구,문래동1가,OFFICE,0.6908,False
+울산광역시,중구,약사동,RESIDENTIAL,0.6749,False
+경상남도,김해시,생림면,GENERAL,0.424,True
+서울특별시,종로구,무악동,TOURIST,0.6782,False
+대구광역시,중구,동인동2가,NIGHTLIFE,0.6296,False
+대전광역시,동구,원동,CAMPUS,0.60455625,False
+서울특별시,서대문구,옥천동,RESIDENTIAL,0.6118857142857143,False
+경상북도,경산시,백천동,GENERAL,0.5529666666666666,False
+경기도,고양시 덕양구,토당동,RESIDENTIAL,0.6780571428571429,False
+제주특별자치도,제주시,도련일동,TOURIST,0.6590692307692307,False
+대구광역시,동구,송정동,RESIDENTIAL,0.6195090909090909,False
+충청남도,천안시 동남구,구성동,GENERAL,0.5534235294117648,False
+경기도,양주시,회정동,GENERAL,0.57445,False
+전라남도,순천시,장천동,TOURIST,0.729,False
+대구광역시,달서구,대천동,RESIDENTIAL,0.6645130434782608,False
+경기도,성남시 중원구,여수동,NIGHTLIFE,0.6380272727272728,False
+충청북도,청주시 서원구,성화동,CAMPUS,0.6077636363636363,False
+서울특별시,종로구,예지동,TOURIST,0.6479647058823529,False
+전라남도,완도군,완도읍,OFFICE,0.61,False
+대전광역시,동구,자양동,CAMPUS,0.5879,True
+경상남도,밀양시,삼문동,TOURIST,0.6185,False
+인천광역시,계양구,효성동,RESIDENTIAL,0.66625,False
+경기도,포천시,내촌면,GENERAL,0.4227,True
+인천광역시,계양구,박촌동,RESIDENTIAL,0.6505916666666667,False
+전라남도,목포시,용당동,NIGHTLIFE,0.6399,False
+인천광역시,남동구,도림동,OFFICE,0.66584,False
+충청북도,제천시,청전동,OFFICE,0.6709,False
+충청남도,계룡시,엄사면,RESIDENTIAL,0.6031,False
+강원특별자치도,양양군,현북면,TOURIST,0.7894,False
+충청남도,보령시,명천동,TOURIST,0.582875,False
+강원특별자치도,원주시,개운동,RESIDENTIAL,0.6651,False
+경기도,포천시,영북면,TOURIST,0.6984,False
+경기도,오산시,금암동,OFFICE,0.6421375,False
+충청남도,천안시 동남구,원성동,OFFICE,0.62245,False
+전라남도,장흥군,장흥읍,GENERAL,0.3983,False
+경상북도,구미시,사곡동,RESIDENTIAL,0.576092,False
+서울특별시,종로구,원남동,TOURIST,0.6479647058823529,False
+전북특별자치도,전주시 완산구,다가동1가,RESIDENTIAL,0.6488894736842105,False
+울산광역시,남구,장생포동,OFFICE,0.6486928571428571,False
+전북특별자치도,익산시,어양동,RESIDENTIAL,0.6345,False
+경기도,고양시 덕양구,관산동,GENERAL,0.4308,True
+전북특별자치도,군산시,미장동,TOURIST,0.5893444444444444,False
+경기도,양주시,고읍동,GENERAL,0.57445,False
+강원특별자치도,속초시,장사동,TOURIST,0.7047875,False
+경상북도,경산시,대동,GENERAL,0.5529666666666666,False
+전북특별자치도,군산시,나운동,RESIDENTIAL,0.6961333333333334,False
+전라남도,나주시,남평읍,RESIDENTIAL,0.697,False
+인천광역시,강화군,양도면,GENERAL,0.3429999999999999,False
+강원특별자치도,철원군,서면,RESIDENTIAL,0.625,False
+경기도,이천시,호법면,OFFICE,0.6238,False
+광주광역시,광산구,도산동,TOURIST,0.6951,False
+충청북도,옥천군,옥천읍,OFFICE,0.6857,False
+인천광역시,서구,경서동,RESIDENTIAL,0.6725869565217392,False
+부산광역시,서구,서대신동2가,CAMPUS,0.6018333333333333,False
+경상남도,밀양시,내일동,RESIDENTIAL,0.6077,False
+경기도,고양시 덕양구,주교동,OFFICE,0.6571,False
+제주특별자치도,서귀포시,보목동,TOURIST,0.6778235294117647,False
+충청남도,예산군,덕산면,TOURIST,0.7545,False
+경기도,평택시,지산동,TOURIST,0.6611,False
+충청북도,청주시 흥덕구,송절동,CAMPUS,0.6104545454545455,False
+제주특별자치도,제주시,오라일동,TOURIST,0.6590692307692307,False
+경기도,고양시 일산동구,설문동,OFFICE,0.6957083333333333,False
+경상남도,김해시,부원동,TOURIST,0.685,False
+제주특별자치도,서귀포시,상효동,TOURIST,0.6778235294117647,False
+대구광역시,동구,검사동,RESIDENTIAL,0.6195090909090909,False
+경기도,성남시 중원구,금광동,NIGHTLIFE,0.6278,False
+경기도,수원시 팔달구,팔달로3가,RESIDENTIAL,0.6567700000000001,False
+충청북도,청주시 청원구,내수읍,OFFICE,0.6583,False
+광주광역시,동구,학동,TOURIST,0.6092,False
+울산광역시,울주군,온양읍,GENERAL,0.3951,False
+서울특별시,중구,남대문로2가,NIGHTLIFE,0.6285866666666667,False
+충청남도,천안시 서북구,성환읍,OFFICE,0.6268,False
+경상북도,경주시,진현동,TOURIST,0.6624217391304348,False
+강원특별자치도,삼척시,교동,OFFICE,0.6015,False
+제주특별자치도,서귀포시,토평동,TOURIST,0.6778235294117647,False
+경기도,화성시 동탄구,송동,RESIDENTIAL,0.6154137931034483,False
+충청남도,논산시,연무읍,OFFICE,0.6605,False
+부산광역시,중구,남포동4가,TOURIST,0.7045,False
+경기도,과천시,주암동,RESIDENTIAL,0.6287428571428572,False
+광주광역시,광산구,소촌동,GENERAL,0.5570238095238095,False
+경기도,양주시,은현면,GENERAL,0.4061,True
+전북특별자치도,전주시 완산구,삼천동1가,RESIDENTIAL,0.6548666666666666,False
+전북특별자치도,군산시,경장동,TOURIST,0.5893444444444444,False
+경상북도,경주시,교동,TOURIST,0.6624217391304348,False
+부산광역시,중구,광복동1가,TOURIST,0.7088,False
+충청남도,당진시,송악읍,GENERAL,0.4168,True
+전북특별자치도,전주시 덕진구,인후동1가,CAMPUS,0.5430333333333334,False
+강원특별자치도,고성군,거진읍,TOURIST,0.7501,False
+인천광역시,중구,북성동3가,TOURIST,0.6587583333333333,False
+경상북도,포항시 북구,용흥동,TOURIST,0.687,False
+충청북도,청주시 상당구,남일면,GENERAL,0.4172,True
+충청남도,천안시 동남구,목천읍,OFFICE,0.6199,False
+서울특별시,종로구,홍지동,TOURIST,0.6479647058823529,False
+전북특별자치도,완주군,소양면,GENERAL,0.4145,True
+경기도,부천시 소사구,소사본동,OFFICE,0.62835,False
+경상남도,창원시 마산합포구,오동동,TOURIST,0.7121,False
+서울특별시,성북구,삼선동4가,CAMPUS,0.6278,False
+충청남도,예산군,삽교읍,GENERAL,0.3228,False
+경상북도,포항시 남구,송도동,TOURIST,0.6818,False
+대전광역시,유성구,노은동,RESIDENTIAL,0.6383333333333333,False
+대구광역시,달서구,성당동,RESIDENTIAL,0.6079,False
+서울특별시,중구,을지로7가,NIGHTLIFE,0.6743,False
+경기도,광주시,양벌동,GENERAL,0.58930625,False
+경상북도,경주시,보문동,TOURIST,0.6624217391304348,False
+부산광역시,중구,중앙동1가,TOURIST,0.6961,False
+서울특별시,종로구,행촌동,TOURIST,0.6479647058823529,False
+경상남도,남해군,서면,TOURIST,0.8018,False
+대전광역시,대덕구,신탄진동,OFFICE,0.649,False
+전북특별자치도,전주시 완산구,서노송동,RESIDENTIAL,0.6488894736842105,False
+대전광역시,대덕구,비래동,TOURIST,0.6198,False
+인천광역시,중구,북성동2가,TOURIST,0.6587583333333333,False
+전북특별자치도,전주시 덕진구,장동,RESIDENTIAL,0.6075,False
+경상남도,통영시,동호동,TOURIST,0.6869133333333333,False
+경상남도,창원시 의창구,동읍,GENERAL,0.3657,False
+경기도,용인시 기흥구,상하동,RESIDENTIAL,0.6022,False
+대구광역시,달서구,호림동,RESIDENTIAL,0.6645130434782608,False
+강원특별자치도,원주시,명륜동,RESIDENTIAL,0.6425000000000001,False
+경상북도,김천시,지례면,GENERAL,0.2816999999999999,False
+강원특별자치도,영월군,주천면,TOURIST,0.6764,False
+경상남도,진주시,대안동,GENERAL,0.5770700000000001,False
+경상북도,문경시,문경읍,TOURIST,0.7354,False
+부산광역시,영도구,남항동1가,TOURIST,0.6941,False
+서울특별시,성북구,상월곡동,RESIDENTIAL,0.6272,False
+강원특별자치도,강릉시,구정면,TOURIST,0.7945,False
+경기도,용인시 기흥구,하갈동,RESIDENTIAL,0.5946933333333333,False
+경상남도,거제시,장승포동,TOURIST,0.7076,False
+경상북도,경산시,조영동,GENERAL,0.5529666666666666,False
+전라남도,여수시,신월동,TOURIST,0.6336481481481481,False
+경기도,수원시 팔달구,교동,RESIDENTIAL,0.6567700000000001,False
+광주광역시,광산구,월곡동,GENERAL,0.5096,False
+서울특별시,성북구,안암동3가,OFFICE,0.6357,False
+경기도,여주시,월송동,GENERAL,0.5664416666666666,False
+경기도,이천시,사음동,GENERAL,0.5423214285714286,False
+경상남도,진주시,호탄동,GENERAL,0.5770700000000001,False
+대전광역시,동구,삼성동,CAMPUS,0.5619,False
+경기도,파주시,신촌동,OFFICE,0.6352,False
+강원특별자치도,고성군,현내면,TOURIST,0.7847,False
+전라남도,영광군,법성면,TOURIST,0.7439,False
+충청북도,청주시 상당구,문화동,RESIDENTIAL,0.5930692307692308,False
+경상남도,창원시 성산구,사파동,RESIDENTIAL,0.6027,False
+울산광역시,중구,유곡동,RESIDENTIAL,0.5905333333333334,False
+경상북도,경주시,서부동,TOURIST,0.6624217391304348,False
+대구광역시,동구,방촌동,RESIDENTIAL,0.6835,False
+경상남도,창원시 진해구,이동,RESIDENTIAL,0.6395,False
+서울특별시,종로구,명륜1가,TOURIST,0.6479647058823529,False
+전북특별자치도,전주시 완산구,전동3가,RESIDENTIAL,0.6488894736842105,False
+경기도,성남시 수정구,사송동,NIGHTLIFE,0.6532176470588235,False
+전북특별자치도,전주시 완산구,경원동3가,RESIDENTIAL,0.6488894736842105,False
+전북특별자치도,전주시 완산구,중앙동1가,TOURIST,0.6894,False
+대구광역시,동구,중대동,RESIDENTIAL,0.6195090909090909,False
+경기도,포천시,신북면,GENERAL,0.4025,True
+울산광역시,북구,화봉동,RESIDENTIAL,0.6740625,False
+충청남도,천안시 동남구,삼룡동,GENERAL,0.5534235294117648,False
+전라남도,함평군,함평읍,OFFICE,0.6256,False
+강원특별자치도,평창군,진부면,OFFICE,0.6071,False
+전라남도,순천시,풍덕동,GENERAL,0.3408,False
+경기도,동두천시,송내동,GENERAL,0.3961,False
+경상남도,남해군,설천면,TOURIST,0.784,False
+대전광역시,유성구,탑립동,RESIDENTIAL,0.6262846153846154,False
+대구광역시,북구,노원동1가,OFFICE,0.6652,False
+전북특별자치도,전주시 덕진구,송천동1가,RESIDENTIAL,0.61995,False
+경상남도,창원시 진해구,여좌동,TOURIST,0.7059,False
+대전광역시,서구,복수동,RESIDENTIAL,0.6142,False
+경기도,파주시,송촌동,OFFICE,0.6352,False
+경상남도,통영시,항남동,TOURIST,0.6869133333333333,False
+인천광역시,중구,중앙동3가,TOURIST,0.6587583333333333,False
+서울특별시,용산구,도원동,OFFICE,0.62136875,False
+경기도,화성시,기안동,RESIDENTIAL,0.6154137931034483,False
+제주특별자치도,제주시,해안동,TOURIST,0.6590692307692307,False
+충청북도,제천시,금성면,TOURIST,0.7399,False
+대구광역시,달성군,논공읍,GENERAL,0.3695,False
+전라남도,곡성군,석곡면,OFFICE,0.6383,False
+경상북도,구미시,상모동,RESIDENTIAL,0.576092,False
+충청북도,제천시,청풍면,TOURIST,0.7687,False
+강원특별자치도,삼척시,근덕면,TOURIST,0.8011,False
+경기도,용인시 기흥구,청덕동,RESIDENTIAL,0.5946933333333333,False
+경기도,고양시 덕양구,고양동,CAMPUS,0.6023,False
+경상남도,통영시,중앙동,TOURIST,0.7465,False
+전북특별자치도,전주시 완산구,풍남동3가,TOURIST,0.7228,False
+서울특별시,용산구,문배동,OFFICE,0.62136875,False
+울산광역시,중구,동동,RESIDENTIAL,0.5905333333333334,False
+인천광역시,서구,시천동,RESIDENTIAL,0.6725869565217392,False
+전라남도,목포시,연산동,RESIDENTIAL,0.624,False
+강원특별자치도,강릉시,성산면,TOURIST,0.7821,False
+충청남도,서산시,성연면,GENERAL,0.3746,False
+경기도,이천시,대월면,OFFICE,0.6333,False
+경기도,여주시,상동,GENERAL,0.5664416666666666,False
+충청남도,논산시,강경읍,TOURIST,0.6853,False
+경상남도,양산시,원동면,TOURIST,0.7967,False
+경기도,평택시,고덕면,OFFICE,0.6938,False
+강원특별자치도,속초시,도문동,TOURIST,0.7047875,False
+경기도,연천군,전곡읍,OFFICE,0.7106,False
+경상북도,구미시,공단동,OFFICE,0.6248,False
+전라남도,목포시,죽교동,TOURIST,0.7049,False
+전라남도,담양군,금성면,TOURIST,0.7905,False
+경기도,고양시 덕양구,오금동,RESIDENTIAL,0.6780571428571429,False
+경상북도,청송군,진보면,TOURIST,0.7243,False
+전북특별자치도,부안군,진서면,GENERAL,0.3798,False
+충청남도,서산시,석남동,RESIDENTIAL,0.6157,False
+경기도,평택시,청북읍,RESIDENTIAL,0.6001,False
+충청남도,천안시 동남구,풍세면,GENERAL,0.4125,True
+경기도,이천시,백사면,GENERAL,0.2885,False
+경상북도,안동시,남부동,TOURIST,0.6069833333333333,False
+강원특별자치도,원주시,소초면,TOURIST,0.7591,False
+전라남도,담양군,월산면,TOURIST,0.7495,False
+서울특별시,종로구,인의동,TOURIST,0.6479647058823529,False
+경상남도,김해시,구산동,OFFICE,0.6030842105263158,False
+인천광역시,계양구,오류동,RESIDENTIAL,0.6505916666666667,False
+경상남도,진주시,상봉동,TOURIST,0.7205,False
+대구광역시,군위군,효령면,GENERAL,0.3692,False
+경상남도,사천시,대방동,TOURIST,0.5692642857142857,False
+경기도,오산시,청호동,OFFICE,0.6421375,False
+서울특별시,성북구,삼선동1가,CAMPUS,0.6278,False
+충청북도,괴산군,청천면,TOURIST,0.78,False
+광주광역시,남구,임암동,RESIDENTIAL,0.6205235294117647,False
+충청남도,당진시,채운동,GENERAL,0.5622499999999999,False
+경기도,오산시,누읍동,OFFICE,0.6421375,False
+경상북도,경주시,성동동,TOURIST,0.6624217391304348,False
+경기도,여주시,하동,GENERAL,0.5664416666666666,False
+강원특별자치도,철원군,갈말읍,OFFICE,0.6846,False
+강원특별자치도,강릉시,노암동,TOURIST,0.6762,False
+경기도,양평군,개군면,OFFICE,0.6469,False
+경상남도,합천군,합천읍,TOURIST,0.6923,False
+서울특별시,구로구,가리봉동,OFFICE,0.6856,False
+경상남도,고성군,고성읍,OFFICE,0.6782,False
+강원특별자치도,횡성군,서원면,RESIDENTIAL,0.6041,False
+경기도,평택시,장안동,OFFICE,0.657788,False
+인천광역시,남동구,운연동,OFFICE,0.66584,False
+경기도,양주시,회암동,GENERAL,0.57445,False
+경상북도,경주시,천북면,TOURIST,0.773,False
+서울특별시,성북구,안암동2가,OFFICE,0.6357,False
+경상북도,경주시,양남면,TOURIST,0.737,False
+경기도,광주시,고산동,GENERAL,0.58930625,False
+부산광역시,서구,남부민동,TOURIST,0.6983999999999999,False
+인천광역시,중구,송월동2가,TOURIST,0.6587583333333333,False
+전라남도,고흥군,도양읍,TOURIST,0.7494,False
+경상북도,경주시,감포읍,TOURIST,0.7504,False
+경상북도,울진군,후포면,TOURIST,0.7309,False
+경상남도,김해시,대동면,GENERAL,0.4308,True
+경상북도,안동시,정하동,TOURIST,0.6069833333333333,False
+서울특별시,서초구,원지동,RESIDENTIAL,0.6613722222222223,False
+대구광역시,북구,읍내동,OFFICE,0.6362,False
+광주광역시,동구,대의동,TOURIST,0.620676923076923,False
+울산광역시,중구,다운동,GENERAL,0.4442,True
+충청남도,당진시,석문면,GENERAL,0.4183,True
+제주특별자치도,제주시,화북일동,TOURIST,0.6590692307692307,False
+부산광역시,영도구,대교동2가,TOURIST,0.6794,False
+전북특별자치도,군산시,지곡동,TOURIST,0.5893444444444444,False
+경상북도,경주시,외동읍,GENERAL,0.3231,False
+경상남도,진주시,금산면,GENERAL,0.3715,False
+강원특별자치도,원주시,일산동,TOURIST,0.6462,False
+광주광역시,남구,백운동,RESIDENTIAL,0.6186,False
+충청남도,서산시,해미면,TOURIST,0.7348,False
+전북특별자치도,남원시,도통동,TOURIST,0.6873,False
+광주광역시,광산구,선암동,GENERAL,0.5570238095238095,False
+서울특별시,서초구,내곡동,TOURIST,0.6042,False
+전북특별자치도,완주군,이서면,RESIDENTIAL,0.6332,False
+경기도,여주시,홍문동,GENERAL,0.5664416666666666,False
+충청남도,아산시,도고면,TOURIST,0.7638,False
+경기도,이천시,장호원읍,CAMPUS,0.607,False
+경기도,이천시,안흥동,GENERAL,0.5423214285714286,False
+울산광역시,중구,서동,RESIDENTIAL,0.5905333333333334,False
+부산광역시,영도구,봉래동1가,TOURIST,0.68445,False
+충청남도,천안시 서북구,성거읍,OFFICE,0.6534,False
+광주광역시,동구,황금동,TOURIST,0.620676923076923,False
+울산광역시,남구,야음동,OFFICE,0.6486928571428571,False
+경기도,화성시,송산면,TOURIST,0.7031,False
+강원특별자치도,삼척시,당저동,GENERAL,0.5076999999999999,False
+경기도,성남시 중원구,상대원동,OFFICE,0.6466333333333334,False
+강원특별자치도,춘천시,옥천동,CAMPUS,0.58904,False
+경상남도,하동군,하동읍,RESIDENTIAL,0.6413,False
+부산광역시,남구,용당동,CAMPUS,0.5036,True
+광주광역시,동구,금동,TOURIST,0.620676923076923,False
+강원특별자치도,양구군,양구읍,TOURIST,0.7163,False
+서울특별시,은평구,증산동,RESIDENTIAL,0.6336,False
+세종특별자치시,,연서면,RESIDENTIAL,0.6562708333333334,False
+강원특별자치도,정선군,사북읍,GENERAL,0.3735,False
+충청북도,증평군,증평읍,OFFICE,0.6643,False
+경상남도,사천시,사남면,GENERAL,0.3484,False
+경상남도,통영시,정량동,TOURIST,0.7389,False
+경상북도,경주시,배동,TOURIST,0.6624217391304348,False
+전라남도,순천시,덕월동,TOURIST,0.589225,False
+대구광역시,중구,대안동,RESIDENTIAL,0.6376916666666667,False
+강원특별자치도,속초시,청학동,TOURIST,0.7047875,False
+경기도,시흥시,거모동,RESIDENTIAL,0.638325,False
+대구광역시,달서구,유천동,RESIDENTIAL,0.7493,False
+부산광역시,중구,보수동3가,TOURIST,0.6778,False
+광주광역시,남구,월산동,RESIDENTIAL,0.6257666666666667,False
+경상북도,문경시,호계면,TOURIST,0.7784,False
+세종특별자치시,,새롬동,RESIDENTIAL,0.6562708333333334,False
+인천광역시,강화군,불은면,GENERAL,0.3339,False
+경상남도,진주시,인사동,GENERAL,0.5770700000000001,False
+광주광역시,서구,양동,TOURIST,0.6643,False
+충청남도,홍성군,광천읍,OFFICE,0.6075,False
+광주광역시,남구,노대동,RESIDENTIAL,0.6205235294117647,False
+경상북도,영덕군,영덕읍,GENERAL,0.3882,False
+강원특별자치도,춘천시,약사동,CAMPUS,0.58904,False
+전라남도,진도군,진도읍,TOURIST,0.709,False
+경기도,이천시,송정동,GENERAL,0.5423214285714286,False
+서울특별시,영등포구,영등포동2가,OFFICE,0.67855,False
+전라남도,화순군,도곡면,TOURIST,0.7781,False
+광주광역시,북구,오치동,CAMPUS,0.62115,False
+강원특별자치도,춘천시,남산면,OFFICE,0.6108,False
+경상남도,창녕군,창녕읍,GENERAL,0.3418,False
+전라남도,나주시,영산동,TOURIST,0.7031,False
+대전광역시,동구,홍도동,CAMPUS,0.5786,True
+광주광역시,서구,매월동,RESIDENTIAL,0.6426000000000001,False
+서울특별시,영등포구,영등포동5가,OFFICE,0.67855,False
+전북특별자치도,전주시 완산구,남노송동,RESIDENTIAL,0.6488894736842105,False
+경상남도,양산시,덕계동,RESIDENTIAL,0.6154,False
+전북특별자치도,고창군,아산면,TOURIST,0.7696,False
+경기도,화성시,중동,RESIDENTIAL,0.6154137931034483,False
+서울특별시,성북구,동소문동1가,RESIDENTIAL,0.6272,False
+광주광역시,광산구,흑석동,GENERAL,0.5570238095238095,False
+경상남도,의령군,의령읍,OFFICE,0.6392,False
+광주광역시,동구,광산동,TOURIST,0.620676923076923,False
+경기도,안성시,양성면,OFFICE,0.6095,False
+충청북도,충주시,금릉동,OFFICE,0.592624,False
+경상남도,밀양시,내이동,TOURIST,0.6556,False
+경상북도,경산시,압량읍,GENERAL,0.3625,False
+충청남도,아산시,신창면,TOURIST,0.7222,False
+충청남도,당진시,원당동,GENERAL,0.5622499999999999,False
+충청남도,천안시 서북구,차암동,RESIDENTIAL,0.6481642857142857,False
+경상북도,예천군,용궁면,GENERAL,0.4082,True
+충청남도,논산시,연산면,RESIDENTIAL,0.6407,False
+경기도,평택시,청룡동,OFFICE,0.657788,False
+경기도,김포시,북변동,OFFICE,0.6777,False
+경기도,파주시,파평면,GENERAL,0.3858,False
+경기도,의정부시,녹양동,CAMPUS,0.6336,False
+경기도,광주시,탄벌동,GENERAL,0.3993,False
+충청북도,충주시,문화동,TOURIST,0.6705,False
+충청남도,천안시 서북구,직산읍,OFFICE,0.6415,False
+강원특별자치도,강릉시,남문동,TOURIST,0.6762,False
+부산광역시,금정구,금성동,GENERAL,0.4675,True
+경상남도,통영시,서호동,TOURIST,0.6869133333333333,False
+인천광역시,서구,신현동,RESIDENTIAL,0.6725869565217392,False
+강원특별자치도,인제군,인제읍,OFFICE,0.6513,False
+경상북도,울릉군,울릉읍,TOURIST,0.7434,False
+전북특별자치도,임실군,운암면,TOURIST,0.7429,False
+경기도,성남시 수정구,오야동,NIGHTLIFE,0.6532176470588235,False
+부산광역시,금정구,서동,GENERAL,0.5583666666666667,False
+강원특별자치도,횡성군,횡성읍,OFFICE,0.6214,False
+경기도,수원시 장안구,이목동,RESIDENTIAL,0.62147,False
+경상남도,창원시 성산구,반지동,RESIDENTIAL,0.625825,False
+경상남도,창원시 성산구,신월동,RESIDENTIAL,0.625825,False
+충청남도,서산시,동문동,OFFICE,0.6568499999999999,False
+충청남도,서산시,대산읍,TOURIST,0.7425,False
+서울특별시,영등포구,양평동3가,OFFICE,0.6396,False
+울산광역시,중구,복산동,RESIDENTIAL,0.7092,False
+경기도,과천시,문원동,GENERAL,0.4272,True
+경기도,광주시,남종면,TOURIST,0.7266,False
+전북특별자치도,군산시,영화동,TOURIST,0.5893444444444444,False
+서울특별시,중구,광희동2가,NIGHTLIFE,0.6504,False
+경상남도,창원시 의창구,팔용동,GENERAL,0.5170714285714285,False
+경기도,연천군,청산면,RESIDENTIAL,0.6026,False
+경기도,부천시 오정구,원종동,RESIDENTIAL,0.64315,False
+경상남도,창원시 마산합포구,교방동,TOURIST,0.6406,False
+경상남도,거제시,양정동,TOURIST,0.63465,False
+전북특별자치도,고창군,고창읍,GENERAL,0.363,False
+부산광역시,사상구,엄궁동,GENERAL,0.4067,True
+충청남도,금산군,금산읍,TOURIST,0.6538,False
+경상북도,경주시,성건동,OFFICE,0.6384,False
+대전광역시,동구,정동,CAMPUS,0.60455625,False
+경기도,부천시,옥길동,RESIDENTIAL,0.6560892857142857,False
+강원특별자치도,강릉시,병산동,TOURIST,0.6762,False
+충청북도,음성군,음성읍,TOURIST,0.6654,False
+경상북도,경산시,남산면,RESIDENTIAL,0.6153,False
+서울특별시,중구,저동1가,NIGHTLIFE,0.6285866666666667,False
+전라남도,여수시,선원동,TOURIST,0.6336481481481481,False
+경기도,파주시,산남동,OFFICE,0.6352,False
+서울특별시,성북구,보문동5가,OFFICE,0.6132,False
+인천광역시,남동구,수산동,OFFICE,0.66584,False
+경기도,오산시,갈곶동,OFFICE,0.6421375,False
+경상남도,김해시,동상동,OFFICE,0.64545,False
+대전광역시,대덕구,연축동,GENERAL,0.5550916666666666,False
+전북특별자치도,전주시 덕진구,우아동2가,TOURIST,0.6943999999999999,False
+경상북도,영천시,망정동,GENERAL,0.55230625,False
+전북특별자치도,군산시,개정면,GENERAL,0.39859999999999995,False
+서울특별시,성북구,삼선동2가,CAMPUS,0.6278,False
+강원특별자치도,춘천시,낙원동,CAMPUS,0.58904,False
+강원특별자치도,원주시,흥업면,CAMPUS,0.5831,False
+인천광역시,중구,중앙동4가,TOURIST,0.6587583333333333,False
+대구광역시,중구,장관동,RESIDENTIAL,0.6376916666666667,False
+대구광역시,북구,동변동,OFFICE,0.6005695652173914,False
+경기도,화성시,기산동,RESIDENTIAL,0.6154137931034483,False
+광주광역시,북구,삼각동,RESIDENTIAL,0.6844,False
+경기도,수원시 권선구,입북동,RESIDENTIAL,0.6196,False
+경기도,성남시 수정구,단대동,RESIDENTIAL,0.634,False
+경상남도,하동군,북천면,GENERAL,0.3706,False
+경기도,파주시,오도동,OFFICE,0.6352,False
+서울특별시,중구,남산동3가,NIGHTLIFE,0.6285866666666667,False
+경기도,수원시 팔달구,지동,OFFICE,0.6112,False
+충청남도,예산군,대흥면,TOURIST,0.7543,False
+인천광역시,중구,운북동,TOURIST,0.6587583333333333,False
+충청남도,서산시,갈산동,GENERAL,0.5169066666666666,False
+충청남도,금산군,추부면,GENERAL,0.427,True
+충청북도,충주시,성서동,OFFICE,0.592624,False
+경상남도,통영시,산양읍,TOURIST,0.7551,False
+경기도,화성시,비봉면,GENERAL,0.4056,True
+경상남도,거제시,연초면,GENERAL,0.427,True
+부산광역시,영도구,남항동3가,TOURIST,0.6941,False
+대구광역시,수성구,사월동,RESIDENTIAL,0.6784826086956521,False
+서울특별시,용산구,청파동1가,CAMPUS,0.6319,False
+전라남도,나주시,중앙동,GENERAL,0.53794,False
+전라남도,목포시,금화동,TOURIST,0.6129043478260869,False
+전라남도,담양군,대전면,GENERAL,0.4052,True
+인천광역시,서구,연희동,OFFICE,0.7268,False
+강원특별자치도,삼척시,정하동,GENERAL,0.5076999999999999,False
+대전광역시,유성구,갑동,RESIDENTIAL,0.6262846153846154,False
+광주광역시,북구,풍향동,RESIDENTIAL,0.6315,False
+경상남도,양산시,북부동,OFFICE,0.5939384615384615,False
+경기도,화성시,정남면,OFFICE,0.6263,False
+대구광역시,서구,원대동2가,OFFICE,0.6159,False
+경상남도,사천시,정동면,RESIDENTIAL,0.6272,False
+서울특별시,성북구,동선동5가,CAMPUS,0.638,False
+경상남도,진주시,이현동,CAMPUS,0.6035,False
+경상북도,포항시 북구,우현동,OFFICE,0.64818,False
+전라남도,담양군,용면,TOURIST,0.8115,False
+광주광역시,동구,궁동,TOURIST,0.620676923076923,False
+경상북도,청송군,청송읍,TOURIST,0.7277,False
+대전광역시,서구,내동,RESIDENTIAL,0.6331,False
+전라남도,목포시,중동1가,TOURIST,0.6129043478260869,False
+강원특별자치도,동해시,쇄운동,TOURIST,0.70769,False
+경기도,고양시 덕양구,대자동,RESIDENTIAL,0.6780571428571429,False
+전북특별자치도,부안군,계화면,GENERAL,0.3995999999999999,False
+대구광역시,북구,매천동,OFFICE,0.6005695652173914,False
+대구광역시,중구,서성로1가,RESIDENTIAL,0.6376916666666667,False
+서울특별시,용산구,청암동,OFFICE,0.62136875,False
+충청북도,괴산군,괴산읍,GENERAL,0.3420999999999999,False
+경상북도,안동시,정상동,TOURIST,0.6069833333333333,False
+대전광역시,중구,대사동,GENERAL,0.4009,True
+강원특별자치도,정선군,고한읍,TOURIST,0.7418,False
+경상남도,창원시 진해구,송학동,RESIDENTIAL,0.6121846153846154,False
+충청남도,천안시 동남구,구룡동,GENERAL,0.5534235294117648,False
+경상남도,거제시,하청면,TOURIST,0.7534,False
+경기도,오산시,내삼미동,OFFICE,0.6421375,False
+경기도,안산시 상록구,건건동,OFFICE,0.6000538461538462,False
+경상남도,밀양시,부북면,OFFICE,0.6135,False
+경기도,용인시 기흥구,지곡동,RESIDENTIAL,0.5946933333333333,False
+광주광역시,북구,연제동,RESIDENTIAL,0.6422962962962963,False
+대구광역시,중구,향촌동,RESIDENTIAL,0.6376916666666667,False
+경상남도,진주시,강남동,GENERAL,0.5770700000000001,False
+충청북도,진천군,이월면,OFFICE,0.6739,False
+충청남도,천안시 서북구,부대동,RESIDENTIAL,0.6481642857142857,False
+서울특별시,서대문구,합동,RESIDENTIAL,0.6118857142857143,False
+경상남도,진주시,평안동,GENERAL,0.5770700000000001,False
+서울특별시,중구,남산동1가,NIGHTLIFE,0.6285866666666667,False
+경기도,안성시,대덕면,OFFICE,0.6215,False
+경상남도,창원시 마산합포구,신포동1가,TOURIST,0.5817,False
+울산광역시,울주군,두동면,TOURIST,0.7942,False
+대구광역시,동구,불로동,RESIDENTIAL,0.6195090909090909,False
+부산광역시,사하구,구평동,RESIDENTIAL,0.621,False
+경기도,고양시 덕양구,대장동,RESIDENTIAL,0.6780571428571429,False
+강원특별자치도,원주시,호저면,TOURIST,0.7435,False
+충청북도,단양군,가곡면,GENERAL,0.3286,False
+경상남도,사천시,서동,TOURIST,0.7231,False
+충청남도,아산시,기산동,OFFICE,0.601864705882353,False
+경기도,용인시 기흥구,상갈동,TOURIST,0.6053,False
+경기도,평택시,소사동,OFFICE,0.657788,False
+전북특별자치도,익산시,인화동2가,CAMPUS,0.5607,False
+경기도,화성시 병점구,능동,RESIDENTIAL,0.6154137931034483,False
+충청남도,아산시,득산동,OFFICE,0.601864705882353,False
+대구광역시,수성구,대흥동,RESIDENTIAL,0.6784826086956521,False
+대구광역시,중구,화전동,RESIDENTIAL,0.6376916666666667,False
+전라남도,구례군,토지면,GENERAL,0.3602999999999999,False
+경기도,시흥시,목감동,RESIDENTIAL,0.7179,False
+경상북도,구미시,지산동,TOURIST,0.7132,False
+경상북도,경산시,중방동,RESIDENTIAL,0.6092,False
+경기도,광주시,문형동,GENERAL,0.58930625,False
+경기도,수원시 권선구,평동,OFFICE,0.6811,False
+울산광역시,북구,연암동,RESIDENTIAL,0.6740625,False
+전북특별자치도,고창군,상하면,TOURIST,0.773,False
+경기도,의왕시,월암동,RESIDENTIAL,0.5898,False
+울산광역시,남구,선암동,GENERAL,0.4376,True
+부산광역시,강서구,대저1동,GENERAL,0.589,False
+경기도,안산시 상록구,팔곡일동,OFFICE,0.6000538461538462,False
+광주광역시,동구,운림동,TOURIST,0.620676923076923,False
+충청북도,보은군,속리산면,TOURIST,0.7749,False
+충청남도,당진시,시곡동,GENERAL,0.5622499999999999,False
+경상남도,양산시,명동,OFFICE,0.5939384615384615,False
+부산광역시,서구,부민동1가,TOURIST,0.6565,False
+울산광역시,중구,장현동,RESIDENTIAL,0.5905333333333334,False
+경기도,화성시 동탄구,오산동,RESIDENTIAL,0.6154137931034483,False
+충청남도,홍성군,서부면,TOURIST,0.7712,False
+경기도,광주시,삼동,GENERAL,0.58930625,False
+전라남도,목포시,북교동,TOURIST,0.6129043478260869,False
+경기도,연천군,군남면,GENERAL,0.3239999999999999,False
+경상남도,거제시,사등면,GENERAL,0.2796999999999999,False
+세종특별자치시,,해밀동,RESIDENTIAL,0.6562708333333334,False
+전북특별자치도,부안군,행안면,TOURIST,0.6734,False
+경상남도,남해군,이동면,TOURIST,0.7459,False
+경상북도,칠곡군,석적읍,OFFICE,0.6186,False
+충청북도,제천시,신월동,GENERAL,0.5625647058823529,False
+대구광역시,북구,관음동,RESIDENTIAL,0.6261,False
+충청북도,충주시,교현동,OFFICE,0.6889,False
+대전광역시,중구,목동,RESIDENTIAL,0.6752,False
+경상북도,포항시 북구,청하면,TOURIST,0.7838,False
+전라남도,순천시,동외동,TOURIST,0.589225,False
+서울특별시,성북구,안암동4가,OFFICE,0.6357,False
+부산광역시,금정구,청룡동,RESIDENTIAL,0.587575,False
+경기도,화성시,송산동,TOURIST,0.7031,False
+경상북도,영덕군,영해면,RESIDENTIAL,0.6001,False
+대전광역시,중구,석교동,OFFICE,0.6369,False
+광주광역시,광산구,우산동,OFFICE,0.6515,False
+대구광역시,중구,동성로1가,RESIDENTIAL,0.6376916666666667,False
+경상남도,창원시 진해구,대흥동,RESIDENTIAL,0.6121846153846154,False
+전라남도,나주시,세지면,GENERAL,0.2598,False
+전라남도,여수시,덕충동,TOURIST,0.6336481481481481,False
+경상북도,구미시,구평동,RESIDENTIAL,0.576092,False
+경상남도,김해시,삼문동,OFFICE,0.6030842105263158,False
+울산광역시,동구,동부동,OFFICE,0.6372222222222222,False
+서울특별시,중구,남대문로1가,NIGHTLIFE,0.6285866666666667,False
+서울특별시,성북구,동소문동4가,RESIDENTIAL,0.6272,False
+경기도,부천시 소사구,괴안동,RESIDENTIAL,0.6609,False
+경상남도,진주시,동성동,GENERAL,0.5770700000000001,False
+경상북도,고령군,다산면,RESIDENTIAL,0.6055,False
+경기도,양주시,율정동,GENERAL,0.57445,False
+경기도,파주시,당하동,OFFICE,0.6352,False
+전북특별자치도,군산시,중앙로1가,TOURIST,0.5893444444444444,False
+경기도,화성시 병점구,안녕동,RESIDENTIAL,0.6154137931034483,False
+강원특별자치도,양구군,방산면,TOURIST,0.7401,False
+강원특별자치도,홍천군,서석면,OFFICE,0.6437,False
+경상남도,밀양시,산외면,TOURIST,0.7907,False
+전라남도,여수시,화장동,TOURIST,0.6336481481481481,False
+경상남도,김해시,무계동,OFFICE,0.6030842105263158,False
+충청북도,충주시,성내동,OFFICE,0.592624,False
+울산광역시,북구,산하동,RESIDENTIAL,0.6740625,False
+전라남도,목포시,온금동,TOURIST,0.6129043478260869,False
+경기도,용인시 처인구,마평동,RESIDENTIAL,0.6186071428571428,False
+충청남도,천안시 동남구,용곡동,GENERAL,0.5534235294117648,False
+서울특별시,용산구,신계동,OFFICE,0.62136875,False
+제주특별자치도,제주시,봉개동,TOURIST,0.7311,False
+경기도,평택시,오성면,TOURIST,0.7032,False
+충청남도,부여군,규암면,GENERAL,0.3178999999999999,False
+대구광역시,달서구,월암동,RESIDENTIAL,0.6645130434782608,False
+충청북도,제천시,강제동,GENERAL,0.5625647058823529,False
+경기도,군포시,속달동,RESIDENTIAL,0.6526333333333333,False
+부산광역시,사상구,덕포동,GENERAL,0.49949999999999994,False
+부산광역시,해운대구,반송동,OFFICE,0.6116,False
+경상북도,구미시,임은동,RESIDENTIAL,0.576092,False
+서울특별시,종로구,종로3가,NIGHTLIFE,0.67195,False
+강원특별자치도,강릉시,금학동,TOURIST,0.6762,False
+경기도,안성시,서인동,OFFICE,0.5664,False
+전라남도,목포시,중앙동2가,TOURIST,0.6129043478260869,False
+전북특별자치도,익산시,신동,CAMPUS,0.5845,True
+강원특별자치도,춘천시,사북면,TOURIST,0.7769,False
+전라남도,함평군,해보면,TOURIST,0.7322,False
+부산광역시,금정구,두구동,RESIDENTIAL,0.587575,False
+충청북도,제천시,의림동,GENERAL,0.5625647058823529,False
+전북특별자치도,익산시,황등면,GENERAL,0.417,True
+경상남도,창녕군,영산면,GENERAL,0.3067999999999999,False
+경상남도,통영시,북신동,TOURIST,0.6823,False
+강원특별자치도,춘천시,요선동,CAMPUS,0.58904,False
+경상남도,산청군,신안면,TOURIST,0.7295,False
+경상북도,구미시,신평동,OFFICE,0.6101,False
+경기도,의왕시,초평동,RESIDENTIAL,0.5898,False
+충청북도,청주시 서원구,모충동,CAMPUS,0.5406,True
+부산광역시,영도구,영선동2가,TOURIST,0.7158500000000001,False
+부산광역시,중구,신창동2가,TOURIST,0.7027555555555556,False
+세종특별자치시,,장군면,RESIDENTIAL,0.6562708333333334,False
+서울특별시,종로구,장사동,TOURIST,0.6479647058823529,False
+서울특별시,중구,충정로1가,NIGHTLIFE,0.6285866666666667,False
+대구광역시,수성구,파동,TOURIST,0.6337,False
+충청남도,서천군,장항읍,TOURIST,0.7281,False
+광주광역시,북구,오룡동,RESIDENTIAL,0.6422962962962963,False
+광주광역시,동구,충장로3가,TOURIST,0.620676923076923,False
+강원특별자치도,동해시,발한동,TOURIST,0.7503,False
+전북특별자치도,전주시 완산구,평화동2가,RESIDENTIAL,0.6315,False
+대전광역시,유성구,봉산동,RESIDENTIAL,0.6262846153846154,False
+전북특별자치도,익산시,창인동1가,GENERAL,0.5517310344827586,False
+충청남도,천안시 동남구,문화동,GENERAL,0.5534235294117648,False
+전라남도,여수시,국동,TOURIST,0.7202,False
+충청북도,음성군,맹동면,CAMPUS,0.6614,False
+광주광역시,동구,충장로1가,TOURIST,0.620676923076923,False
+충청남도,태안군,원북면,TOURIST,0.789,False
+전라남도,순천시,행동,TOURIST,0.589225,False
+경상남도,통영시,용남면,TOURIST,0.7733,False
+경기도,화성시 동탄구,영천동,RESIDENTIAL,0.6154137931034483,False
+전북특별자치도,군산시,산북동,TOURIST,0.5893444444444444,False
+충청남도,공주시,금흥동,TOURIST,0.5812937499999999,False
+경상북도,경주시,마동,TOURIST,0.6624217391304348,False
+전라남도,곡성군,옥과면,GENERAL,0.3923,False
+경상남도,창원시 성산구,대방동,RESIDENTIAL,0.625825,False
+경기도,여주시,창동,GENERAL,0.5664416666666666,False
+충청북도,제천시,화산동,GENERAL,0.3702,False
+경기도,파주시,아동동,OFFICE,0.6352,False
+경상남도,창원시 마산합포구,가포동,PREMIUM,0.5513,False
+경상북도,경산시,삼남동,GENERAL,0.5529666666666666,False
+경상남도,김해시,풍유동,OFFICE,0.6030842105263158,False
+인천광역시,중구,관동3가,TOURIST,0.6587583333333333,False
+경상북도,영천시,문외동,GENERAL,0.55230625,False
+광주광역시,광산구,명화동,GENERAL,0.5570238095238095,False
+경기도,파주시,적성면,TOURIST,0.7298,False
+부산광역시,중구,동광동3가,TOURIST,0.7237,False
+대전광역시,대덕구,법동,RESIDENTIAL,0.6334500000000001,False
+경상북도,포항시 북구,여남동,OFFICE,0.64818,False
+충청북도,충주시,수안보면,TOURIST,0.7609,False
+충청남도,보령시,대천동,RESIDENTIAL,0.66232,False
+인천광역시,서구,오류동,RESIDENTIAL,0.6725869565217392,False
+충청북도,청주시 서원구,장성동,CAMPUS,0.6077636363636363,False
+부산광역시,중구,신창동3가,TOURIST,0.7027555555555556,False
+부산광역시,중구,대청동1가,TOURIST,0.7003,False
+경기도,광명시,옥길동,RESIDENTIAL,0.6759894736842105,False
+경기도,성남시 분당구,분당동,RESIDENTIAL,0.7089,False
+강원특별자치도,원주시,봉산동,RESIDENTIAL,0.6411,False
+경상남도,사천시,서금동,TOURIST,0.7356,False
+경상남도,창원시 마산합포구,동성동,TOURIST,0.5817,False
+경상남도,통영시,봉평동,TOURIST,0.722,False
+강원특별자치도,인제군,기린면,TOURIST,0.757,False
+전라남도,담양군,가사문학면,PREMIUM,0.6194,False
+부산광역시,중구,남포동3가,TOURIST,0.7045,False
+경기도,안산시 상록구,일동,OFFICE,0.6745,False
+경상남도,통영시,무전동,OFFICE,0.6444,False
+경상남도,남해군,남면,GENERAL,0.3586,False
+광주광역시,북구,동림동,RESIDENTIAL,0.7096,False
+인천광역시,중구,관동2가,TOURIST,0.6587583333333333,False
+부산광역시,강서구,천성동,GENERAL,0.5988777777777777,False
+대구광역시,동구,상매동,RESIDENTIAL,0.6195090909090909,False
+경상남도,창원시 마산합포구,덕동동,TOURIST,0.5817,False
+대전광역시,중구,용두동,RESIDENTIAL,0.6587,False
+부산광역시,강서구,녹산동,OFFICE,0.6469,False
+인천광역시,강화군,교동면,GENERAL,0.3348,False
+부산광역시,서구,동대신동2가,RESIDENTIAL,0.6092666666666666,False
+서울특별시,서대문구,신촌동,NIGHTLIFE,0.6293,False
+경상북도,문경시,마성면,GENERAL,0.3857,False
+경기도,파주시,파주읍,GENERAL,0.3232,False
+경상남도,함안군,산인면,TOURIST,0.7801,False
+대전광역시,동구,가양동,CAMPUS,0.6246,False
+경상남도,거제시,남부면,TOURIST,0.7886,False
+경상남도,창원시 의창구,봉림동,RESIDENTIAL,0.6192,False
+충청북도,청주시 상당구,용정동,RESIDENTIAL,0.5930692307692308,False
+강원특별자치도,홍천군,화촌면,TOURIST,0.7392,False
+대전광역시,동구,용운동,CAMPUS,0.5729,True
+부산광역시,동구,좌천동,TOURIST,0.6182,False
+경기도,화성시 만세구,송산면,RESIDENTIAL,0.6154137931034483,False
+전라남도,순천시,매곡동,TOURIST,0.7014,False
+충청북도,청주시 서원구,사직동,RESIDENTIAL,0.66185,False
+전라남도,순천시,대룡동,TOURIST,0.589225,False
+전북특별자치도,전주시 덕진구,중동,RESIDENTIAL,0.6075,False
+충청북도,진천군,광혜원면,OFFICE,0.6621,False
+대구광역시,서구,원대동1가,OFFICE,0.6159,False
+광주광역시,북구,매곡동,RESIDENTIAL,0.675,False
+경기도,오산시,양산동,OFFICE,0.6421375,False
+전북특별자치도,전주시 완산구,상림동,RESIDENTIAL,0.6488894736842105,False
+경기도,안산시 단원구,대부남동,OFFICE,0.7033416666666668,False
+광주광역시,북구,각화동,RESIDENTIAL,0.6422962962962963,False
+경기도,양평군,청운면,TOURIST,0.8124,False
+전라남도,여수시,고소동,TOURIST,0.6336481481481481,False
+경상남도,창원시 마산회원구,석전동,RESIDENTIAL,0.6021,False
+부산광역시,사상구,감전동,OFFICE,0.6422,False
+부산광역시,강서구,봉림동,GENERAL,0.5988777777777777,False
+경상북도,포항시 남구,장기면,TOURIST,0.8099,False
+서울특별시,영등포구,당산동,OFFICE,0.70035,False
+충청남도,아산시,송악면,TOURIST,0.7477,False
+경상남도,창원시 마산합포구,월영동,CAMPUS,0.6311,False
+경기도,화성시 병점구,진안동,RESIDENTIAL,0.6154137931034483,False
+세종특별자치시,,집현동,RESIDENTIAL,0.6562708333333334,False
+경기도,안성시,서운면,GENERAL,0.3053,False
+충청남도,천안시 동남구,청수동,GENERAL,0.5534235294117648,False
+전라남도,해남군,산이면,GENERAL,0.3812,False
+경상북도,경주시,문무대왕면,TOURIST,0.7534,False
+경기도,안산시 상록구,사사동,OFFICE,0.6000538461538462,False
+서울특별시,성북구,보문동6가,OFFICE,0.6132,False
+대구광역시,중구,동인동3가,NIGHTLIFE,0.6296,False
+경상남도,창원시 진해구,대죽동,RESIDENTIAL,0.6121846153846154,False
+충청북도,청주시 상당구,영운동,RESIDENTIAL,0.6099,False
+경상남도,창원시 마산합포구,중앙동2가,TOURIST,0.5817,False
+부산광역시,남구,우암동,RESIDENTIAL,0.618,False
+전라남도,목포시,유동,TOURIST,0.6129043478260869,False
+충청북도,충주시,칠금동,OFFICE,0.592624,False
+대전광역시,유성구,계산동,RESIDENTIAL,0.6262846153846154,False
+경상북도,김천시,대항면,GENERAL,0.2846999999999999,False
+서울특별시,구로구,궁동,OFFICE,0.63971875,False
+경상북도,경산시,갑제동,GENERAL,0.5529666666666666,False
+전라남도,영암군,학산면,GENERAL,0.3416,False
+경기도,부천시,원종동,RESIDENTIAL,0.6560892857142857,False
+광주광역시,남구,사동,RESIDENTIAL,0.6205235294117647,False
+경기도,성남시 분당구,이매동,RESIDENTIAL,0.7667,False
+서울특별시,중구,만리동2가,NIGHTLIFE,0.6285866666666667,False
+대전광역시,동구,마산동,CAMPUS,0.60455625,False
+제주특별자치도,제주시,화북이동,TOURIST,0.6590692307692307,False
+충청남도,서산시,석림동,GENERAL,0.5169066666666666,False
+경기도,의정부시,자일동,RESIDENTIAL,0.6607733333333333,False
+경기도,여주시,현암동,GENERAL,0.5664416666666666,False
+대구광역시,서구,중리동,TOURIST,0.596664705882353,False
+경기도,안성시,영동,OFFICE,0.5664,False
+전라남도,여수시,수정동,TOURIST,0.6336481481481481,False
+경기도,남양주시,수동면,OFFICE,0.6911,False
+부산광역시,중구,중앙동6가,TOURIST,0.6961,False
+충청남도,공주시,반죽동,TOURIST,0.5812937499999999,False
+충청남도,보령시,천북면,TOURIST,0.7792,False
+강원특별자치도,강릉시,남항진동,TOURIST,0.6762,False
+전북특별자치도,전주시 덕진구,팔복동1가,OFFICE,0.6209,False
+광주광역시,광산구,월전동,GENERAL,0.5570238095238095,False
+경상북도,안동시,삼산동,TOURIST,0.6069833333333333,False
+전북특별자치도,남원시,하정동,GENERAL,0.5627043478260869,False
+전라남도,무안군,청계면,GENERAL,0.3282,False
+경상남도,사천시,용현면,GENERAL,0.4051,True
+충청북도,충주시,단월동,OFFICE,0.592624,False
+경상북도,포항시 북구,송라면,TOURIST,0.7957,False
+경기도,가평군,조종면,GENERAL,0.3046,False
+강원특별자치도,원주시,태장동,CAMPUS,0.47524999999999995,False
+울산광역시,북구,신천동,RESIDENTIAL,0.6740625,False
+서울특별시,성북구,동소문동6가,RESIDENTIAL,0.6272,False
+전라남도,여수시,화양면,TOURIST,0.8104,False
+울산광역시,북구,중산동,RESIDENTIAL,0.6740625,False
+강원특별자치도,춘천시,소양로3가,CAMPUS,0.58904,False
+경상남도,거제시,거제면,GENERAL,0.3259999999999999,False
+경상북도,청도군,화양읍,TOURIST,0.7618,False
+충청북도,청주시 상당구,대성동,RESIDENTIAL,0.5930692307692308,False
+경기도,용인시 기흥구,언남동,RESIDENTIAL,0.5946933333333333,False
+경상북도,안동시,풍산읍,OFFICE,0.6156,False
+대전광역시,동구,성남동,CAMPUS,0.6049,False
+경기도,안성시,구포동,OFFICE,0.5664,False
+경기도,수원시 팔달구,영동,RESIDENTIAL,0.6567700000000001,False
+경기도,고양시 덕양구,벽제동,RESIDENTIAL,0.6780571428571429,False
+서울특별시,종로구,구기동,TOURIST,0.6479647058823529,False
+경기도,부천시,송내동,RESIDENTIAL,0.6560892857142857,False
+부산광역시,중구,보수동2가,TOURIST,0.6778,False
+경기도,오산시,은계동,OFFICE,0.6421375,False
+충청남도,아산시,영인면,GENERAL,0.2694,False
+서울특별시,용산구,원효로4가,OFFICE,0.61415,False
+충청남도,아산시,인주면,OFFICE,0.6422,False
+경상남도,창원시 마산합포구,월포동,TOURIST,0.5817,False
+전라남도,영암군,삼호읍,CAMPUS,0.6313,False
+충청북도,영동군,영동읍,RESIDENTIAL,0.6226,False
+충청북도,제천시,봉양읍,GENERAL,0.3497,False
+충청남도,서천군,서면,TOURIST,0.7681,False
+충청북도,제천시,명동,GENERAL,0.5625647058823529,False
+서울특별시,성북구,보문동7가,OFFICE,0.6132,False
+충청북도,청주시 청원구,사천동,OFFICE,0.5974875,False
+충청남도,청양군,청양읍,TOURIST,0.6855,False
+경기도,오산시,가장동,OFFICE,0.6421375,False
+대전광역시,중구,태평동,RESIDENTIAL,0.64995,False
+부산광역시,서구,토성동1가,TOURIST,0.6558769230769231,False
+광주광역시,북구,유동,RESIDENTIAL,0.6422962962962963,False
+인천광역시,남동구,장수동,OFFICE,0.66584,False
+전라남도,광양시,마동,GENERAL,0.5718416666666667,False
+경기도,이천시,갈산동,GENERAL,0.5423214285714286,False
+강원특별자치도,평창군,용평면,TOURIST,0.7278,False
+부산광역시,사상구,학장동,OFFICE,0.6124,False
+전라남도,순천시,저전동,TOURIST,0.7304,False
+경상남도,진주시,본성동,GENERAL,0.5770700000000001,False
+경기도,동두천시,상패동,RESIDENTIAL,0.6397,False
+경상남도,김해시,대성동,OFFICE,0.6030842105263158,False
+경상남도,함안군,가야읍,OFFICE,0.626,False
+충청북도,충주시,용산동,RESIDENTIAL,0.6578,False
+경기도,시흥시,광석동,RESIDENTIAL,0.638325,False
+경상북도,경주시,산내면,TOURIST,0.7934,False
+울산광역시,동구,서부동,OFFICE,0.6372222222222222,False
+경상남도,창원시 마산합포구,신포동2가,TOURIST,0.5817,False
+경상남도,김해시,삼정동,OFFICE,0.6030842105263158,False
+강원특별자치도,삼척시,우지동,GENERAL,0.5076999999999999,False
+대전광역시,중구,중촌동,RESIDENTIAL,0.6449,False
+경상북도,울진군,근남면,TOURIST,0.7422,False
+경기도,의왕시,왕곡동,RESIDENTIAL,0.5898,False
+경상남도,사천시,신벽동,TOURIST,0.5692642857142857,False
+충청남도,보령시,죽정동,TOURIST,0.582875,False
+경상북도,성주군,수륜면,GENERAL,0.3784999999999999,False
+전북특별자치도,전주시 완산구,효자동1가,RESIDENTIAL,0.6374,False
+전라남도,여수시,충무동,TOURIST,0.7308,False
+부산광역시,금정구,노포동,RESIDENTIAL,0.587575,False
+인천광역시,서구,금곡동,RESIDENTIAL,0.6725869565217392,False
+경상북도,경산시,상방동,GENERAL,0.5529666666666666,False
+전북특별자치도,전주시 덕진구,호성동1가,GENERAL,0.4045,True
+경상남도,김해시,불암동,GENERAL,0.4259,True
+경상북도,포항시 북구,덕수동,OFFICE,0.64818,False
+경기도,여주시,세종대왕면,TOURIST,0.7601,False
+충청북도,옥천군,청산면,TOURIST,0.765,False
+충청남도,금산군,부리면,TOURIST,0.7836,False
+전북특별자치도,군산시,사정동,TOURIST,0.5893444444444444,False
+대전광역시,동구,천동,CAMPUS,0.60455625,False
+서울특별시,서초구,우면동,RESIDENTIAL,0.6613722222222223,False
+전북특별자치도,군산시,구암동,RESIDENTIAL,0.6042,False
+충청북도,청주시 흥덕구,지동동,CAMPUS,0.6104545454545455,False
+경상북도,문경시,영순면,GENERAL,0.3978,False
+전라남도,광양시,태인동,GENERAL,0.426,True
+전북특별자치도,정읍시,농소동,OFFICE,0.6048,False
+경상북도,상주시,만산동,GENERAL,0.5363791666666666,False
+경상남도,양산시,삼호동,OFFICE,0.5939384615384615,False
+충청남도,당진시,합덕읍,TOURIST,0.7222,False
+부산광역시,사상구,모라동,CAMPUS,0.56455,False
+전라남도,목포시,남교동,TOURIST,0.6129043478260869,False
+전라남도,나주시,금계동,GENERAL,0.53794,False
+경상북도,경산시,대평동,GENERAL,0.5529666666666666,False
+전라남도,목포시,호남동,TOURIST,0.6129043478260869,False
+경상남도,사천시,송포동,TOURIST,0.5692642857142857,False
+경상남도,창원시 진해구,장천동,RESIDENTIAL,0.6121846153846154,False
+경상북도,청도군,매전면,TOURIST,0.8124,False
+전라남도,영암군,군서면,TOURIST,0.7459,False
+충청북도,충주시,충인동,OFFICE,0.592624,False
+충청남도,천안시 동남구,다가동,GENERAL,0.5534235294117648,False
+경상북도,안동시,태화동,RESIDENTIAL,0.613,False
+경기도,안성시,죽산면,OFFICE,0.6845,False
+경기도,안성시,가사동,OFFICE,0.5664,False
+전라남도,목포시,항동,TOURIST,0.6129043478260869,False
+충청남도,보령시,내항동,TOURIST,0.582875,False
+강원특별자치도,화천군,화천읍,TOURIST,0.7274,False
+세종특별자치시,,전의면,RESIDENTIAL,0.6562708333333334,False
+인천광역시,동구,화수동,TOURIST,0.6013,False
+경기도,평택시,독곡동,OFFICE,0.657788,False
+경기도,시흥시,금이동,RESIDENTIAL,0.638325,False
+경기도,여주시,흥천면,GENERAL,0.3763999999999999,False
+전라남도,나주시,금천면,TOURIST,0.7237,False
+경상북도,영천시,금호읍,OFFICE,0.7012,False
+경기도,부천시,범박동,RESIDENTIAL,0.6560892857142857,False
+경상남도,의령군,용덕면,GENERAL,0.3426,False
+대구광역시,북구,칠성동1가,OFFICE,0.6068,False
+경상북도,영주시,휴천동,TOURIST,0.5529666666666666,False
+경상남도,진주시,장대동,GENERAL,0.5770700000000001,False
+경기도,여주시,산북면,GENERAL,0.4153,True
+경상북도,상주시,함창읍,OFFICE,0.6714,False
+경상남도,양산시,소주동,OFFICE,0.6224,False
+전북특별자치도,군산시,나포면,GENERAL,0.3628,False
+경상북도,울릉군,서면,TOURIST,0.7829,False
+대구광역시,달성군,하빈면,GENERAL,0.4068,True
+서울특별시,성북구,삼선동3가,CAMPUS,0.6278,False
+전라남도,무안군,해제면,GENERAL,0.3074,False
+충청북도,제천시,한수면,TOURIST,0.7677,False
+부산광역시,서구,아미동2가,TOURIST,0.6778,False
+인천광역시,계양구,방축동,RESIDENTIAL,0.6505916666666667,False
+경상북도,포항시 북구,남빈동,OFFICE,0.64818,False
+대전광역시,중구,사정동,RESIDENTIAL,0.5973117647058823,False
+세종특별자치시,,대평동,RESIDENTIAL,0.6562708333333334,False
+대전광역시,동구,대별동,CAMPUS,0.60455625,False
+경상남도,창원시 진해구,수송동,RESIDENTIAL,0.6121846153846154,False
+경상남도,김해시,명법동,OFFICE,0.6030842105263158,False
+경기도,오산시,고현동,OFFICE,0.6421375,False
+충청북도,청주시 서원구,수곡동,CAMPUS,0.595,False
+경기도,고양시 덕양구,내유동,RESIDENTIAL,0.6780571428571429,False
+강원특별자치도,동해시,동회동,TOURIST,0.70769,False
+경기도,김포시,감정동,OFFICE,0.6777,False
+충청남도,공주시,봉황동,TOURIST,0.5812937499999999,False
+경기도,남양주시,금곡동,OFFICE,0.6574,False
+서울특별시,영등포구,문래동5가,OFFICE,0.6908,False
+경기도,평택시,칠괴동,OFFICE,0.657788,False
+경상북도,상주시,남성동,GENERAL,0.5363791666666666,False
+대전광역시,서구,갈마2동,NIGHTLIFE,0.6364,False
+경상남도,고성군,개천면,GENERAL,0.4242,True
+인천광역시,중구,도원동,TOURIST,0.6765,False
+경상북도,영주시,조암동,TOURIST,0.6237684210526315,False
+충청남도,당진시,우강면,TOURIST,0.6932,False
+전북특별자치도,전주시 덕진구,여의동2가,OFFICE,0.6213,False
+서울특별시,중구,장교동,NIGHTLIFE,0.6285866666666667,False
+전북특별자치도,무주군,무주읍,GENERAL,0.3205,False
+경상남도,창녕군,이방면,GENERAL,0.3661,False
+경상북도,문경시,산북면,GENERAL,0.3608,False
+충청남도,보령시,남포면,GENERAL,0.2572,False
+충청남도,금산군,남일면,GENERAL,0.3804999999999999,False
+인천광역시,중구,남북동,TOURIST,0.6587583333333333,False
+경상남도,창원시 마산회원구,두척동,GENERAL,0.5394249999999999,False
+부산광역시,영도구,신선동2가,TOURIST,0.6929,False
+경상북도,포항시 북구,대흥동,OFFICE,0.64818,False
+전라남도,목포시,용해동,CAMPUS,0.5636,True
+경상남도,함안군,칠서면,GENERAL,0.4028,True
+경상북도,포항시 북구,동빈2가,OFFICE,0.64818,False
+대구광역시,중구,달성동,RESIDENTIAL,0.6376916666666667,False
+광주광역시,동구,충장로5가,TOURIST,0.620676923076923,False
+대구광역시,중구,태평로1가,RESIDENTIAL,0.6376916666666667,False
+경상남도,창원시 성산구,불모산동,RESIDENTIAL,0.625825,False
+충청남도,태안군,소원면,TOURIST,0.7816,False
+부산광역시,강서구,범방동,GENERAL,0.5988777777777777,False
+전북특별자치도,남원시,신촌동,GENERAL,0.5627043478260869,False
+충청북도,충주시,노은면,TOURIST,0.7375,False
+충청북도,청주시 상당구,탑동,RESIDENTIAL,0.5930692307692308,False
+인천광역시,부평구,일신동,OFFICE,0.7226,False
+경기도,광주시,장지동,GENERAL,0.58930625,False
+대구광역시,동구,숙천동,RESIDENTIAL,0.6195090909090909,False
+전북특별자치도,익산시,남중동,CAMPUS,0.5433,False
+충청북도,제천시,남천동,GENERAL,0.5625647058823529,False
+대구광역시,동구,입석동,RESIDENTIAL,0.6195090909090909,False
+경기도,화성시 효행구,기안동,RESIDENTIAL,0.6154137931034483,False
+강원특별자치도,동해시,송정동,TOURIST,0.7476,False
+경상남도,창원시 마산합포구,우산동,TOURIST,0.5817,False
+전라남도,완도군,신지면,TOURIST,0.7607,False
+충청남도,서산시,인지면,GENERAL,0.2871,False
+인천광역시,중구,해안동4가,TOURIST,0.6587583333333333,False
+경상남도,밀양시,초동면,GENERAL,0.3618,False
+경기도,고양시 일산동구,사리현동,OFFICE,0.6957083333333333,False
+전북특별자치도,전주시 완산구,중인동,RESIDENTIAL,0.6488894736842105,False
+대전광역시,유성구,방동,RESIDENTIAL,0.6262846153846154,False
+경기도,포천시,화현면,GENERAL,0.3032,False
+경상북도,상주시,연원동,GENERAL,0.5363791666666666,False
+강원특별자치도,춘천시,신동면,TOURIST,0.7248,False
+경상남도,통영시,태평동,TOURIST,0.6869133333333333,False
+전북특별자치도,전주시 덕진구,우아동3가,TOURIST,0.6943999999999999,False
+전라남도,목포시,대의동3가,TOURIST,0.6129043478260869,False
+전라남도,순천시,승주읍,GENERAL,0.2899,False
+경상남도,양산시,어곡동,OFFICE,0.5939384615384615,False
+경기도,동두천시,안흥동,GENERAL,0.5643375,False
+충청남도,천안시 동남구,동면,GENERAL,0.2642,False
+충청북도,충주시,살미면,GENERAL,0.3742,False
+인천광역시,중구,선린동,TOURIST,0.6587583333333333,False
+경기도,양평군,지평면,GENERAL,0.4311,True
+경상남도,사천시,실안동,TOURIST,0.5692642857142857,False
+경상북도,포항시 북구,학산동,OFFICE,0.64818,False
+경상북도,김천시,용두동,GENERAL,0.43600909090909085,False
+서울특별시,영등포구,영등포동8가,OFFICE,0.67855,False
+경기도,가평군,북면,TOURIST,0.7838,False
+경기도,포천시,관인면,OFFICE,0.6459,False
+서울특별시,중구,방산동,NIGHTLIFE,0.6285866666666667,False
+경상남도,창원시 진해구,안골동,RESIDENTIAL,0.6121846153846154,False
+경상남도,산청군,금서면,TOURIST,0.773,False
+경기도,안성시,인지동,OFFICE,0.5664,False
+충청남도,부여군,석성면,GENERAL,0.2868,False
+전북특별자치도,남원시,주천면,TOURIST,0.803,False
+전라남도,순천시,남정동,TOURIST,0.589225,False
+경상북도,안동시,송천동,TOURIST,0.6069833333333333,False
+경상남도,창원시 마산합포구,구산면,TOURIST,0.7948,False
+경기도,성남시 수정구,양지동,GENERAL,0.4099,True
+전북특별자치도,군산시,금동,TOURIST,0.5893444444444444,False
+전라남도,보성군,벌교읍,TOURIST,0.7036,False
+경상북도,경주시,남산동,TOURIST,0.6624217391304348,False
+경상남도,사천시,향촌동,RESIDENTIAL,0.6337,False
+광주광역시,북구,용두동,RESIDENTIAL,0.6422962962962963,False
+전라남도,담양군,창평면,TOURIST,0.7885,False
+충청북도,청주시 흥덕구,옥산면,OFFICE,0.6055,False
+경상남도,창원시 진해구,안곡동,RESIDENTIAL,0.6121846153846154,False
+경상남도,사천시,죽림동,TOURIST,0.5692642857142857,False
+충청북도,충주시,동량면,GENERAL,0.366,False
+전북특별자치도,군산시,미원동,TOURIST,0.5893444444444444,False
+충청북도,제천시,중앙로2가,GENERAL,0.5625647058823529,False
+경기도,여주시,강천면,RESIDENTIAL,0.6893,False
+경상남도,거제시,덕포동,TOURIST,0.63465,False
+경기도,포천시,가산면,OFFICE,0.706,False
+광주광역시,북구,임동,TOURIST,0.6747,False
+경기도,광주시,추자동,GENERAL,0.58930625,False
+충청남도,공주시,우성면,GENERAL,0.2749,False
+경기도,포천시,어룡동,OFFICE,0.5713071428571429,False
+경기도,시흥시,매화동,OFFICE,0.6111,False
+경기도,수원시 팔달구,구천동,RESIDENTIAL,0.6567700000000001,False
+경상북도,구미시,신동,RESIDENTIAL,0.576092,False
+서울특별시,중구,남학동,NIGHTLIFE,0.6285866666666667,False
+충청북도,청주시 상당구,낭성면,TOURIST,0.7528,False
+인천광역시,남동구,남촌동,OFFICE,0.66584,False
+경기도,시흥시,안현동,RESIDENTIAL,0.638325,False
+부산광역시,사상구,삼락동,GENERAL,0.3854999999999999,False
+경상북도,경산시,유곡동,GENERAL,0.5529666666666666,False
+경기도,오산시,벌음동,OFFICE,0.6421375,False
+광주광역시,북구,북동,RESIDENTIAL,0.6422962962962963,False
+경상남도,창원시 성산구,안민동,RESIDENTIAL,0.625825,False
+전북특별자치도,부안군,부안읍,TOURIST,0.704,False
+충청북도,제천시,천남동,GENERAL,0.5625647058823529,False
+인천광역시,옹진군,북도면,TOURIST,0.775,False
+인천광역시,중구,율목동,TOURIST,0.6643,False
+전북특별자치도,군산시,서수면,GENERAL,0.4141,True
+전북특별자치도,전주시 완산구,태평동,RESIDENTIAL,0.6488894736842105,False
+충청남도,아산시,풍기동,OFFICE,0.601864705882353,False
+전라남도,여수시,관문동,TOURIST,0.6336481481481481,False
+경기도,양평군,단월면,GENERAL,0.3577,False
+경상북도,포항시 북구,신광면,GENERAL,0.3919,False
+경상남도,밀양시,하남읍,RESIDENTIAL,0.6078,False
+전라남도,구례군,산동면,TOURIST,0.7877,False
+충청남도,논산시,벌곡면,TOURIST,0.8173,False
+대구광역시,북구,검단동,OFFICE,0.6041,False
+부산광역시,서구,서대신동1가,CAMPUS,0.6018333333333333,False
+강원특별자치도,인제군,북면,OFFICE,0.6658,False
+경상남도,창원시 마산합포구,월남동3가,TOURIST,0.5817,False
+강원특별자치도,동해시,삼화동,RESIDENTIAL,0.6372,False
+전라남도,광양시,진상면,GENERAL,0.3616,False
+전북특별자치도,군산시,장미동,TOURIST,0.5893444444444444,False
+경상북도,상주시,사벌국면,GENERAL,0.383,False
+경상북도,안동시,용상동,TOURIST,0.6873,False
+경기도,파주시,금릉동,OFFICE,0.6352,False
+경기도,이천시,율현동,GENERAL,0.5423214285714286,False
+전라남도,목포시,무안동,TOURIST,0.6129043478260869,False
+충청북도,청주시 상당구,금천동,RESIDENTIAL,0.6392,False
+인천광역시,중구,전동,TOURIST,0.6587583333333333,False
+경상남도,하동군,고전면,GENERAL,0.4156,True
+전북특별자치도,남원시,산내면,TOURIST,0.7837,False
+충청남도,금산군,복수면,TOURIST,0.7716,False
+제주특별자치도,제주시,이호이동,TOURIST,0.6590692307692307,False
+경기도,구리시,사노동,RESIDENTIAL,0.6785,False
+제주특별자치도,제주시,삼양이동,TOURIST,0.6590692307692307,False
+전라남도,구례군,문척면,GENERAL,0.4263,True
+경기도,부천시 소사구,범박동,RESIDENTIAL,0.6545,False
+충청북도,단양군,단성면,TOURIST,0.8135,False
+광주광역시,서구,유촌동,RESIDENTIAL,0.6426000000000001,False
+서울특별시,성북구,동소문동7가,RESIDENTIAL,0.6272,False
+충청북도,옥천군,군북면,TOURIST,0.7591,False
+전라남도,광양시,광영동,GENERAL,0.3975999999999999,False
+강원특별자치도,춘천시,교동,TOURIST,0.6562,False
+대전광역시,유성구,원내동,RESIDENTIAL,0.6262846153846154,False
+인천광역시,남동구,고잔동,OFFICE,0.66584,False
+강원특별자치도,삼척시,원당동,GENERAL,0.5076999999999999,False
+전라남도,장성군,진원면,TOURIST,0.7874,False
+경기도,화성시,금곡동,RESIDENTIAL,0.6154137931034483,False
+인천광역시,동구,화평동,TOURIST,0.6236999999999999,False
+전라남도,나주시,대호동,GENERAL,0.53794,False
+경상남도,창원시 의창구,용동,GENERAL,0.5170714285714285,False
+강원특별자치도,춘천시,동산면,GENERAL,0.3968,False
+충청북도,음성군,금왕읍,TOURIST,0.6816,False
+전라남도,신안군,지도읍,GENERAL,0.3380999999999999,False
+경상남도,거제시,수월동,TOURIST,0.63465,False
+서울특별시,영등포구,양화동,OFFICE,0.6752444444444444,False
+경상남도,통영시,도천동,TOURIST,0.7261,False
+충청북도,음성군,감곡면,TOURIST,0.6913,False
+전라남도,신안군,흑산면,TOURIST,0.7605,False
+충청남도,논산시,관촉동,GENERAL,0.5839866666666667,False
+울산광역시,중구,학성동,TOURIST,0.6318,False
+충청남도,서산시,양대동,GENERAL,0.5169066666666666,False
+부산광역시,서구,부용동1가,TOURIST,0.6558769230769231,False
+전라남도,장흥군,용산면,GENERAL,0.3903,False
+경기도,평택시,모곡동,OFFICE,0.657788,False
+전라남도,목포시,대의동2가,TOURIST,0.6129043478260869,False
+울산광역시,동구,주전동,OFFICE,0.6372222222222222,False
+경기도,과천시,막계동,RESIDENTIAL,0.6287428571428572,False
+전북특별자치도,전주시 완산구,중앙동2가,TOURIST,0.6894,False
+대전광역시,대덕구,대화동,OFFICE,0.6091,False
+대전광역시,대덕구,미호동,GENERAL,0.5550916666666666,False
+경상북도,안동시,송현동,TOURIST,0.6069833333333333,False
+강원특별자치도,태백시,장성동,GENERAL,0.3102,False
+전라남도,함평군,손불면,GENERAL,0.2922,False
+대전광역시,서구,가장동,RESIDENTIAL,0.6509,False
+부산광역시,서구,토성동5가,TOURIST,0.6558769230769231,False
+전라남도,영암군,덕진면,GENERAL,0.4474,True
+경상북도,영주시,영주동,RESIDENTIAL,0.6374,False
+전북특별자치도,정읍시,수성동,TOURIST,0.7048,False
+경상북도,안동시,신세동,TOURIST,0.6069833333333333,False
+충청남도,공주시,석장리동,TOURIST,0.5812937499999999,False
+충청북도,청주시 상당구,남주동,RESIDENTIAL,0.5930692307692308,False
+전라남도,화순군,능주면,TOURIST,0.7244,False
+경상남도,진주시,봉곡동,GENERAL,0.5770700000000001,False
+경상남도,남해군,상주면,TOURIST,0.7906,False
+전북특별자치도,전주시 덕진구,인후동2가,CAMPUS,0.5430333333333334,False
+강원특별자치도,홍천군,내면,GENERAL,0.2782,False
+광주광역시,동구,충장로4가,TOURIST,0.620676923076923,False
+서울특별시,중구,입정동,NIGHTLIFE,0.6285866666666667,False
+경상남도,창원시 의창구,대산면,OFFICE,0.6564,False
+대구광역시,동구,대림동,RESIDENTIAL,0.6195090909090909,False
+전라남도,강진군,강진읍,TOURIST,0.7073,False
+대구광역시,동구,도동,RESIDENTIAL,0.6195090909090909,False
+경상북도,안동시,수하동,TOURIST,0.6069833333333333,False
+제주특별자치도,제주시,회천동,TOURIST,0.6590692307692307,False
+경상북도,칠곡군,약목면,GENERAL,0.2931,False
+강원특별자치도,정선군,여량면,TOURIST,0.7386,False
+충청남도,청양군,화성면,GENERAL,0.3719,False
+전라남도,보성군,회천면,TOURIST,0.7766,False
+경상북도,김천시,교동,GENERAL,0.43600909090909085,False
+경상북도,상주시,모서면,OFFICE,0.6291,False
+전라남도,보성군,보성읍,TOURIST,0.7219,False
+경상북도,영주시,장수면,OFFICE,0.6192,False
+충청남도,공주시,신기동,TOURIST,0.5812937499999999,False
+서울특별시,동작구,본동,RESIDENTIAL,0.6474466666666667,False
+전라남도,여수시,신기동,TOURIST,0.6336481481481481,False
+경기도,오산시,두곡동,OFFICE,0.6421375,False
+경기도,오산시,지곶동,OFFICE,0.6421375,False
+충청남도,당진시,면천면,TOURIST,0.761,False
+전북특별자치도,전주시 덕진구,진북동,TOURIST,0.6554,False
+대전광역시,동구,신흥동,CAMPUS,0.60455625,False
+부산광역시,동래구,낙민동,RESIDENTIAL,0.6708153846153846,False
+충청북도,제천시,수산면,GENERAL,0.3841,False
+서울특별시,서대문구,영천동,RESIDENTIAL,0.6118857142857143,False
+충청북도,청주시 흥덕구,원평동,CAMPUS,0.6104545454545455,False
+경상남도,함안군,칠원읍,GENERAL,0.3708,False
+충청남도,논산시,등화동,GENERAL,0.5839866666666667,False
+충청남도,아산시,점양동,OFFICE,0.601864705882353,False
+대구광역시,달서구,갈산동,RESIDENTIAL,0.6645130434782608,False
+경기도,화성시,매송면,TOURIST,0.7709,False
+전북특별자치도,남원시,인월면,TOURIST,0.7832,False
+충청남도,아산시,읍내동,OFFICE,0.601864705882353,False
+강원특별자치도,강릉시,내곡동,OFFICE,0.6392,False
+경상북도,경산시,계양동,GENERAL,0.5529666666666666,False
+경기도,포천시,창수면,GENERAL,0.3477,False
+충청남도,당진시,행정동,GENERAL,0.5622499999999999,False
+전라남도,곡성군,죽곡면,TOURIST,0.7596,False
+제주특별자치도,제주시,월평동,TOURIST,0.6590692307692307,False
+경상남도,합천군,가야면,TOURIST,0.7275,False
+경상북도,안동시,와룡면,GENERAL,0.4098,True
+인천광역시,중구,관동1가,TOURIST,0.6587583333333333,False
+충청북도,청주시 흥덕구,강내면,CAMPUS,0.6084,False
+광주광역시,광산구,운남동,RESIDENTIAL,0.6551,False
+경기도,의왕시,이동,RESIDENTIAL,0.5898,False
+경상북도,구미시,구포동,RESIDENTIAL,0.576092,False
+대전광역시,동구,하소동,CAMPUS,0.60455625,False
+대구광역시,달서구,파호동,RESIDENTIAL,0.6645130434782608,False
+부산광역시,중구,남포동1가,TOURIST,0.7045,False
+광주광역시,동구,금남로2가,TOURIST,0.620676923076923,False
+대구광역시,군위군,부계면,TOURIST,0.7807,False
+경기도,안양시 만안구,박달동,RESIDENTIAL,0.6870333333333334,False
+충청남도,논산시,반월동,GENERAL,0.5839866666666667,False
+경상북도,경주시,석장동,TOURIST,0.6624217391304348,False
+부산광역시,중구,광복동3가,TOURIST,0.7088,False
+경기도,광명시,가학동,RESIDENTIAL,0.6759894736842105,False
+경상북도,성주군,가천면,TOURIST,0.8064,False
+경상남도,산청군,생초면,GENERAL,0.397,False
+강원특별자치도,강릉시,난곡동,TOURIST,0.6762,False
+부산광역시,해운대구,석대동,RESIDENTIAL,0.6847277777777777,False
+경상북도,안동시,남문동,TOURIST,0.6069833333333333,False
+세종특별자치시,,산울동,RESIDENTIAL,0.6562708333333334,False
+경기도,안산시 단원구,와동,OFFICE,0.6728,False
+강원특별자치도,삼척시,읍상동,GENERAL,0.5076999999999999,False
+충청북도,청주시 서원구,현도면,TOURIST,0.7332,False
+충청북도,괴산군,칠성면,TOURIST,0.7593,False
+경기도,동두천시,동두천동,GENERAL,0.5643375,False
+경기도,부천시,작동,RESIDENTIAL,0.6560892857142857,False
+전북특별자치도,전주시 완산구,경원동2가,RESIDENTIAL,0.6488894736842105,False
+경상북도,경주시,안강읍,OFFICE,0.6721,False
+경기도,포천시,영중면,OFFICE,0.6563,False
+부산광역시,중구,창선동2가,TOURIST,0.7027555555555556,False
+경상북도,경주시,탑동,TOURIST,0.6624217391304348,False
+경상북도,경주시,현곡면,RESIDENTIAL,0.6176,False
+제주특별자치도,제주시,도평동,TOURIST,0.6590692307692307,False
+경상북도,의성군,봉양면,TOURIST,0.764,False
+충청남도,서산시,수석동,OFFICE,0.6643,False
+충청남도,공주시,쌍신동,TOURIST,0.5812937499999999,False
+대구광역시,중구,북성로2가,RESIDENTIAL,0.6376916666666667,False
+경기도,포천시,동교동,OFFICE,0.5713071428571429,False
+충청북도,옥천군,청성면,GENERAL,0.243,False
+경상북도,예천군,예천읍,TOURIST,0.6981,False
+전라남도,순천시,주암면,TOURIST,0.774,False
+경상북도,김천시,삼락동,GENERAL,0.43600909090909085,False
+충청남도,서천군,서천읍,OFFICE,0.6159,False
+경상북도,구미시,광평동,GENERAL,0.4501,True
+경상북도,경산시,용성면,GENERAL,0.2755999999999999,False
+충청북도,청주시 서원구,장암동,CAMPUS,0.6077636363636363,False
+충청남도,공주시,월송동,GENERAL,0.4183,True
+경상남도,진주시,사봉면,GENERAL,0.4277,True
+서울특별시,성북구,보문동2가,OFFICE,0.6132,False
+경기도,여주시,교동,GENERAL,0.5664416666666666,False
+경기도,안성시,보개면,GENERAL,0.3142,False
+경상북도,고령군,성산면,OFFICE,0.6347,False
+세종특별자치시,,반곡동,RESIDENTIAL,0.6562708333333334,False
+강원특별자치도,춘천시,칠전동,CAMPUS,0.58904,False
+강원특별자치도,양구군,국토정중앙면,GENERAL,0.3626,False
+부산광역시,중구,보수동1가,TOURIST,0.6778,False
+경기도,여주시,점동면,GENERAL,0.4009,True
+전라남도,나주시,산포면,OFFICE,0.6003,False
+경상남도,창원시 마산합포구,중성동,TOURIST,0.5817,False
+전북특별자치도,남원시,동충동,TOURIST,0.6614,False
+전북특별자치도,군산시,대야면,GENERAL,0.3453,False
+충청남도,아산시,장존동,OFFICE,0.601864705882353,False
+충청남도,천안시 동남구,쌍용동,GENERAL,0.5534235294117648,False
+경상북도,상주시,내서면,GENERAL,0.3972,False
+전라남도,순천시,가곡동,TOURIST,0.589225,False
+경상북도,경주시,인왕동,TOURIST,0.6624217391304348,False
+충청남도,보령시,화산동,TOURIST,0.582875,False
+전라남도,순천시,조곡동,TOURIST,0.71,False
+경상북도,상주시,헌신동,GENERAL,0.5363791666666666,False
+울산광역시,울주군,삼동면,GENERAL,0.2145,False
+충청남도,천안시 서북구,입장면,OFFICE,0.6162,False
+경상북도,포항시 북구,대신동,OFFICE,0.64818,False
+부산광역시,중구,부평동4가,TOURIST,0.7045,False
+전라남도,함평군,엄다면,TOURIST,0.7597,False
+경기도,안성시,아양동,OFFICE,0.5664,False
+광주광역시,동구,소태동,TOURIST,0.620676923076923,False
+전라남도,해남군,송지면,RESIDENTIAL,0.6364,False
+울산광역시,울주군,청량읍,OFFICE,0.6074,False
+충청북도,제천시,동현동,GENERAL,0.5625647058823529,False
+경기도,화성시 효행구,봉담읍,RESIDENTIAL,0.6154137931034483,False
+강원특별자치도,화천군,사내면,GENERAL,0.2803,False
+경상북도,성주군,성주읍,GENERAL,0.3614,False
+경기도,시흥시,하중동,RESIDENTIAL,0.638325,False
+인천광역시,서구,백석동,RESIDENTIAL,0.6725869565217392,False
+전라남도,여수시,경호동,TOURIST,0.6336481481481481,False
+경상북도,경주시,시래동,TOURIST,0.6624217391304348,False
+서울특별시,용산구,주성동,OFFICE,0.62136875,False
+경기도,안성시,금광면,TOURIST,0.7375,False
+충청남도,천안시 서북구,와촌동,RESIDENTIAL,0.6481642857142857,False
+경상남도,창원시 마산합포구,상남동,TOURIST,0.5817,False
+대구광역시,북구,사수동,OFFICE,0.6005695652173914,False
+전라남도,무안군,몽탄면,GENERAL,0.4254,True
+경상북도,포항시 북구,여천동,OFFICE,0.64818,False
+전북특별자치도,전주시 완산구,서완산동1가,RESIDENTIAL,0.6488894736842105,False
+충청남도,천안시 서북구,신당동,RESIDENTIAL,0.6481642857142857,False
+서울특별시,중구,봉래동1가,NIGHTLIFE,0.6285866666666667,False
+경상북도,봉화군,물야면,TOURIST,0.7801,False
+서울특별시,종로구,충신동,TOURIST,0.6479647058823529,False
+전북특별자치도,고창군,심원면,TOURIST,0.7542,False
+충청북도,충주시,목행동,OFFICE,0.592624,False
+충청남도,아산시,신인동,OFFICE,0.601864705882353,False
+경기도,성남시 수정구,금토동,NIGHTLIFE,0.6532176470588235,False
+전라남도,나주시,송월동,TOURIST,0.7292,False
+전라남도,강진군,마량면,TOURIST,0.7705,False
+서울특별시,종로구,,TOURIST,0.6479647058823529,False
+전북특별자치도,군산시,미룡동,TOURIST,0.5893444444444444,False
+경상북도,청도군,금천면,TOURIST,0.7876,False
+경상남도,창원시 진해구,부흥동,RESIDENTIAL,0.6121846153846154,False
+광주광역시,동구,산수동,CAMPUS,0.60215,False
+경상북도,예천군,지보면,TOURIST,0.7842,False
+경기도,안산시 단원구,대부동동,TOURIST,0.785,False
+전북특별자치도,김제시,신풍동,RESIDENTIAL,0.6559,False
+경상북도,안동시,옥정동,TOURIST,0.6069833333333333,False
+전라남도,고흥군,도화면,TOURIST,0.7435,False
+전라남도,목포시,창평동,TOURIST,0.6129043478260869,False
+경상남도,김해시,한림면,TOURIST,0.7662,False
+충청남도,천안시 서북구,업성동,RESIDENTIAL,0.6481642857142857,False
+충청북도,충주시,성남동,OFFICE,0.592624,False
+강원특별자치도,삼척시,도계읍,GENERAL,0.3087999999999999,False
+서울특별시,종로구,신영동,TOURIST,0.6479647058823529,False
+전라남도,순천시,영동,TOURIST,0.589225,False
+강원특별자치도,홍천군,두촌면,GENERAL,0.2586,False
+경기도,부천시 원미구,소사동,OFFICE,0.6152,False
+경상남도,창원시 마산합포구,남성동,TOURIST,0.5817,False
+전북특별자치도,임실군,성수면,GENERAL,0.3965999999999999,False
+전북특별자치도,군산시,옥구읍,TOURIST,0.7242,False
+충청북도,음성군,생극면,GENERAL,0.4273,True
+충청남도,태안군,고남면,TOURIST,0.7489,False
+부산광역시,서구,동대신동3가,RESIDENTIAL,0.6092666666666666,False
+대구광역시,북구,팔달동,OFFICE,0.6005695652173914,False
+경기도,하남시,상산곡동,RESIDENTIAL,0.6532928571428572,False
+경상남도,창원시 진해구,제황산동,RESIDENTIAL,0.6121846153846154,False
+경상북도,김천시,감문면,GENERAL,0.4073,True
+전라남도,여수시,봉강동,TOURIST,0.6336481481481481,False
+부산광역시,금정구,회동동,RESIDENTIAL,0.587575,False
+강원특별자치도,원주시,부론면,TOURIST,0.7611,False
+경상북도,구미시,장천면,GENERAL,0.4065,True
+경기도,하남시,초이동,OFFICE,0.6293,False
+경상남도,진주시,망경동,GENERAL,0.5770700000000001,False
+경기도,시흥시,방산동,RESIDENTIAL,0.638325,False
+강원특별자치도,춘천시,사농동,CAMPUS,0.58904,False
+경기도,여주시,오금동,GENERAL,0.5664416666666666,False
+충청북도,청주시 상당구,석교동,RESIDENTIAL,0.5930692307692308,False
+경기도,성남시 중원구,중앙동,NIGHTLIFE,0.697,False
+경상북도,봉화군,봉성면,TOURIST,0.7567,False
+대구광역시,동구,지저동,GENERAL,0.402,True
+전라남도,목포시,수강동1가,TOURIST,0.6129043478260869,False
+충청남도,천안시 동남구,사직동,GENERAL,0.5534235294117648,False
+대구광역시,수성구,노변동,RESIDENTIAL,0.6784826086956521,False
+울산광역시,남구,상개동,OFFICE,0.6486928571428571,False
+인천광역시,계양구,갈현동,RESIDENTIAL,0.6505916666666667,False
+광주광역시,동구,남동,TOURIST,0.620676923076923,False
+충청남도,보령시,궁촌동,TOURIST,0.582875,False
+전라남도,순천시,별량면,GENERAL,0.4195,True
+서울특별시,성북구,돈암동,RESIDENTIAL,0.70855,False
+경상북도,상주시,낙양동,GENERAL,0.5363791666666666,False
+대전광역시,유성구,원촌동,RESIDENTIAL,0.6262846153846154,False
+경상남도,사천시,곤양면,GENERAL,0.3053,False
+경상북도,고령군,대가야읍,GENERAL,0.3323,False
+전라남도,화순군,동면,GENERAL,0.3769,False
+서울특별시,성동구,상왕십리동,RESIDENTIAL,0.6122705882352941,False
+부산광역시,서구,동대신동1가,RESIDENTIAL,0.6092666666666666,False
+전북특별자치도,남원시,죽항동,TOURIST,0.6959,False
+강원특별자치도,춘천시,소양로2가,CAMPUS,0.58904,False
+울산광역시,북구,양정동,OFFICE,0.6206,False
+경기도,안산시 단원구,성곡동,OFFICE,0.7033416666666668,False
+경기도,성남시 중원구,은행동,GENERAL,0.5305,False
+서울특별시,성북구,동소문동3가,RESIDENTIAL,0.6272,False
+전라남도,강진군,성전면,RESIDENTIAL,0.6444,False
+경상북도,경주시,구황동,TOURIST,0.6624217391304348,False
+서울특별시,성북구,보문동1가,OFFICE,0.6132,False
+대전광역시,유성구,하기동,RESIDENTIAL,0.6262846153846154,False
+경상남도,진주시,판문동,RESIDENTIAL,0.6168,False
+경기도,포천시,신읍동,OFFICE,0.5713071428571429,False
+전라남도,여수시,미평동,RESIDENTIAL,0.6077,False
+경기도,여주시,금사면,GENERAL,0.3697,False
+경기도,화성시,마도면,GENERAL,0.3994999999999999,False
+전북특별자치도,부안군,보안면,GENERAL,0.4359,True
+충청북도,충주시,주덕읍,TOURIST,0.7443,False
+전라남도,구례군,마산면,TOURIST,0.7814,False
+대전광역시,동구,대성동,CAMPUS,0.60455625,False
+경상북도,칠곡군,지천면,GENERAL,0.4,True
+경상남도,진주시,내동면,GENERAL,0.4069,True
+경기도,수원시 팔달구,매교동,RESIDENTIAL,0.6751,False
+인천광역시,강화군,삼산면,TOURIST,0.799,False
+경기도,화성시 동탄구,석우동,RESIDENTIAL,0.6154137931034483,False
+전라남도,목포시,복만동,TOURIST,0.6129043478260869,False
+경상북도,경주시,동부동,TOURIST,0.6624217391304348,False
+강원특별자치도,정선군,정선읍,GENERAL,0.3309999999999999,False
+전북특별자치도,김제시,검산동,RESIDENTIAL,0.6374,False
+경상북도,안동시,동부동,TOURIST,0.6069833333333333,False
+대구광역시,동구,신기동,RESIDENTIAL,0.6195090909090909,False
+전북특별자치도,전주시 완산구,삼천동2가,RESIDENTIAL,0.6548666666666666,False
+경기도,평택시,유천동,OFFICE,0.657788,False
+전북특별자치도,무주군,설천면,TOURIST,0.7873,False
+전북특별자치도,전주시 완산구,중앙동4가,TOURIST,0.6894,False
+전북특별자치도,남원시,쌍교동,GENERAL,0.5627043478260869,False
+경기도,여주시,대신면,TOURIST,0.7386,False
+경기도,화성시,양감면,GENERAL,0.3746,False
+경상남도,창원시 진해구,마천동,RESIDENTIAL,0.6121846153846154,False
+부산광역시,금정구,선동,RESIDENTIAL,0.587575,False
+경상북도,포항시 북구,덕산동,OFFICE,0.64818,False
+전라남도,목포시,서산동,TOURIST,0.6129043478260869,False
+제주특별자치도,제주시,삼도1동,NIGHTLIFE,0.70145,False
+경기도,고양시 덕양구,효자동,RESIDENTIAL,0.7648,False
+강원특별자치도,동해시,용정동,TOURIST,0.70769,False
+충청남도,공주시,소학동,TOURIST,0.5812937499999999,False
+경기도,부천시 원미구,원미동,OFFICE,0.6372,False
+충청남도,서천군,판교면,GENERAL,0.3909,False
+대구광역시,동구,백안동,RESIDENTIAL,0.6195090909090909,False
+전라남도,장흥군,안양면,GENERAL,0.4023,True
+강원특별자치도,강릉시,유천동,TOURIST,0.6762,False
+전라남도,해남군,마산면,GENERAL,0.3912,False
+전북특별자치도,부안군,동진면,GENERAL,0.3637,False
+경기도,안산시 상록구,수암동,OFFICE,0.6000538461538462,False
+인천광역시,중구,신흥동3가,OFFICE,0.6241,False
+경기도,이천시,진리동,GENERAL,0.5423214285714286,False
+대전광역시,동구,판암동,GENERAL,0.51985,False
+강원특별자치도,동해시,단봉동,TOURIST,0.70769,False
+경기도,하남시,하산곡동,RESIDENTIAL,0.6532928571428572,False
+전라남도,목포시,상락동2가,TOURIST,0.6129043478260869,False
+경상남도,함안군,법수면,GENERAL,0.3783999999999999,False
+부산광역시,영도구,봉래동5가,TOURIST,0.68445,False
+전북특별자치도,군산시,죽성동,TOURIST,0.5893444444444444,False
+경상북도,김천시,어모면,GENERAL,0.3915999999999999,False
+전라남도,여수시,오림동,TOURIST,0.6336481481481481,False
+경기도,화성시 동탄구,장지동,RESIDENTIAL,0.6154137931034483,False
+전라남도,목포시,명륜동,TOURIST,0.6129043478260869,False
+경기도,안성시,동본동,OFFICE,0.5664,False
+경상남도,거창군,위천면,TOURIST,0.7868,False
+제주특별자치도,제주시,영평동,TOURIST,0.6590692307692307,False
+충청북도,제천시,두학동,GENERAL,0.5625647058823529,False
+대전광역시,동구,신촌동,CAMPUS,0.60455625,False
+전북특별자치도,익산시,춘포면,GENERAL,0.3931,False
+광주광역시,광산구,하산동,GENERAL,0.5570238095238095,False
+충청북도,청주시 청원구,주성동,OFFICE,0.5974875,False
+광주광역시,동구,선교동,TOURIST,0.620676923076923,False
+인천광역시,강화군,송해면,GENERAL,0.3897,False
+경기도,부천시 오정구,내동,RESIDENTIAL,0.6477428571428572,False
+서울특별시,종로구,경운동,TOURIST,0.6479647058823529,False
+서울특별시,성동구,응봉동,RESIDENTIAL,0.6437,False
+전라남도,장성군,장성읍,OFFICE,0.6096,False
+경상북도,경산시,평산동,GENERAL,0.5529666666666666,False
+경상남도,산청군,시천면,TOURIST,0.7814,False
+전라남도,광양시,진월면,TOURIST,0.7278,False
+전라남도,순천시,남내동,TOURIST,0.589225,False
+대전광역시,유성구,화암동,RESIDENTIAL,0.6262846153846154,False
+경기도,화성시 동탄구,목동,RESIDENTIAL,0.6154137931034483,False
+전북특별자치도,전주시 완산구,동서학동,TOURIST,0.7036,False
+전북특별자치도,익산시,신흥동,GENERAL,0.5517310344827586,False
+부산광역시,중구,동광동2가,TOURIST,0.7237,False
+전라남도,여수시,율촌면,TOURIST,0.7229,False
+경기도,안성시,고삼면,OFFICE,0.6269,False
+충청북도,충주시,앙성면,OFFICE,0.649,False
+전라남도,진도군,고군면,GENERAL,0.3827,False
+강원특별자치도,홍천군,남면,GENERAL,0.4048,True
+강원특별자치도,횡성군,안흥면,TOURIST,0.7953,False
+인천광역시,계양구,상야동,RESIDENTIAL,0.6505916666666667,False
+인천광역시,중구,무의동,TOURIST,0.6587583333333333,False
+충청남도,아산시,실옥동,OFFICE,0.601864705882353,False
+세종특별자치시,,종촌동,RESIDENTIAL,0.6562708333333334,False
+경기도,광주시,매산동,GENERAL,0.58930625,False
+대구광역시,북구,고성동2가,GENERAL,0.4203,True
+경기도,화성시,반정동,RESIDENTIAL,0.6154137931034483,False
+경상북도,경주시,서면,GENERAL,0.3767,False
+경상북도,상주시,서문동,GENERAL,0.5363791666666666,False
+광주광역시,광산구,지평동,GENERAL,0.5570238095238095,False
+경기도,용인시 처인구,원삼면,OFFICE,0.7013,False
+경상남도,창원시 진해구,광화동,RESIDENTIAL,0.6121846153846154,False
+경기도,부천시,여월동,RESIDENTIAL,0.6560892857142857,False
+강원특별자치도,동해시,구미동,TOURIST,0.70769,False
+대전광역시,대덕구,목상동,GENERAL,0.4287,True
+경기도,고양시 덕양구,강매동,RESIDENTIAL,0.6780571428571429,False
+서울특별시,마포구,토정동,CAMPUS,0.61548125,False
+광주광역시,북구,지야동,RESIDENTIAL,0.6422962962962963,False
+강원특별자치도,춘천시,중앙로3가,CAMPUS,0.58904,False
+대구광역시,북구,노원동3가,OFFICE,0.6652,False
+강원특별자치도,태백시,소도동,GENERAL,0.5353625,False
+대구광역시,수성구,연호동,RESIDENTIAL,0.6784826086956521,False
+제주특별자치도,제주시,삼양일동,TOURIST,0.6590692307692307,False
+강원특별자치도,춘천시,남면,GENERAL,0.279,False
+충청남도,청양군,정산면,TOURIST,0.7414,False
+전라남도,곡성군,곡성읍,GENERAL,0.3196,False
+경기도,여주시,삼교동,GENERAL,0.5664416666666666,False
+경기도,동두천시,보산동,TOURIST,0.6887,False
+경기도,양주시,유양동,GENERAL,0.57445,False
+대구광역시,동구,용계동,RESIDENTIAL,0.6195090909090909,False
+경상남도,진주시,이반성면,GENERAL,0.26,False
+전라남도,무안군,망운면,TOURIST,0.7793,False
+경기도,오산시,청학동,OFFICE,0.6421375,False
+전라남도,해남군,북일면,GENERAL,0.3913,False
+전라남도,장성군,북하면,TOURIST,0.7599,False
+대전광역시,중구,정생동,RESIDENTIAL,0.5973117647058823,False
+강원특별자치도,동해시,평릉동,TOURIST,0.70769,False
+전라남도,목포시,상락동1가,TOURIST,0.6129043478260869,False
+전북특별자치도,남원시,이백면,GENERAL,0.4256,True
+경기도,부천시,심곡본동,RESIDENTIAL,0.6560892857142857,False
+경기도,안성시,당왕동,OFFICE,0.5664,False
+강원특별자치도,횡성군,공근면,GENERAL,0.2809,False
+경상남도,밀양시,산내면,GENERAL,0.384,False
+경상북도,상주시,복룡동,GENERAL,0.5363791666666666,False
+경상북도,경산시,사정동,GENERAL,0.5529666666666666,False
+전라남도,순천시,중앙동,TOURIST,0.7176,False
+광주광역시,광산구,산정동,GENERAL,0.5570238095238095,False
+대구광역시,서구,이현동,TOURIST,0.596664705882353,False
+전라남도,나주시,금성동,GENERAL,0.53794,False
+전북특별자치도,전주시 완산구,다가동2가,RESIDENTIAL,0.6488894736842105,False
+광주광역시,남구,지석동,RESIDENTIAL,0.6205235294117647,False
+경상남도,진주시,남성동,GENERAL,0.5770700000000001,False
+경상북도,안동시,당북동,TOURIST,0.6069833333333333,False
+경기도,하남시,학암동,RESIDENTIAL,0.6532928571428572,False
+강원특별자치도,평창군,방림면,RESIDENTIAL,0.6001,False
+경상남도,창원시 진해구,명동,RESIDENTIAL,0.6121846153846154,False
+대구광역시,동구,도학동,RESIDENTIAL,0.6195090909090909,False
+전라남도,목포시,영해동1가,TOURIST,0.6129043478260869,False
+전라남도,구례군,광의면,TOURIST,0.7701,False
+전북특별자치도,전주시 덕진구,고랑동,RESIDENTIAL,0.6075,False
+전라남도,화순군,백아면,GENERAL,0.3813,False
+경상남도,김해시,전하동,OFFICE,0.6030842105263158,False
+전북특별자치도,정읍시,용산동,GENERAL,0.5397,False
+경기도,화성시 만세구,남양읍,RESIDENTIAL,0.6154137931034483,False
+경상북도,구미시,비산동,OFFICE,0.6132,False
+충청남도,예산군,응봉면,GENERAL,0.2945,False
+경상남도,거제시,문동동,TOURIST,0.63465,False
+전라남도,순천시,송광면,OFFICE,0.6266,False
+경기도,부천시 소사구,심곡본동,NIGHTLIFE,0.6413500000000001,False
+강원특별자치도,삼척시,정상동,GENERAL,0.5076999999999999,False
+강원특별자치도,춘천시,서면,GENERAL,0.3681999999999999,False
+경상북도,영덕군,병곡면,TOURIST,0.7891,False
+대구광역시,수성구,가천동,RESIDENTIAL,0.6784826086956521,False
+경기도,남양주시,일패동,OFFICE,0.67578125,False
+경기도,파주시,검산동,OFFICE,0.6352,False
+경상남도,사천시,벌리동,TOURIST,0.5692642857142857,False
+강원특별자치도,원주시,원동,RESIDENTIAL,0.633348,False
+강원특별자치도,춘천시,중앙로2가,CAMPUS,0.58904,False
+충청북도,충주시,지현동,TOURIST,0.6172,False
+경기도,안성시,일죽면,GENERAL,0.4046,True
+경기도,수원시 권선구,당수동,OFFICE,0.6592333333333333,False
+경상북도,봉화군,봉화읍,OFFICE,0.6079,False
+강원특별자치도,원주시,학성동,TOURIST,0.641,False
+전북특별자치도,완주군,고산면,GENERAL,0.3569,False
+강원특별자치도,홍천군,북방면,TOURIST,0.7901,False
+강원특별자치도,춘천시,운교동,CAMPUS,0.58904,False
+전라남도,광양시,성황동,GENERAL,0.5718416666666667,False
+전북특별자치도,전주시 완산구,평화동1가,RESIDENTIAL,0.6315,False
+광주광역시,광산구,옥동,GENERAL,0.5570238095238095,False
+서울특별시,중구,묵정동,NIGHTLIFE,0.6285866666666667,False
+대구광역시,동구,신평동,RESIDENTIAL,0.6195090909090909,False
+경기도,부천시 오정구,오정동,OFFICE,0.6248,False
+경기도,화성시 만세구,서신면,RESIDENTIAL,0.6154137931034483,False
+전라남도,무안군,일로읍,OFFICE,0.6111,False
+경상북도,안동시,상아동,TOURIST,0.6069833333333333,False
+경상북도,경주시,서악동,TOURIST,0.6624217391304348,False
+강원특별자치도,강릉시,명주동,TOURIST,0.6762,False
+충청남도,금산군,군북면,GENERAL,0.359,False
+충청북도,옥천군,동이면,GENERAL,0.3557,False
+경상남도,김해시,서상동,OFFICE,0.6030842105263158,False
+경상북도,문경시,점촌동,OFFICE,0.5827199999999999,False
+충청북도,제천시,고암동,GENERAL,0.5625647058823529,False
+전라남도,고흥군,풍양면,GENERAL,0.3617,False
+경상남도,밀양시,삼랑진읍,TOURIST,0.7153,False
+인천광역시,중구,용동,TOURIST,0.6587583333333333,False
+전라남도,여수시,공화동,TOURIST,0.6336481481481481,False
+충청남도,청양군,대치면,TOURIST,0.7348,False
+충청남도,보령시,남곡동,TOURIST,0.582875,False
+경상북도,경주시,건천읍,OFFICE,0.6984,False
+경상남도,사천시,노룡동,TOURIST,0.5692642857142857,False
+광주광역시,서구,내방동,RESIDENTIAL,0.6426000000000001,False
+경기도,안성시,계동,OFFICE,0.5664,False
+충청남도,공주시,산성동,TOURIST,0.5812937499999999,False
+경상북도,예천군,보문면,GENERAL,0.2742,False
+전북특별자치도,전주시 완산구,풍남동2가,TOURIST,0.7228,False
+경상남도,창원시 의창구,동정동,GENERAL,0.5170714285714285,False
+울산광역시,북구,당사동,RESIDENTIAL,0.6740625,False
+전라남도,강진군,병영면,GENERAL,0.2971,False
+서울특별시,종로구,신교동,TOURIST,0.6479647058823529,False
+경상남도,창원시 마산합포구,창포동3가,TOURIST,0.5817,False
+강원특별자치도,강릉시,성내동,TOURIST,0.6762,False
+충청남도,공주시,중학동,TOURIST,0.728,False
+경기도,연천군,연천읍,OFFICE,0.6778,False
+전북특별자치도,전주시 덕진구,팔복동2가,OFFICE,0.6209,False
+충청북도,제천시,영천동,GENERAL,0.5625647058823529,False
+서울특별시,서대문구,천연동,OFFICE,0.6003,False
+부산광역시,부산진구,범전동,RESIDENTIAL,0.63713,False
+충청북도,충주시,산척면,GENERAL,0.4274,True
+전라남도,강진군,군동면,TOURIST,0.6922,False
+전라남도,목포시,대안동,TOURIST,0.6129043478260869,False
+경상북도,예천군,호명읍,RESIDENTIAL,0.6299,False
+충청남도,공주시,중동,TOURIST,0.5812937499999999,False
+대구광역시,중구,사일동,RESIDENTIAL,0.6376916666666667,False
+전북특별자치도,김제시,금구면,TOURIST,0.7661,False
+경기도,안산시 단원구,선감동,OFFICE,0.7033416666666668,False
+강원특별자치도,정선군,북평면,TOURIST,0.7808,False
+대구광역시,동구,미곡동,RESIDENTIAL,0.6195090909090909,False
+광주광역시,남구,주월동,RESIDENTIAL,0.6332,False
+전북특별자치도,익산시,송학동,RESIDENTIAL,0.6391,False
+경상남도,진주시,봉래동,GENERAL,0.5770700000000001,False
+강원특별자치도,동해시,효가동,TOURIST,0.70769,False
+울산광역시,북구,신명동,RESIDENTIAL,0.6740625,False
+부산광역시,강서구,식만동,GENERAL,0.5988777777777777,False
+전라남도,순천시,금곡동,TOURIST,0.589225,False
+충청북도,청주시 상당구,수동,RESIDENTIAL,0.5930692307692308,False
+경기도,양주시,남면,OFFICE,0.6429,False
+충청남도,공주시,금학동,CAMPUS,0.6094,False
+충청남도,태안군,근흥면,TOURIST,0.7442,False
+경상남도,통영시,미수동,TOURIST,0.7503,False
+충청북도,청주시 흥덕구,석곡동,CAMPUS,0.6104545454545455,False
+경상북도,안동시,법흥동,TOURIST,0.6069833333333333,False
+대전광역시,중구,부사동,TOURIST,0.6906,False
+경상북도,구미시,양호동,RESIDENTIAL,0.576092,False
+경기도,고양시 일산서구,법곳동,OFFICE,0.7321272727272727,False
+전라남도,목포시,만호동,TOURIST,0.7298,False
+충청북도,보은군,마로면,GENERAL,0.2912,False
+대전광역시,동구,구도동,CAMPUS,0.60455625,False
+강원특별자치도,영월군,무릉도원면,GENERAL,0.3399,False
+전라남도,신안군,임자면,TOURIST,0.7564,False
+전라남도,여수시,안산동,TOURIST,0.6336481481481481,False
+서울특별시,종로구,궁정동,TOURIST,0.6479647058823529,False
+경상북도,포항시 북구,기계면,RESIDENTIAL,0.6367,False
+충청북도,제천시,중앙로1가,GENERAL,0.5625647058823529,False
+경상남도,밀양시,단장면,TOURIST,0.7935,False
+충청북도,청주시 흥덕구,신봉동,CAMPUS,0.6104545454545455,False
+경상남도,창원시 진해구,소사동,RESIDENTIAL,0.6121846153846154,False
+강원특별자치도,동해시,나안동,TOURIST,0.70769,False
+강원특별자치도,양양군,서면,GENERAL,0.3727,False
+부산광역시,영도구,대교동1가,TOURIST,0.6794,False
+강원특별자치도,동해시,망상동,TOURIST,0.7837,False
+경상북도,영덕군,축산면,TOURIST,0.7605,False
+충청남도,보령시,웅천읍,GENERAL,0.3507,False
+충청북도,단양군,매포읍,GENERAL,0.3093,False
+충청북도,충주시,봉방동,RESIDENTIAL,0.6074,False
+경기도,평택시,신대동,OFFICE,0.657788,False
+경기도,파주시,야동동,OFFICE,0.6352,False
+충청남도,계룡시,금암동,OFFICE,0.6238,False
+경상북도,울진군,북면,TOURIST,0.7385,False
+인천광역시,중구,중앙동2가,TOURIST,0.6587583333333333,False
+충청남도,계룡시,두마면,RESIDENTIAL,0.6215,False
+경상북도,상주시,가장동,GENERAL,0.5363791666666666,False
+경기도,부천시,춘의동,RESIDENTIAL,0.6560892857142857,False
+경상남도,창원시 마산합포구,중앙동1가,TOURIST,0.5817,False
+전라남도,영광군,홍농읍,GENERAL,0.3016,False
+충청남도,천안시 동남구,오룡동,GENERAL,0.5534235294117648,False
+전북특별자치도,고창군,해리면,GENERAL,0.3881,False

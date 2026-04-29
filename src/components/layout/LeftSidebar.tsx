@@ -873,7 +873,7 @@ function FileTreeNode({
   onOpenNotebook: (id: string) => void
   onOpenReport: (id: string) => void
 }) {
-  const [open, setOpen] = useState(depth < 1)
+  const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [creatingNb, setCreatingNb] = useState(false)
