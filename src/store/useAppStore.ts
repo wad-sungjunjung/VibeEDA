@@ -421,6 +421,8 @@ interface AppStore {
   agentLoading: boolean
   agentStartedAtMs: number | null
   agentStatus: string | null
+  // 에이전트가 어느 노트북에서 시작됐는지 — 사용자가 다른 노트북으로 전환했을 때 FAB 등이 가려지도록.
+  agentNotebookId: string | null
   // 현재 진행중 세션의 tier 분류 결과 + 예산 진행 상황 (tier_classified / tier_promoted / budget_warning 으로 갱신)
   agentTier: import('@/lib/api').AgentTier | null
   agentTierReason: string | null
@@ -1338,6 +1340,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   agentLoading: false,
   agentStartedAtMs: null,
   agentStatus: null,
+  agentNotebookId: null,
   agentTier: null,
   agentTierReason: null,
   agentEstimatedSeconds: null,
@@ -1564,6 +1567,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       agentLoading: true,
       agentStartedAtMs: Date.now(),
       agentStatus: '생각 중',
+      agentNotebookId: notebookId,
     }))
 
     // 현재 세션 메타를 localStorage 에 반영 — 새로고침 후에도 "현재 대화" 로 복원 가능.
@@ -1997,6 +2001,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       // 안전장치: 종료/에러/abort 와 무관하게 남은 델타가 있으면 flush.
       flushAgentDeltas()
       _agentController = null
+      // agentNotebookId 는 의도적으로 유지 — 완료 후에도 doneBubble 이 원래 노트북에서만 보이도록.
+      // 다음 에이전트 실행이 새 값으로 덮어씀.
       set({ agentLoading: false, agentStartedAtMs: null, agentStatus: null })
     }
   },

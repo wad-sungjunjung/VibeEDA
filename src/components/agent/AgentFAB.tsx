@@ -6,15 +6,19 @@ import { cn } from '@/lib/utils'
 import Markdown from '@/components/common/Markdown'
 
 export default function AgentFAB() {
-  const { agentMode, agentLoading, agentStatus, agentChatHistory, toggleAgentMode } = useAppStore(
+  const { agentMode, agentLoading, agentStatus, agentChatHistory, toggleAgentMode, notebookId, agentNotebookId } = useAppStore(
     useShallow((s) => ({
       agentMode: s.agentMode,
       agentLoading: s.agentLoading,
       agentStatus: s.agentStatus,
       agentChatHistory: s.agentChatHistory,
       toggleAgentMode: s.toggleAgentMode,
+      notebookId: s.notebookId,
+      agentNotebookId: s.agentNotebookId,
     }))
   )
+  // 에이전트가 다른 노트북에서 돌고 있는 동안에는 현재 노트북 화면에 진행 표시를 띄우지 않는다.
+  const onAgentNotebook = !agentNotebookId || agentNotebookId === notebookId
   const [doneBubble, setDoneBubble] = useState<string | null>(null)
   const [showCheck, setShowCheck] = useState(false)
   const prevLoadingRef = useRef(false)
@@ -55,7 +59,7 @@ export default function AgentFAB() {
     if (checkTimerRef.current) clearTimeout(checkTimerRef.current)
   }, [agentMode])
 
-  const isGenerating = agentLoading && !agentMode
+  const isGenerating = agentLoading && !agentMode && onAgentNotebook
   const liveStatus = isGenerating ? (agentStatus ?? '생각 중') : null
   const liveAssistantMsg = isGenerating
     ? [...agentChatHistory].reverse().find(
@@ -66,7 +70,7 @@ export default function AgentFAB() {
 
   return (
     <div className="fixed bottom-6 right-6 z-[120]">
-      {(doneBubble || liveStatus || liveAssistantText) && !agentMode && (
+      {(doneBubble || liveStatus || liveAssistantText) && !agentMode && onAgentNotebook && (
         <div
           className="absolute bottom-16 right-0 bg-surface border border-border rounded-2xl shadow-lg px-5 py-4 animate-fade-in"
           style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)', width: 380, maxHeight: '60vh', overflowY: 'auto' }}
