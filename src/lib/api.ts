@@ -211,20 +211,32 @@ async function readSSEStream<T>(
   const decoder = new TextDecoder()
   let buffer = ''
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop()!
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          onEvent(JSON.parse(line.slice(6)) as T)
-        } catch {
-          // ignore malformed lines
-        }
+  const flushLine = (line: string) => {
+    if (line.startsWith('data: ')) {
+      try {
+        onEvent(JSON.parse(line.slice(6)) as T)
+      } catch {
+        // ignore malformed lines
       }
+    }
+  }
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop()!
+      for (const line of lines) flushLine(line)
+    }
+    buffer += decoder.decode()
+    if (buffer) flushLine(buffer)
+  } finally {
+    try {
+      await reader.cancel()
+    } catch {
+      // already closed
     }
   }
 }

@@ -59,6 +59,7 @@ const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const _vibeControllers = new Map<string, AbortController>()
 const _cellExecControllers = new Map<string, AbortController>()
 let _agentController: AbortController | null = null
+let _reportController: AbortController | null = null
 const _pendingSaves = new Map<string, () => void>()
 // 보류 중 vibe 변경의 메타(수락 시점에 채팅 히스토리 엔트리 만들 때 필요).
 // pendingCode 자체는 cell 에 들어가 있고, 수락 콜백에서 이 메타를 함께 사용한다.
@@ -165,6 +166,28 @@ function scheduleAgentFlush() {
   _agentRafHandle = requestAnimationFrame(() => {
     _agentRafHandle = null
     flushAgentDeltas()
+  })
+}
+
+let _reportDeltaBuffer = ''
+let _reportRafHandle: number | null = null
+
+function flushReportDeltas() {
+  if (_reportRafHandle !== null) {
+    cancelAnimationFrame(_reportRafHandle)
+    _reportRafHandle = null
+  }
+  if (!_reportDeltaBuffer) return
+  const drained = _reportDeltaBuffer
+  _reportDeltaBuffer = ''
+  useAppStore.setState((s) => ({ reportContent: s.reportContent + drained }))
+}
+
+function scheduleReportFlush() {
+  if (_reportRafHandle !== null) return
+  _reportRafHandle = requestAnimationFrame(() => {
+    _reportRafHandle = null
+    flushReportDeltas()
   })
 }
 
@@ -505,6 +528,7 @@ interface AppStore {
   closeCurrentReport: () => Promise<void>
   setShowReportModal: (v: boolean) => void
   generateReport: (args: { cellIds: string[]; goal?: string }) => Promise<void>
+  cancelReport: () => void
   setShowReport: (v: boolean) => void
   fetchReports: () => Promise<void>
   openReport: (id: string) => Promise<void>
@@ -2209,6 +2233,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
   generateReport: async ({ cellIds, goal }) => {
     const { notebookId, analysisTheme } = get()
     if (!notebookId) return
+    // 이전 진행 중 리포트가 있으면 abort
+    if (_reportController) {
+      try { _reportController.abort() } catch { /* noop */ }
+    }
+    _reportDeltaBuffer = ''
+    if (_reportRafHandle !== null) {
+      cancelAnimationFrame(_reportRafHandle)
+      _reportRafHandle = null
+    }
+    const controller = new AbortController()
+    _reportController = controller
     set({
       generatingReport: true,
       showReportModal: false,
@@ -2229,17 +2264,22 @@ export const useAppStore = create<AppStore>((set, get) => ({
         { notebook_id: notebookId, cell_ids: cellIds, goal: goal || '' },
         (event) => {
           if (event.type === 'delta') {
-            set((s) => ({ reportContent: s.reportContent + event.content }))
+            // 토큰별 set 대신 rAF 배치 — 긴 리포트에서 수백 번 리렌더 방지.
+            _reportDeltaBuffer += event.content
+            scheduleReportFlush()
           } else if (event.type === 'stage') {
+            flushReportDeltas()
             set((s) => ({
               reportStages: [...s.reportStages, { stage: event.stage, label: event.label, at: Date.now() }],
             }))
           } else if (event.type === 'meta') {
+            flushReportDeltas()
             set({
               reportProcessingNotes: event.processing_notes,
               reportOutline: event.outline,
             })
           } else if (event.type === 'complete') {
+            flushReportDeltas()
             set((s) => ({
               generatingReport: false,
               currentReportId: event.id,
@@ -2258,16 +2298,35 @@ export const useAppStore = create<AppStore>((set, get) => ({
             }).catch((err) => console.warn('getReport after complete failed', err))
             // draft 는 사이드바에 노출되지 않음 — 승격 시에만 목록 새로고침
           } else if (event.type === 'error') {
+            flushReportDeltas()
             set({ generatingReport: false, reportError: event.message })
           }
         },
+        controller.signal,
       )
     } catch (e) {
+      flushReportDeltas()
+      const aborted = e instanceof DOMException && e.name === 'AbortError'
       set({
         generatingReport: false,
-        reportError: e instanceof Error ? e.message : String(e),
+        reportError: aborted ? null : (e instanceof Error ? e.message : String(e)),
       })
+    } finally {
+      if (_reportController === controller) _reportController = null
     }
+  },
+
+  cancelReport: () => {
+    if (_reportController) {
+      try { _reportController.abort() } catch { /* noop */ }
+      _reportController = null
+    }
+    _reportDeltaBuffer = ''
+    if (_reportRafHandle !== null) {
+      cancelAnimationFrame(_reportRafHandle)
+      _reportRafHandle = null
+    }
+    set({ generatingReport: false })
   },
 
   setShowReport: (v) => set({ showReport: v }),
@@ -2291,10 +2350,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   closeCurrentReport: async () => {
-    const { currentReportId, reportIsDraft, generatingReport } = get()
-    // 스트리밍 중 닫기: 일단 모달만 닫음 (생성은 계속). 완료 후 draft 가 남겠지만 그건 허용.
+    const { currentReportId, reportIsDraft, generatingReport, cancelReport } = get()
+    // 스트리밍 중 닫기: 백그라운드 생성/렌더링 자원을 즉시 해제.
     set({ showReport: false })
-    if (generatingReport) return
+    if (generatingReport) {
+      cancelReport()
+      return
+    }
     if (currentReportId && reportIsDraft) {
       try {
         const api = await import('@/lib/api')
