@@ -651,7 +651,9 @@ def _render_plan_markdown(
     out_of_scope: list[str],
     method_section: str = "",
 ) -> str:
-    lines = ["# 📋 분석 플랜", ""]
+    # PLAN_MARKER 는 _detect_existing_plan_cell 이 재진입 시 플랜 셀을 식별하는 표지.
+    # 보이지 않는 HTML 주석이라 프론트 Markdown 렌더에는 영향 없음.
+    lines = [PLAN_MARKER, "", "# 📋 분석 플랜", ""]
     if scope:
         lines += [f"**스코프**: {scope}", ""]
     # 메서드별 설계 섹션 (causal/ml/predict/ab_test/explore) 이 있으면 가설 위에 배치 —
@@ -797,7 +799,10 @@ def handle_skill_tool(
         new_md = inp.get("new_plan_markdown", "")
         if not new_md.strip():
             return {"success": False, "error": "empty_plan", "message": "`new_plan_markdown` 이 비어 있습니다."}, []
+        # 모델이 마커를 중복/엉뚱한 위치에 박았을 수 있음 → 모두 제거 후 첫 줄에 단일 마커 재주입.
+        # 멱등 — 여러 번 호출돼도 마커는 항상 정확히 한 개.
         new_md = new_md.replace(PLAN_MARKER, "").lstrip("\n")
+        new_md = f"{PLAN_MARKER}\n{new_md}"
         old_md = cell.code
         cell.code = new_md
         _log_agent_chat(state, plan_id, old_md, new_md, created=False)
