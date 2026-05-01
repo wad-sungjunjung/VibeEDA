@@ -39,6 +39,7 @@ _FRAGMENT_EXPLORE = """
 - 모든 선택 마트에 `profile_mart` 를 한 턴에 병렬로 호출
 - 결과를 보고 NULL/카디널리티/수치 분포에서 이상한 점 1~2개를 메모로 기록
 - WHERE 절 후보 컬럼은 `get_category_values` 로 실제 값 확인 (추측 금지)
+- 플랜 작성 시 `exploration_plan` (marts_to_profile, checks) 채우면 체크리스트가 플랜 셀에 표시됨
 """.strip()
 
 _FRAGMENT_ANALYZE = """
@@ -55,6 +56,7 @@ _FRAGMENT_PREDICT = """
 - 학습 데이터의 최대 시점이 예측 대상보다 앞서야 함 (시간 누수 금지)
 - 예측에는 반드시 신뢰구간 or 분산 정보 포함
 - 메모에 "이 예측의 한계 (외삽 / 계절성 / 충격)" 1줄 명시
+- **`create_plan` 호출 시 `forecast_spec` 필수**: time_column, target_metric, train_window, horizon, seasonality
 """.strip()
 
 _FRAGMENT_CAUSAL = """
@@ -64,6 +66,7 @@ _FRAGMENT_CAUSAL = """
 - 교란 후보 (confounders) 를 최소 2개 이상 나열
 - 무작위 배정/준실험이 아니면 결론에 "관찰 데이터 — 인과 약함" 표시
 - 도구: S5 에서 compare_groups, confounders_check, power_analysis 추가
+- **`create_plan` 호출 시 `causal_design` 필수**: treatment, outcome, confounders(≥2), assignment
 """.strip()
 
 _FRAGMENT_ML = """
@@ -73,6 +76,7 @@ _FRAGMENT_ML = """
 - 분류 작업은 클래스 균형 확인 + class_weight 조정 고려
 - 단순 정확도만 보지 말 것 — confusion matrix / AUC / 잔차 함께
 - 도구: S4 에서 fit_model, evaluate_model, feature_importance 추가
+- **`create_plan` 호출 시 `ml_design` 필수**: target, features, task_type, evaluation_metric
 """.strip()
 
 _FRAGMENT_AB_TEST = """
@@ -82,6 +86,7 @@ _FRAGMENT_AB_TEST = """
 - power < 0.8 이면 결론을 "결정 불가" 로 명시
 - 다중 메트릭 비교 시 Bonferroni / FDR 보정 언급
 - 도구: S5 의 power_analysis, compare_groups 활용
+- **`create_plan` 호출 시 `ab_design` 필수**: control_group, treatment_group, primary_metric, MDE, power, alpha
 """.strip()
 
 _FRAGMENT_BENCHMARK = """
@@ -102,6 +107,87 @@ METHOD_FRAGMENTS: dict[str, str] = {
     "ab_test": _FRAGMENT_AB_TEST,
     "benchmark": _FRAGMENT_BENCHMARK,
 }
+
+
+# ─── 메서드별 플래닝 스키마 ─────────────────────────────────────────────────
+# 메서드마다 "플래닝의 본질" 이 다르다.
+#   analyze / benchmark → 가설 기반 (관찰 가능한 패턴 추측)
+#   explore             → 탐색 체크리스트 (마트 순서, 무엇을 먼저 볼지)
+#   predict             → 예측 명세 (시계열 컬럼, 학습 구간, 예측 지평)
+#   causal              → 변수 선언 (처치, 결과, 교란 후보)
+#   ml                  → 모델 설계 (타깃, 피처, 태스크 타입)
+#   ab_test             → 통계 설계 (그룹, 메트릭, MDE, 검정력)
+#
+# 모든 메서드는 공통 가설 섹션(min 3개) 을 유지하되,
+# 메서드별로 추가 필수 필드 (REQUIRED) 와 권장 필드 (OPTIONAL) 를 둔다.
+# create_plan 도구는 활성 메서드를 보고 필수 필드 누락 시 거부한다.
+
+# 메서드별 플랜 필수 필드 — 누락 시 create_plan 이 plan_field_missing 으로 거부.
+PLAN_REQUIRED_FIELDS: dict[str, list[str]] = {
+    "explore": [],            # 탐색은 가설만 강제 (체크리스트는 권장)
+    "analyze": [],            # 기본 가설만
+    "benchmark": [],          # 기본 가설만 (메모 단계에서 baseline 강제)
+    "predict": ["forecast_spec"],
+    "causal": ["causal_design"],
+    "ml": ["ml_design"],
+    "ab_test": ["ab_design"],
+}
+
+# 메서드별 플랜 추가 필드 안내 — 모델에게 무엇을 채워야 하는지 1줄 설명.
+# create_plan 도구 description 동적 보강 + system prompt 안내에 사용.
+PLAN_FIELD_HINTS: dict[str, str] = {
+    "exploration_plan": (
+        "탐색 체크리스트 — 어떤 마트를 어떤 순서로 profile/preview 할지, "
+        "확인해야 할 컬럼 분포·NULL·카디널리티 등."
+    ),
+    "forecast_spec": (
+        "예측 명세 — time_column (시계열 키), target_metric (예측 대상), "
+        "train_window (학습 구간), horizon (예측 지평), seasonality (예: 주/월/없음)."
+    ),
+    "causal_design": (
+        "인과 설계 — treatment (처치 변수+값), outcome (결과 지표), "
+        "confounders (교란 후보 최소 2개), assignment (관찰/무작위/준실험)."
+    ),
+    "ml_design": (
+        "ML 설계 — target (타깃 컬럼), features (피처 후보), "
+        "task_type (classification/regression), evaluation_metric (예: AUC, RMSE)."
+    ),
+    "ab_design": (
+        "A/B 설계 — control_group/treatment_group 정의, primary_metric, "
+        "MDE (최소 탐지 효과), expected_power (기본 0.8), alpha (기본 0.05)."
+    ),
+}
+
+
+def get_required_plan_fields(methods: list[str]) -> list[str]:
+    """선택된 메서드들에 따라 필수 플랜 필드 리스트 반환 (중복 제거).
+    예: ['causal', 'predict'] → ['causal_design', 'forecast_spec']
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for m in methods or []:
+        for field in PLAN_REQUIRED_FIELDS.get(m, []):
+            if field not in seen:
+                seen.add(field)
+                out.append(field)
+    return out
+
+
+def build_plan_field_hint_block(methods: list[str]) -> str:
+    """선택된 메서드들에 해당하는 플랜 필드 안내 블록 (system prompt 보강용).
+
+    필수 필드만 출력. 빈 문자열이면 추가 안내 없음 (analyze/benchmark/explore 단독 등).
+    """
+    required = get_required_plan_fields(methods)
+    if not required:
+        return ""
+    lines = ["", "### 플랜 추가 필수 필드 (이번 메서드 조합)"]
+    for field in required:
+        hint = PLAN_FIELD_HINTS.get(field)
+        if hint:
+            lines.append(f"- `{field}`: {hint}")
+    lines.append("`create_plan` 호출 시 위 필드를 hypotheses 와 함께 반드시 채우세요.")
+    return "\n".join(lines)
 
 
 # 메서드 사용자-친화 라벨 (프론트 칩 표시용)

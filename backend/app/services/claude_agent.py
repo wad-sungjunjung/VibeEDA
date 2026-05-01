@@ -1750,6 +1750,10 @@ def _build_system_prompt(state: NotebookState) -> str:
             "이 조합에 맞춰 분석 흐름을 진행하세요. 아래 메서드별 가이드라인을 준수.\n"
         )
         methods_block = agent_methods.build_methods_fragment(state.methods)
+        # 메서드별 필수 플랜 필드 (causal/ml/predict/ab_test) 안내
+        plan_hint = agent_methods.build_plan_field_hint_block(state.methods)
+        if plan_hint:
+            methods_block = (methods_block or "") + plan_hint + "\n"
     elif tier in ("L2", "L3"):
         routing_block = (
             "\n## 📍 분석 메서드 선택 (필수 — 첫 도구 호출)\n"

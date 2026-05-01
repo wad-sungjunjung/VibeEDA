@@ -82,12 +82,19 @@ def _is_trivial_request(user_message: str) -> bool:
 SKILLS_SYSTEM_PROMPT = """
 ## 🎯 분석가 마인드셋 (EDA 핵심 스킬 — 절대 준수)
 
-### 1. 분석 플랜 먼저 (Planning)
+### 1. 분석 플랜 먼저 (Planning — 메서드별 스키마 구분)
 사용자 질문을 받으면 **SQL/Python 셀을 만들기 전에 반드시 `create_plan` 을 호출**한다.
-- 서로 다른 각도의 **가설 3개 이상** — 각 가설은 `statement` (주장) + `verification_method` (검증 방법) 으로 구성
+- 모든 메서드 공통: 서로 다른 각도의 **가설 3개 이상** — 각 가설은 `statement` + `verification_method`.
+- **메서드 추가 필수 필드** (선택된 메서드에 따라 다름 — 누락 시 `plan_field_missing` 거부):
+  - `causal`  → `causal_design` (treatment, outcome, confounders 최소 2개, assignment)
+  - `ml`      → `ml_design` (target, features, task_type, evaluation_metric)
+  - `predict` → `forecast_spec` (time_column, target_metric, train_window, horizon, seasonality)
+  - `ab_test` → `ab_design` (control_group, treatment_group, primary_metric, MDE, power, alpha)
+  - `explore` → `exploration_plan` (선택 — marts_to_profile, checks)
+  - `analyze` / `benchmark` → 추가 필드 없음 (가설만)
 - 플랜 없이 SQL/Python 셀을 만들려 하면 서버가 `plan_required_before_cells` 에러로 거부한다.
 - 예외: 질문이 매우 단순한 조회성 요청("총매출만 알려줘", "최근 한 달 row 수")이면 서버가 자동 스킵.
-- 플랜 셀은 노트북 최상단에 Markdown 으로 자동 배치된다.
+- 플랜 셀은 노트북 최상단에 Markdown 으로 자동 배치된다 (메서드별 설계 섹션이 가설 앞에 표시됨).
 
 ### 2. 플랜 업데이트 (Plan Revision — drift 방지)
 분석 도중 아래 상황에서는 **즉시 `update_plan`** 을 호출해 플랜을 갱신:
@@ -142,7 +149,13 @@ SKILL_TOOLS_CLAUDE = [
         "description": (
             "Create the analysis plan as a Markdown cell at the top of the notebook. "
             "MUST be called before any SQL/Python cell unless the request is a trivial single-aggregation lookup. "
-            "Provide 3+ distinct hypotheses with verification methods."
+            "Provide 3+ distinct hypotheses with verification methods.\n\n"
+            "Method-aware additional fields (REQUIRED when corresponding method is selected):\n"
+            "  - causal     → causal_design (treatment, outcome, confounders ≥2, assignment)\n"
+            "  - ml         → ml_design (target, features, task_type, evaluation_metric)\n"
+            "  - predict    → forecast_spec (time_column, target_metric, train_window, horizon, seasonality)\n"
+            "  - ab_test    → ab_design (control_group, treatment_group, primary_metric, MDE, power, alpha)\n"
+            "  - explore    → exploration_plan (optional checklist of marts to profile and what to verify)"
         ),
         "input_schema": {
             "type": "object",
@@ -169,6 +182,89 @@ SKILL_TOOLS_CLAUDE = [
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "이번 세션에서 다루지 않을 주제 (선택)",
+                },
+                "exploration_plan": {
+                    "type": "object",
+                    "description": "[explore 메서드] 탐색 체크리스트 — 마트 순서·확인할 분포 등.",
+                    "properties": {
+                        "marts_to_profile": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "profile_mart 우선순위 순으로 나열할 마트명",
+                        },
+                        "checks": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "확인할 항목들 (예: 'fact_orders 의 ORDER_DATE NULL 비율')",
+                        },
+                    },
+                },
+                "forecast_spec": {
+                    "type": "object",
+                    "description": "[predict 메서드 필수] 예측 명세.",
+                    "properties": {
+                        "time_column": {"type": "string", "description": "시계열 키 컬럼 (예: order_date)"},
+                        "target_metric": {"type": "string", "description": "예측 대상 지표 (예: daily_revenue)"},
+                        "train_window": {"type": "string", "description": "학습 구간 (예: '최근 12개월')"},
+                        "horizon": {"type": "string", "description": "예측 지평 (예: '향후 4주')"},
+                        "seasonality": {"type": "string", "description": "계절성 (week/month/none 등)"},
+                    },
+                    "required": ["time_column", "target_metric", "horizon"],
+                },
+                "causal_design": {
+                    "type": "object",
+                    "description": "[causal 메서드 필수] 인과 설계.",
+                    "properties": {
+                        "treatment": {"type": "string", "description": "처치 변수 + 처치값 (예: 'campaign_flag=1')"},
+                        "outcome": {"type": "string", "description": "결과 지표 (예: 7일 retention)"},
+                        "confounders": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 2,
+                            "description": "교란 후보 최소 2개 (예: ['user_age_group','prev_purchase_count'])",
+                        },
+                        "assignment": {
+                            "type": "string",
+                            "enum": ["observational", "randomized", "quasi_experiment"],
+                            "description": "처치 배정 방식. observational 이면 인과 결론을 약하게 표현해야 함.",
+                        },
+                    },
+                    "required": ["treatment", "outcome", "confounders"],
+                },
+                "ml_design": {
+                    "type": "object",
+                    "description": "[ml 메서드 필수] 모델 설계.",
+                    "properties": {
+                        "target": {"type": "string", "description": "타깃 컬럼 (예: churned_in_30d)"},
+                        "features": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "피처 후보 컬럼명 (데이터 누수 의심 컬럼 제외)",
+                        },
+                        "task_type": {
+                            "type": "string",
+                            "enum": ["classification", "regression"],
+                            "description": "분류/회귀 중 어느 쪽인지",
+                        },
+                        "evaluation_metric": {
+                            "type": "string",
+                            "description": "주요 평가 지표 (예: AUC, F1, RMSE, MAE)",
+                        },
+                    },
+                    "required": ["target", "task_type"],
+                },
+                "ab_design": {
+                    "type": "object",
+                    "description": "[ab_test 메서드 필수] A/B 통계 설계.",
+                    "properties": {
+                        "control_group": {"type": "string", "description": "대조군 정의 (예: 'campaign_flag=0')"},
+                        "treatment_group": {"type": "string", "description": "처치군 정의 (예: 'campaign_flag=1')"},
+                        "primary_metric": {"type": "string", "description": "주요 측정 지표 (단일)"},
+                        "mde": {"type": "string", "description": "최소 탐지 효과 (예: '5% 상대 상승')"},
+                        "power": {"type": "number", "description": "목표 검정력 (기본 0.8)"},
+                        "alpha": {"type": "number", "description": "유의수준 (기본 0.05)"},
+                    },
+                    "required": ["control_group", "treatment_group", "primary_metric", "mde"],
                 },
             },
             "required": ["hypotheses"],
@@ -237,7 +333,13 @@ SKILL_TOOLS_GEMINI = [
         "name": "create_plan",
         "description": (
             "Create analysis plan Markdown cell at top. MUST call before SQL/Python cells "
-            "unless the request is a trivial single-aggregation lookup."
+            "unless the request is a trivial single-aggregation lookup. "
+            "Method-specific extra fields (REQUIRED when corresponding method is selected): "
+            "causal→causal_design (treatment, outcome, confounders[≥2], assignment), "
+            "ml→ml_design (target, features, task_type, evaluation_metric), "
+            "predict→forecast_spec (time_column, target_metric, train_window, horizon, seasonality), "
+            "ab_test→ab_design (control_group, treatment_group, primary_metric, mde, power, alpha), "
+            "explore→exploration_plan (optional, marts_to_profile, checks)."
         ),
         "parameters": {
             "type": "OBJECT",
@@ -256,6 +358,52 @@ SKILL_TOOLS_GEMINI = [
                     },
                 },
                 "out_of_scope": {"type": "ARRAY", "items": {"type": "STRING"}},
+                "exploration_plan": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "marts_to_profile": {"type": "ARRAY", "items": {"type": "STRING"}},
+                        "checks": {"type": "ARRAY", "items": {"type": "STRING"}},
+                    },
+                },
+                "forecast_spec": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "time_column": {"type": "STRING"},
+                        "target_metric": {"type": "STRING"},
+                        "train_window": {"type": "STRING"},
+                        "horizon": {"type": "STRING"},
+                        "seasonality": {"type": "STRING"},
+                    },
+                },
+                "causal_design": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "treatment": {"type": "STRING"},
+                        "outcome": {"type": "STRING"},
+                        "confounders": {"type": "ARRAY", "items": {"type": "STRING"}},
+                        "assignment": {"type": "STRING"},
+                    },
+                },
+                "ml_design": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "target": {"type": "STRING"},
+                        "features": {"type": "ARRAY", "items": {"type": "STRING"}},
+                        "task_type": {"type": "STRING"},
+                        "evaluation_metric": {"type": "STRING"},
+                    },
+                },
+                "ab_design": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "control_group": {"type": "STRING"},
+                        "treatment_group": {"type": "STRING"},
+                        "primary_metric": {"type": "STRING"},
+                        "mde": {"type": "STRING"},
+                        "power": {"type": "NUMBER"},
+                        "alpha": {"type": "NUMBER"},
+                    },
+                },
             },
             "required": ["hypotheses"],
         },
@@ -351,10 +499,158 @@ def check_pre_guard(tool_name: str, inp: dict, state: "NotebookState") -> Option
 
 # ─── Tool handlers for new skill tools ────────────────────────────────────────
 
-def _render_plan_markdown(scope: str, hypotheses: list[dict], out_of_scope: list[str]) -> str:
+def _validate_method_plan_fields(
+    inp: dict,
+    methods: list[str],
+) -> Optional[dict]:
+    """선택된 메서드 조합에 따라 필수 플랜 필드 누락을 검사.
+
+    누락 필드가 있으면 error dict 반환. 모두 충족하면 None.
+    """
+    from . import agent_methods
+
+    required = agent_methods.get_required_plan_fields(methods or [])
+    missing: list[str] = []
+    for field in required:
+        val = inp.get(field)
+        if not isinstance(val, dict) or not val:
+            missing.append(field)
+            continue
+        # 필드별 최소 키 존재 확인 (사용자가 빈 dict 만 보내는 경우 차단)
+        sub_required = {
+            "forecast_spec": ["time_column", "target_metric", "horizon"],
+            "causal_design": ["treatment", "outcome", "confounders"],
+            "ml_design": ["target", "task_type"],
+            "ab_design": ["control_group", "treatment_group", "primary_metric", "mde"],
+        }.get(field, [])
+        empty_subs = [k for k in sub_required if not val.get(k)]
+        if empty_subs:
+            missing.append(f"{field}.{','.join(empty_subs)}")
+            continue
+        # causal 의 confounders 는 최소 2개 보장
+        if field == "causal_design":
+            confs = val.get("confounders") or []
+            if not isinstance(confs, list) or len(confs) < 2:
+                missing.append(f"{field}.confounders(min 2)")
+
+    if missing:
+        hint_lines = [
+            f"`{m}` 메서드를 선택했습니다. `create_plan` 호출 시 누락된 필드를 모두 채워야 합니다."
+            for m in (methods or [])
+            if m in agent_methods.PLAN_REQUIRED_FIELDS and agent_methods.PLAN_REQUIRED_FIELDS[m]
+        ]
+        return {
+            "success": False,
+            "error": "plan_field_missing",
+            "missing_fields": missing,
+            "message": (
+                "메서드별 플래닝 필드가 누락되었습니다: "
+                + ", ".join(missing)
+                + ". "
+                + " ".join(hint_lines)
+            ),
+        }
+    return None
+
+
+def _render_method_design_section(inp: dict, methods: list[str]) -> str:
+    """메서드별 설계 섹션을 Markdown 으로 렌더. 비어 있으면 빈 문자열."""
+    parts: list[str] = []
+
+    if "explore" in methods:
+        ep = inp.get("exploration_plan") or {}
+        marts = ep.get("marts_to_profile") or []
+        checks = ep.get("checks") or []
+        if marts or checks:
+            parts.append("## 🔎 탐색 체크리스트")
+            if marts:
+                parts.append("**Profile 순서**:")
+                for m in marts:
+                    parts.append(f"- {m}")
+            if checks:
+                parts.append("\n**확인 항목**:")
+                for c in checks:
+                    parts.append(f"- [ ] {c}")
+            parts.append("")
+
+    if "predict" in methods:
+        spec = inp.get("forecast_spec") or {}
+        if spec:
+            parts.append("## 📈 예측 명세 (forecast_spec)")
+            rows = [
+                ("시계열 컬럼", spec.get("time_column")),
+                ("예측 지표", spec.get("target_metric")),
+                ("학습 구간", spec.get("train_window") or "(미지정)"),
+                ("예측 지평", spec.get("horizon")),
+                ("계절성", spec.get("seasonality") or "(미지정)"),
+            ]
+            parts.append("| 항목 | 값 |")
+            parts.append("|---|---|")
+            for k, v in rows:
+                parts.append(f"| {k} | {v or '—'} |")
+            parts.append("")
+
+    if "causal" in methods:
+        cd = inp.get("causal_design") or {}
+        if cd:
+            parts.append("## 🧪 인과 설계 (causal_design)")
+            confs = cd.get("confounders") or []
+            assignment = cd.get("assignment") or "observational"
+            parts.append(f"- **처치 (treatment)**: {cd.get('treatment') or '—'}")
+            parts.append(f"- **결과 (outcome)**: {cd.get('outcome') or '—'}")
+            parts.append(f"- **교란 후보 (confounders)**: {', '.join(confs) if confs else '—'}")
+            parts.append(f"- **배정 방식 (assignment)**: {assignment}")
+            if assignment == "observational":
+                parts.append("- ⚠️ 관찰 데이터 — 결론에서 인과 표현을 약하게 (예: '연관 있음')")
+            parts.append("")
+
+    if "ml" in methods:
+        md = inp.get("ml_design") or {}
+        if md:
+            parts.append("## 🤖 ML 설계 (ml_design)")
+            feats = md.get("features") or []
+            parts.append(f"- **타깃 (target)**: {md.get('target') or '—'}")
+            parts.append(f"- **태스크 타입**: {md.get('task_type') or '—'}")
+            parts.append(f"- **평가 지표**: {md.get('evaluation_metric') or '(미지정)'}")
+            if feats:
+                parts.append(f"- **피처 후보 ({len(feats)}개)**: {', '.join(feats)}")
+            else:
+                parts.append("- **피처 후보**: (탐색 후 결정)")
+            parts.append("")
+
+    if "ab_test" in methods:
+        ab = inp.get("ab_design") or {}
+        if ab:
+            parts.append("## 🅰️🅱️ A/B 통계 설계 (ab_design)")
+            parts.append("| 항목 | 값 |")
+            parts.append("|---|---|")
+            parts.append(f"| 대조군 | {ab.get('control_group') or '—'} |")
+            parts.append(f"| 처치군 | {ab.get('treatment_group') or '—'} |")
+            parts.append(f"| 주요 지표 | {ab.get('primary_metric') or '—'} |")
+            parts.append(f"| MDE | {ab.get('mde') or '—'} |")
+            parts.append(f"| 검정력 (power) | {ab.get('power') if ab.get('power') is not None else 0.8} |")
+            parts.append(f"| 유의수준 (alpha) | {ab.get('alpha') if ab.get('alpha') is not None else 0.05} |")
+            parts.append("")
+
+    if not parts:
+        return ""
+    return "\n".join(parts).rstrip() + "\n\n"
+
+
+def _render_plan_markdown(
+    scope: str,
+    hypotheses: list[dict],
+    out_of_scope: list[str],
+    method_section: str = "",
+) -> str:
     lines = ["# 📋 분석 플랜", ""]
     if scope:
         lines += [f"**스코프**: {scope}", ""]
+    # 메서드별 설계 섹션 (causal/ml/predict/ab_test/explore) 이 있으면 가설 위에 배치 —
+    # 분석 변수·명세를 먼저 보여주고 그 위에서 가설을 세워야 일관성이 유지됨.
+    if method_section:
+        lines.append(method_section.rstrip())
+        lines.append("")
     lines += ["## 가설"]
     for i, h in enumerate(hypotheses, 1):
         if not isinstance(h, dict):
@@ -428,9 +724,17 @@ def handle_skill_tool(
                 "error": "insufficient_hypotheses",
                 "message": "가설을 최소 3개 이상 제시하세요. 서로 다른 각도 (지표/차원/가정)에서.",
             }, []
+        # 메서드별 필수 필드 검증 (predict/causal/ml/ab_test)
+        active_methods = list(state.methods or [])
+        validation = _validate_method_plan_fields(inp, active_methods)
+        if validation:
+            return validation, []
         scope = inp.get("scope", "")
         out_of_scope = inp.get("out_of_scope") or []
-        plan_md = _render_plan_markdown(scope, hypotheses, out_of_scope)
+        method_section = _render_method_design_section(inp, active_methods)
+        plan_md = _render_plan_markdown(
+            scope, hypotheses, out_of_scope, method_section=method_section,
+        )
 
         # 이미 플랜 셀이 있으면 내용 덮어쓰기 (재호출 시)
         existing_id = ctx.get("plan_cell_id")
