@@ -274,7 +274,9 @@ SKILL_TOOLS_CLAUDE = [
         "name": "update_plan",
         "description": (
             "Update the analysis plan cell. Use when a new hypothesis emerges, results diverge from the initial plan, "
-            "or to mark verified hypotheses as checked (`- [x]`). Provide the full new plan Markdown body."
+            "or to mark verified hypotheses as checked (`- [x]`). Provide the full new plan Markdown body. "
+            "If the original plan contains method-specific design sections (causal_design / ml_design / forecast_spec / ab_design), "
+            "preserve those sections — they describe the analysis variables and should not disappear during updates."
         ),
         "input_schema": {
             "type": "object",
@@ -283,7 +285,9 @@ SKILL_TOOLS_CLAUDE = [
                     "type": "string",
                     "description": (
                         "전체 플랜 Markdown 본문. 기존 가설의 체크 상태(`- [x]`/`- [ ]`)를 유지하고 "
-                        "새 가설을 추가하거나 범위 밖 항목을 이동시킬 것."
+                        "새 가설을 추가하거나 범위 밖 항목을 이동시킬 것. "
+                        "메서드별 설계 섹션 (인과 설계 / ML 설계 / 예측 명세 / A/B 설계) 이 있으면 "
+                        "그대로 유지 — 분석 변수 정의이므로 갱신 중 사라지면 안 됨."
                     ),
                 },
                 "reason": {
@@ -410,7 +414,11 @@ SKILL_TOOLS_GEMINI = [
     },
     {
         "name": "update_plan",
-        "description": "Update the analysis plan cell — mark verified, add new hypotheses, revise.",
+        "description": (
+            "Update the analysis plan cell — mark verified, add new hypotheses, revise. "
+            "Preserve method-specific design sections (causal_design / ml_design / forecast_spec / ab_design) "
+            "if they exist; they should not disappear during updates."
+        ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
