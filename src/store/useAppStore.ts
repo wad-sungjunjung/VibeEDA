@@ -1213,6 +1213,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
               ),
               cellActiveEntryId: { ...s.cellActiveEntryId, [cellId]: null },
             }))
+            // Auto Mode: 수락 단계 스킵하고 즉시 cell.code 로 승격 + 실행.
+            if (useModelStore.getState().vibeAutoApply) {
+              get().acceptVibeChange(cellId)
+            }
           } else if (event.type === 'error') {
             // error → pendingCode 정리하고 원본 그대로 둠.
             _vibeDeltaBuffer.delete(cellId)

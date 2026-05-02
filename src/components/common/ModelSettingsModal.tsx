@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Eye, EyeOff, Key, AlertCircle } from 'lucide-react'
+import { X, Eye, EyeOff, Key, AlertCircle, Zap } from 'lucide-react'
 import { useModelStore, ALL_MODELS } from '@/store/modelStore'
 
 interface Props {
@@ -26,6 +26,7 @@ function ApiKeyWarning({ model, geminiKey, anthropicKey }: { model: string; gemi
 export default function ModelSettingsModal({ onClose }: Props) {
   const {
     geminiApiKey, anthropicApiKey, vibeModel, agentModel,
+    vibeAutoApply, setVibeAutoApply,
     setGeminiApiKey, setAnthropicApiKey, setVibeModel, setAgentModel,
   } = useModelStore()
 
@@ -131,6 +132,27 @@ export default function ModelSettingsModal({ onClose }: Props) {
                 </optgroup>
               </select>
               <ApiKeyWarning model={vibeModel} geminiKey={geminiDraft} anthropicKey={anthropicDraft} />
+
+              {/* 자동 수락 토글 */}
+              <button
+                onClick={() => setVibeAutoApply(!vibeAutoApply)}
+                className="mt-2 w-full flex items-start gap-2.5 px-3 py-2 rounded-md border border-border-subtle bg-bg-sidebar hover:border-border transition-colors text-left"
+              >
+                <div className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center shrink-0 ${vibeAutoApply ? 'bg-primary text-white' : 'bg-chip text-text-tertiary'}`}>
+                  <Zap size={10} strokeWidth={2.5} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-medium text-text-primary">자동 모드 (Auto Apply)</span>
+                    <span className={`text-[10px] font-semibold ${vibeAutoApply ? 'text-primary-text' : 'text-text-tertiary'}`}>
+                      {vibeAutoApply ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-text-tertiary mt-0.5 leading-relaxed">
+                    ON 시 새 코드가 수락 단계 없이 즉시 반영·실행됩니다.
+                  </div>
+                </div>
+              </button>
             </div>
 
             {/* Agent Mode */}

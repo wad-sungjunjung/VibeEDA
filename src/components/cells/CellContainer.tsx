@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, lazy, Suspense, memo } from 'react'
-import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle, Maximize2, Minimize2, Sparkles, Grid3x3, Paperclip, X as XIcon, Check } from 'lucide-react'
+import { Play, Trash2, Code, BarChart3, Telescope, ArrowUp, FileText, Square, Columns2, Rows2, Loader2, ChevronDown, StopCircle, Maximize2, Minimize2, Sparkles, Grid3x3, Paperclip, X as XIcon, Check, Zap } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useModelStore, VIBE_MODELS } from '@/store/modelStore'
@@ -89,7 +89,7 @@ function CellContainer({ cell, index }: Props) {
     setFullscreenCellId: s.setFullscreenCellId,
   })))
 
-  const { vibeModel, setVibeModel } = useModelStore()
+  const { vibeModel, setVibeModel, vibeAutoApply, toggleVibeAutoApply } = useModelStore()
 
   const isExecuting = executingCells.has(cell.id)
   const isVibing = vibingCells.has(cell.id)
@@ -1084,6 +1084,24 @@ function CellContainer({ cell, index }: Props) {
                 className="flex items-center justify-center text-text-disabled hover:text-text-secondary transition-colors disabled:cursor-not-allowed"
               >
                 <Paperclip size={11} />
+              </button>
+            )}
+            {!isSheet && (
+              <button
+                title={vibeAutoApply
+                  ? '자동 모드 ON — 새 코드가 즉시 반영·실행됩니다 (수락 단계 스킵)'
+                  : '자동 모드 OFF — 새 코드는 수락 버튼을 눌러야 반영됩니다'}
+                disabled={effectiveVibing}
+                onClick={(e) => { e.stopPropagation(); toggleVibeAutoApply() }}
+                className={cn(
+                  'flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors disabled:cursor-not-allowed',
+                  vibeAutoApply
+                    ? 'bg-primary-light text-primary-text border border-primary-border hover:bg-primary-pale'
+                    : 'text-text-disabled hover:text-text-secondary border border-transparent'
+                )}
+              >
+                <Zap size={10} strokeWidth={2.5} />
+                AUTO
               </button>
             )}
           </div>

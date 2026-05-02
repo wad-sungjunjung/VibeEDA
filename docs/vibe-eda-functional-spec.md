@@ -317,6 +317,12 @@
   - 활성 (텍스트 있음): 코랄 배경 + 흰 `ArrowUp` + shadow
   - 비활성: 베이지 배경 + 커서 not-allowed
   - 32×32px
+- **[CNB-008-4] 자동 모드 토글 (AUTO)**
+  - 위치: 좌하단 푸터 (모델 셀렉터 · 이미지 첨부 우측), `Zap` 아이콘 + "AUTO" 라벨
+  - **OFF (기본)**: 새 코드는 `pendingCode` 상태로 머무르며 **수락/거절** 버튼을 눌러야 `cell.code` 로 반영됨
+  - **ON**: `complete` 이벤트 도착 즉시 자동으로 수락(`acceptVibeChange`) → 채팅 히스토리 엔트리 생성 → 백엔드 저장 → 셀 실행
+  - 상태는 `useModelStore.vibeAutoApply` 에 영속 저장 (localStorage), 모달 `모델 설정` 에서도 토글 가능
+  - 적용 범위: SQL/Python/Markdown 셀에만. Sheet 셀은 별도 vibe 패치 경로(`vibeSheet`)를 사용해 항상 즉시 반영되므로 토글 미노출
 
 ### [CNB-009] 셀 추가 바 (하단 고정, h-14)
 - **구성**: `Plus` 아이콘 + "셀 추가" 라벨 + 3개 버튼 (SQL / Python / Markdown)
