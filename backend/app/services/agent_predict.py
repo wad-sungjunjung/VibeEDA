@@ -14,8 +14,29 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
+
+from ._optional_deps import missing_dep_error
 
 logger = logging.getLogger(__name__)
+
+
+def _require_predict_deps(*, need_statsmodels: bool = True) -> Optional[dict]:
+    """scipy / statsmodels 임포트 가능 여부 — 미설치면 LLM 용 friendly 에러 dict.
+    detect_anomalies 는 statsmodels 없이도 동작 가능(scipy 만 사용)이므로 옵션화.
+    """
+    try:
+        import scipy  # noqa: F401
+    except ImportError:
+        return missing_dep_error("scipy", install="requirements-ml.txt", suggest_method="analyze")
+    if need_statsmodels:
+        try:
+            import statsmodels  # noqa: F401
+        except ImportError:
+            return missing_dep_error(
+                "statsmodels", install="requirements-ml.txt", suggest_method="analyze",
+            )
+    return None
 
 
 # ─── Tool specs ───────────────────────────────────────────────────────────────
@@ -177,6 +198,8 @@ def _prepare_series(df, time_col: str, value_col: str):
 
 
 def handle_fit_trend(inp: dict, state) -> tuple[dict, list[dict]]:
+    if (e := _require_predict_deps(need_statsmodels=True)):
+        return e, []
     df, err = _get_dataframe(state, inp.get("data_cell_id", ""))
     if err:
         return {"success": False, "error": err}, []
@@ -273,6 +296,8 @@ def handle_fit_trend(inp: dict, state) -> tuple[dict, list[dict]]:
 
 
 def handle_forecast(inp: dict, state) -> tuple[dict, list[dict]]:
+    if (e := _require_predict_deps(need_statsmodels=True)):
+        return e, []
     df, err = _get_dataframe(state, inp.get("data_cell_id", ""))
     if err:
         return {"success": False, "error": err}, []
@@ -372,6 +397,8 @@ def handle_forecast(inp: dict, state) -> tuple[dict, list[dict]]:
 
 
 def handle_detect_anomalies(inp: dict, state) -> tuple[dict, list[dict]]:
+    if (e := _require_predict_deps(need_statsmodels=False)):
+        return e, []
     df, err = _get_dataframe(state, inp.get("data_cell_id", ""))
     if err:
         return {"success": False, "error": err}, []

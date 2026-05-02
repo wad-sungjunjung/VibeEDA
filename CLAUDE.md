@@ -201,10 +201,24 @@ Tailwind `darkMode: 'class'`, `<html>.dark` 클래스 토글로 전환.
 
 ## 개발 실행
 
+### 설치 모드 (Python 의존성)
+- **풀 (~700MB, 기본)**: 모든 기능 동작
+  ```bash
+  cd backend
+  pip install -r requirements.txt -r requirements-vis.txt -r requirements-ml.txt -r requirements-arrow.txt
+  ```
+- **슬림 (~280MB)**: 코어만. kaleido(차트 PNG) / sklearn·scipy·statsmodels(ML/Causal/Predict 메서드) / pyarrow(Snowflake Arrow 가속) 제외.
+  ```bash
+  cd backend
+  pip install -r requirements.txt
+  ```
+  슬림에서 ML/Causal/Predict 도구를 호출하면 LLM 이 `missing_optional_dependency` 응답을 받고 다른 메서드로 우회. SQL 결과는 JSON 폴백(2-3배 느림). 차트는 UI 정상이지만 LLM 이 이미지로 못 봄.
+- **`scripts/setup.mjs --minimal`** / `--full` 플래그로 모드 자동 선택 가능.
+
 ```bash
 # 백엔드
 cd backend
-pip install -r requirements.txt   # kaleido 포함 — 차트 PNG 렌더에 필수
+# 위 설치 모드 중 하나 선택
 cp .env.example .env   # ANTHROPIC_API_KEY / GEMINI_API_KEY 설정 (최소 하나)
                        # DEFAULT_VIBE_MODEL=gemini-2.5-flash
                        # DEFAULT_AGENT_MODEL=claude-opus-4-7

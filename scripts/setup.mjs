@@ -41,9 +41,26 @@ if (!existsSync(VENV)) {
   console.log('✓ .venv 이미 존재 — 건너뜀')
 }
 
-// 2) pip install
+// 2) pip install — 모드 선택
+//    --minimal  : 코어만 (~280MB) — kaleido/ML/Arrow 제외, 도구 호출 시 친절한 안내
+//    --full     : 모든 옵션 포함 (~700MB, 기존 동작과 동일) — 기본값
+const argv = process.argv.slice(2)
+const installMode = argv.includes('--minimal') ? 'minimal' : 'full'
+console.log(`\n▸ Python 의존성 설치 모드: ${installMode === 'minimal' ? 'minimal (코어만, ~280MB)' : 'full (~700MB)'}`)
+console.log('  변경하려면 `node scripts/setup.mjs --minimal` 또는 `--full` 로 다시 실행하세요.')
+
 run(PY_BIN, ['-m', 'pip', 'install', '--upgrade', 'pip', '--quiet'])
 run(PY_BIN, ['-m', 'pip', 'install', '-r', join(BACKEND, 'requirements.txt')])
+if (installMode === 'full') {
+  run(PY_BIN, ['-m', 'pip', 'install',
+    '-r', join(BACKEND, 'requirements-vis.txt'),
+    '-r', join(BACKEND, 'requirements-ml.txt'),
+    '-r', join(BACKEND, 'requirements-arrow.txt'),
+  ])
+} else {
+  console.log('  ↳ kaleido(차트 PNG) / sklearn,scipy,statsmodels(ML 메서드) / pyarrow(Snowflake 가속) 는 제외했습니다.')
+  console.log('  ↳ 나중에 필요하면: pip install -r backend/requirements-vis.txt -r backend/requirements-ml.txt -r backend/requirements-arrow.txt')
+}
 
 // 3) .env
 if (!existsSync(ENV)) {

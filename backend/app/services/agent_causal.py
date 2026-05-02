@@ -20,7 +20,19 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from ._optional_deps import missing_dep_error
+
 logger = logging.getLogger(__name__)
+
+
+def _require_scipy() -> Optional[dict]:
+    try:
+        import scipy  # noqa: F401
+        return None
+    except ImportError:
+        return missing_dep_error(
+            "scipy", install="requirements-ml.txt", suggest_method="analyze",
+        )
 
 
 # ─── Tool specs ───────────────────────────────────────────────────────────────
@@ -169,6 +181,8 @@ def _get_dataframe(state, cell_id: str):
 
 
 def handle_compare_groups(inp: dict, state) -> tuple[dict, list[dict]]:
+    if (e := _require_scipy()):
+        return e, []
     df, err = _get_dataframe(state, inp.get("data_cell_id", ""))
     if err:
         return {"success": False, "error": err}, []
@@ -261,6 +275,8 @@ def handle_compare_groups(inp: dict, state) -> tuple[dict, list[dict]]:
 
 
 def handle_confounders_check(inp: dict, state) -> tuple[dict, list[dict]]:
+    if (e := _require_scipy()):
+        return e, []
     df, err = _get_dataframe(state, inp.get("data_cell_id", ""))
     if err:
         return {"success": False, "error": err}, []
@@ -362,6 +378,8 @@ def handle_power_analysis(inp: dict, state) -> tuple[dict, list[dict]]:
     - n1, n2 제공 → MDE 계산
     - effect_size 제공 → 필요한 n 계산
     """
+    if (e := _require_scipy()):
+        return e, []
     alpha = float(inp.get("alpha") or 0.05)
     power = float(inp.get("power") or 0.8)
     if not (0 < alpha < 0.5) or not (0.5 <= power < 1.0):

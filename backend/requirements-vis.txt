@@ -1,0 +1,6 @@
+# Vibe EDA — 시각화 확장 (Plotly→PNG 렌더용 kaleido)
+# 약 +157MB (Chromium 번들 포함). LLM 이 차트를 이미지로 보기 위해 필요.
+# 끄는 방법: VIBE_ENABLE_KALEIDO=0 (env) — 라이브러리는 설치되어 있지만 PNG 렌더 skip.
+# 완전히 빼고 싶으면 이 파일을 설치하지 않으면 됨 (UI 차트는 정상).
+
+kaleido==0.2.1

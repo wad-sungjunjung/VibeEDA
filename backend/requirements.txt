@@ -1,3 +1,14 @@
+# Vibe EDA — 코어 의존성 (최소 설치)
+# 약 280MB. 추가 기능은 같은 디렉터리의 requirements-*.txt 참조.
+#
+# 옵션 확장:
+#   pip install -r requirements-vis.txt    # +157MB Plotly→PNG 렌더 (kaleido/Chromium)
+#   pip install -r requirements-ml.txt     # +141MB Agent ML/Causal/Predict 메서드 (sklearn/scipy/statsmodels)
+#   pip install -r requirements-arrow.txt  # +81MB  Snowflake Arrow 결과셋 (pyarrow) — 없으면 JSON 폴백
+#
+# 풀 설치(기존과 동일):
+#   pip install -r requirements.txt -r requirements-vis.txt -r requirements-ml.txt -r requirements-arrow.txt
+
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 pydantic>=2.6.0
@@ -9,10 +20,6 @@ httpx>=0.27.0
 pandas>=2.0.0
 numpy>=1.26.0
 plotly>=5.0.0
-kaleido==0.2.1
-scikit-learn>=1.4.0
-scipy>=1.12.0
-statsmodels>=0.14.0
 mcp>=1.0.0
-snowflake-connector-python[pandas]>=3.0.0
+snowflake-connector-python>=3.0.0
 psutil>=5.9.0

@@ -21,7 +21,22 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from ._optional_deps import missing_dep_error
+
 logger = logging.getLogger(__name__)
+
+
+def _require_sklearn() -> Optional[dict]:
+    """sklearn 임포트 가능 여부만 확인 — 미설치면 LLM 용 friendly 에러 dict 반환, OK 면 None."""
+    try:
+        import sklearn  # noqa: F401
+        return None
+    except ImportError:
+        return missing_dep_error(
+            "scikit-learn",
+            install="requirements-ml.txt",
+            suggest_method="analyze",
+        )
 
 
 # 학습된 모델 저장소 (notebook_id × cell_id) — evaluate_model / feature_importance 가 참조.
@@ -183,6 +198,8 @@ def _get_dataframe(state, cell_id: str):
 
 
 def handle_fit_model(inp: dict, state) -> tuple[dict, list[dict]]:
+    if (err := _require_sklearn()):
+        return err, []
     cell_id = inp.get("data_cell_id", "")
     target = (inp.get("target") or "").strip()
     features_in = inp.get("features") or []
@@ -405,6 +422,8 @@ def _build_model(task: str, name: str, random_state: int):
 
 
 def handle_evaluate_model(inp: dict, state) -> tuple[dict, list[dict]]:
+    if (err := _require_sklearn()):
+        return err, []
     cell_id = inp.get("model_cell_id", "")
     nb_id = state.notebook_id or ""
     key = (nb_id, cell_id)
@@ -486,6 +505,8 @@ def handle_evaluate_model(inp: dict, state) -> tuple[dict, list[dict]]:
 
 
 def handle_feature_importance(inp: dict, state) -> tuple[dict, list[dict]]:
+    if (err := _require_sklearn()):
+        return err, []
     cell_id = inp.get("model_cell_id", "")
     top_n = min(max(int(inp.get("top_n") or 20), 1), 50)
     nb_id = state.notebook_id or ""

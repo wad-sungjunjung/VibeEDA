@@ -1,0 +1,7 @@
+# Vibe EDA — ML/통계 확장
+# 약 +141MB. Agent 의 ml/predict/causal 메서드(7 개 중 3 개)에서만 lazy import 됨.
+# 미설치 시 해당 도구 호출은 친절한 에러 메시지로 실패하고, 다른 메서드(analyze/explore/ab_test/benchmark)는 정상 동작.
+
+scikit-learn>=1.4.0
+scipy>=1.12.0
+statsmodels>=0.14.0

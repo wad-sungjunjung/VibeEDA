@@ -1,0 +1,5 @@
+# Vibe EDA — Snowflake Arrow 결과셋 가속 (pyarrow)
+# 약 +81MB. snowflake-connector-python 의 fetch_pandas_all() 가속용.
+# 미설치 시 자동으로 JSON 폴백 — 결과는 같지만 큰 결과셋(>100k rows) 에서 ~2-3 배 느림.
+
+pyarrow>=14.0.0

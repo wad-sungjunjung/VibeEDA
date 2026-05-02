@@ -437,7 +437,14 @@ def _execute_sql_once(sql: str):
         cur = conn.cursor()
         cur.execute(sql)
         return cur.fetch_pandas_all()
-    except Exception:
+    except Exception as exc:
+        # pyarrow 미설치(슬림 install)면 fetch_pandas_all 이 ImportError 로 실패.
+        # 그 외에도 결과 포맷이 ARROW 가 아니면 동일 경로. JSON 폴백으로 결과는 동일.
+        # 큰 결과셋(>100k rows)에서는 ~2-3 배 느릴 수 있음 — 가속하려면 requirements-arrow.txt 설치.
+        if isinstance(exc, ImportError) and "pyarrow" in str(exc).lower():
+            logger.info("pyarrow 미설치 — JSON 폴백으로 SQL 결과를 가져옵니다 (가속하려면 pip install -r backend/requirements-arrow.txt)")
+        else:
+            logger.debug("fetch_pandas_all 실패 → JSON 폴백: %s", exc)
         import pandas as _pd
         cur2 = conn.cursor()
         try:
