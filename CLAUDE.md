@@ -33,6 +33,7 @@ FastAPI 백엔드 (localhost:4750)
 | 상태 | Zustand (`src/store/useAppStore.ts` 단일 스토어) |
 | 아이콘 | Lucide React (이모지 사용 금지) |
 | 타입 | `src/types/index.ts` 중앙 관리 |
+| 차트 | `plotly.js-cartesian-dist-min` (cartesian only, ~1.4MB) + `react-plotly.js/factory`. `PlotlyChart.tsx` 가 lazy chunk 로 분리되어 차트 셀이 등장할 때만 로드. mapbox/maplibre 트레이스는 미지원 — 필요 시 `plotly.js-dist-min` 으로 교체. 번들에서 `plotly.js` 트랜지티브는 `package.json` `overrides` 로 cartesian 으로 강제 치환. |
 
 ### 백엔드
 | 영역 | 기술 |
@@ -43,7 +44,7 @@ FastAPI 백엔드 (localhost:4750)
 | Agent Mode | **기본 Claude Opus** (`claude-opus-4-7`) 또는 Gemini. 프론트 `X-Agent-Model` 헤더로 스위치. **시니어 분석가 v0.5** — 4-Phase 아키텍처 (복잡도 분류→메서드 라우팅→실행→종합 정리), 3-Tier 예산 (L1/L2/L3, auto-promotion), 7개 메서드 (analyze/explore/predict/causal/ml/ab_test/benchmark) 및 메서드별 도구 (ML·Causal·Predict 각 3개) + 가드. **메서드별 플래닝 스키마** — `create_plan` 이 활성 메서드에 따라 추가 필드 강제 (causal→causal_design, ml→ml_design, predict→forecast_spec, ab_test→ab_design). Tool 총 34개. 노트북별 `learnings.md` 누적. **안정성 가드**: tool loop 절대 50회 캡, LLM API 호출당 5분 타임아웃, 셀 실행 1시간 (SQL/Python 동일). 자세한 내부는 `docs/vibe-eda-agent-pipeline.md` (구조도 포함). |
 | Reporting | **기본 Claude Opus** (`DEFAULT_REPORT_MODEL`). 프론트 `X-Report-Model` 헤더로 스위치. SSE 스트리밍 Markdown 생성 → `reports/*.md` 저장. 차트는 `{id}_images/*.png` 상대 경로로 임베드. 자세한 내부는 `docs/vibe-eda-reporting-pipeline.md`. |
 | Sheet 셀 | UniverJS 기반 스프레드시트 셀. `sheet_snapshot.py`로 workbook JSON 생성·파싱, `sheet_vibe_service.py`로 자연어→JSON 패치 변환. |
-| 커널 | in-process Python exec (노트북별 namespace 유지, **LRU 최대 20개** — `VIBE_KERNEL_NS_MAX` env 로 튜닝), Plotly Figure 출력 시 600×400 PNG 자동 렌더 (`kaleido` 필요) |
+| 커널 | in-process Python exec (노트북별 namespace 유지, **LRU 최대 20개** — `VIBE_KERNEL_NS_MAX` env 로 튜닝, **RSS 임계치 가드** — `VIBE_KERNEL_RSS_MB` 기본 2048MB), Plotly Figure 출력 시 600×400 PNG 자동 렌더 (`kaleido`). **kaleido 옵션화** — `VIBE_ENABLE_KALEIDO=0` 으로 끄면 PNG 렌더 skip (UI 차트는 정상, LLM 만 이미지로 못 봄) |
 | SQL 실행 | Snowflake Python Connector (externalbrowser SSO, 세션 싱글톤) |
 | MCP 서버 | `backend/app/api/mcp_server.py` (Claude Code 연동) |
 | DB (미사용) | `backend/app/models.py`, `database.py` — SQLAlchemy 모델 정의만 존재. 현재 초기화되지 않음 (향후 멀티유저 확장용) |

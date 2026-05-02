@@ -26,9 +26,8 @@
     "@univerjs/preset-sheets-core": "^0.21.0",
     "@univerjs/presets": "^0.21.0",
     "clsx": "^2.1.1",
-    "html2pdf.js": "^0.14.0",
     "lucide-react": "^0.469.0",
-    "plotly.js-dist-min": "^3.5.0",
+    "plotly.js-cartesian-dist-min": "^3.5.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
@@ -36,6 +35,9 @@
     "remark-gfm": "^4.0.0",
     "tailwind-merge": "^2.6.0",
     "zustand": "^5.0.3"
+  },
+  "overrides": {
+    "plotly.js": "npm:plotly.js-cartesian-dist-min@^3.5.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

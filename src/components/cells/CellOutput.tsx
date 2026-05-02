@@ -1,6 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from 'react'
-import Plot from 'react-plotly.js'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, memo, lazy, Suspense } from 'react'
 import { Copy, Check } from 'lucide-react'
+
+// Plotly 번들(~1.4MB)은 차트 셀이 화면에 등장할 때만 로드 — 메인 청크에서 분리.
+const PlotlyChart = lazy(() => import('./PlotlyChart'))
 import type { Cell } from '@/types'
 import { formatNumber } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -93,9 +95,9 @@ async function copyTextRobust(text: string): Promise<void> {
 
 async function copyPlotAsImage(gd: HTMLElement | null) {
   if (!gd) throw new Error('plot not ready')
-  // @ts-ignore — Plotly는 전역으로 로드되어 있음
-  const Plotly = (await import('plotly.js-dist-min')).default
-  const dataUrl: string = await Plotly.toImage(gd, { format: 'png', scale: 2 })
+  // PlotlyChart 청크가 이미 로드돼 있으면 즉시 resolve, 아니면 동일 청크에서 가져온다.
+  const { plotToPngDataUrl } = await import('./PlotlyChart')
+  const dataUrl = await plotToPngDataUrl(gd)
   const blob = await (await fetch(dataUrl)).blob()
   if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
     await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
@@ -144,42 +146,12 @@ function CellOutput({ cell }: Props) {
   }
 
   if (output.type === 'chart' && output.plotlyJson) {
-    const pj = output.plotlyJson as { data?: unknown[]; layout?: Record<string, unknown> }
-    const { template: _t, ...layoutRest } = (pj.layout ?? {}) as Record<string, unknown>
-    const baseLayout = layoutRest as Record<string, any>
-    // Plotly layout에 지정된 폭/높이를 그대로 사용. 없으면 기본 600x400.
-    const natW = typeof baseLayout.width === 'number' && baseLayout.width > 0 ? baseLayout.width : 600
-    const natH = typeof baseLayout.height === 'number' && baseLayout.height > 0 ? baseLayout.height : 400
     return (
-      <div className="relative group/output h-full overflow-auto flex items-center justify-center">
-        <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 focus-within:opacity-100 transition-opacity">
-          <CopyButton
-            label="이미지 복사"
-            onCopy={() => copyPlotAsImage(plotDivRef.current?.querySelector('.js-plotly-plot') as HTMLElement | null)}
-          />
-        </div>
-        <div ref={plotDivRef} style={{ width: natW, height: natH, maxWidth: '100%' }}>
-          <Plot
-            data={(pj.data ?? []) as Plotly.Data[]}
-            layout={{
-              ...baseLayout,
-              template: (isDark ? 'plotly_dark' : 'plotly_white') as unknown as Plotly.Template,
-              autosize: true,
-              width: undefined,
-              height: undefined,
-              margin: baseLayout.margin ?? { l: 48, r: 16, t: 40, b: 40, pad: 4 },
-              paper_bgcolor: isDark ? '#1b1916' : '#ffffff',
-              plot_bgcolor: isDark ? '#1b1916' : '#ffffff',
-              font: { family: 'Pretendard, -apple-system, sans-serif', size: 12, color: isDark ? '#e9e6df' : '#3d3530' },
-              xaxis: { ...(baseLayout.xaxis ?? {}), automargin: true },
-              yaxis: { ...(baseLayout.yaxis ?? {}), automargin: true },
-            }}
-            config={{ responsive: true, displayModeBar: false }}
-            style={{ width: '100%', height: '100%' }}
-            useResizeHandler
-          />
-        </div>
-      </div>
+      <ChartOutput
+        plotlyJson={output.plotlyJson}
+        isDark={isDark}
+        plotDivRef={plotDivRef}
+      />
     )
   }
 
@@ -525,6 +497,66 @@ function TableOutput({
           </span>
         )}
       </div>
+    </div>
+  )
+}
+
+interface ChartOutputProps {
+  plotlyJson: Record<string, unknown>
+  isDark: boolean
+  plotDivRef: React.RefObject<HTMLDivElement | null>
+}
+
+function ChartOutput({ plotlyJson, isDark, plotDivRef }: ChartOutputProps) {
+  // data 배열은 plotlyJson 가 같은 한 동일 ref 유지 → react-plotly.js 의 diff 가 트레이스 재생성을 건너뜀
+  const data = useMemo(() => {
+    const pj = plotlyJson as { data?: unknown[] }
+    return (pj.data ?? []) as Plotly.Data[]
+  }, [plotlyJson])
+
+  // base 레이아웃(차트 자체의 의미적 속성) — 테마와 무관, plotlyJson 가 같은 한 안정.
+  const baseLayout = useMemo(() => {
+    const pj = plotlyJson as { layout?: Record<string, unknown> }
+    const { template: _t, ...rest } = (pj.layout ?? {}) as Record<string, unknown>
+    return rest as Record<string, any>
+  }, [plotlyJson])
+
+  // Plotly layout에 지정된 폭/높이를 그대로 사용. 없으면 기본 600x400.
+  const natW = typeof baseLayout.width === 'number' && baseLayout.width > 0 ? baseLayout.width : 600
+  const natH = typeof baseLayout.height === 'number' && baseLayout.height > 0 ? baseLayout.height : 400
+
+  // 테마 의존 layout 패치만 분리해 메모이제이션 → 테마 토글 시에만 새 객체 생성.
+  const layout = useMemo(() => ({
+    ...baseLayout,
+    template: (isDark ? 'plotly_dark' : 'plotly_white') as unknown as Plotly.Template,
+    autosize: true,
+    width: undefined,
+    height: undefined,
+    margin: baseLayout.margin ?? { l: 48, r: 16, t: 40, b: 40, pad: 4 },
+    paper_bgcolor: isDark ? '#1b1916' : '#ffffff',
+    plot_bgcolor: isDark ? '#1b1916' : '#ffffff',
+    font: { family: 'Pretendard, -apple-system, sans-serif', size: 12, color: isDark ? '#e9e6df' : '#3d3530' },
+    xaxis: { ...(baseLayout.xaxis ?? {}), automargin: true },
+    yaxis: { ...(baseLayout.yaxis ?? {}), automargin: true },
+  }), [baseLayout, isDark])
+
+  return (
+    <div className="relative group/output h-full overflow-auto flex items-center justify-center">
+      <div className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover/output:opacity-100 focus-within:opacity-100 transition-opacity">
+        <CopyButton
+          label="이미지 복사"
+          onCopy={() => copyPlotAsImage(plotDivRef.current?.querySelector('.js-plotly-plot') as HTMLElement | null)}
+        />
+      </div>
+      <Suspense fallback={<div className="text-[12px] text-text-disabled">차트 로딩 중…</div>}>
+        <PlotlyChart
+          ref={plotDivRef}
+          data={data}
+          layout={layout}
+          width={natW}
+          height={natH}
+        />
+      </Suspense>
     </div>
   )
 }

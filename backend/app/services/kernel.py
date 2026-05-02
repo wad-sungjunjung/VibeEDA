@@ -13,11 +13,53 @@ logger = logging.getLogger(__name__)
 # (LLM 이 차트를 이미지로 보지 못할 뿐, 사용자 노트북 흐름은 막히지 않음)
 KALEIDO_RENDER_TIMEOUT_SEC = 30
 
+# kaleido(Chromium 번들 ~157MB) 옵션화 — 기본 on, env 로 끄면 PNG 렌더 자체 skip.
+# 끄면 차트는 UI 에서 정상이지만 LLM 은 차트를 이미지로 못 봄(메타데이터 텍스트로만 인지).
+# 1차 효과: 셀 실행마다 chromium 서브프로세스 spawn 비용 제거 (CPU/메모리 spike 해소).
+KALEIDO_ENABLED = os.environ.get("VIBE_ENABLE_KALEIDO", "1").lower() not in ("0", "false", "off", "no")
+
 # 노트북별 namespace 는 셀 간 변수 공유(SQL→Python)를 위해 프로세스 메모리에 유지된다.
 # 무제한이면 사용자가 노트북을 자주 열고 닫을수록 RSS 가 단조 증가 → OOM.
 # LRU 로 가장 최근에 사용한 N 개만 유지. 환경변수로 튜닝 가능.
 KERNEL_NAMESPACE_MAX = int(os.environ.get("VIBE_KERNEL_NS_MAX", "20"))
+
+# 추가 RSS 가드 — 개수 LRU 로 막지 못하는 거대한 DataFrame 누적 케이스 차단.
+# 프로세스 RSS(MB) 가 임계치를 넘으면 가장 오래된 namespace 부터 evict.
+# 0 이면 비활성. 기본 2048MB.
+KERNEL_RSS_MB_LIMIT = int(os.environ.get("VIBE_KERNEL_RSS_MB", "2048"))
+
 _namespaces: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+
+
+def _process_rss_mb() -> float | None:
+    """현재 프로세스 RSS 를 MB 로 반환. psutil 없거나 실패하면 None."""
+    try:
+        import psutil  # requirements.txt 에 명시
+        return psutil.Process().memory_info().rss / (1024 * 1024)
+    except Exception:
+        return None
+
+
+def _enforce_rss_cap() -> None:
+    """RSS 가 임계치 초과면 가장 오래된 namespace 부터 evict (최소 1개는 남김).
+    호출 주기: get_namespace 진입 시 + 이후 LRU 캡 처리 후.
+    """
+    if KERNEL_RSS_MB_LIMIT <= 0:
+        return
+    rss = _process_rss_mb()
+    if rss is None:
+        return
+    while rss > KERNEL_RSS_MB_LIMIT and len(_namespaces) > 1:
+        evicted_id, _ = _namespaces.popitem(last=False)
+        logger.warning(
+            "kernel namespace RSS evict: notebook=%s (rss=%.0fMB > cap=%dMB)",
+            evicted_id, rss, KERNEL_RSS_MB_LIMIT,
+        )
+        # 다음 측정 — 메모리는 즉시 반환 안 될 수도 있어 보수적으로 한 번만 재측정.
+        rss2 = _process_rss_mb()
+        if rss2 is None or rss2 >= rss:
+            break
+        rss = rss2
 
 
 def _suppress_plotly_show() -> None:
@@ -67,6 +109,8 @@ def get_namespace(notebook_id: str) -> dict[str, Any]:
     if notebook_id in _namespaces:
         # LRU: 사용 시 끝으로 이동
         _namespaces.move_to_end(notebook_id)
+        # 기존 namespace 사용도 RSS 체크 — 거대한 DataFrame 갱신으로 임계치 넘을 수 있음
+        _enforce_rss_cap()
         return _namespaces[notebook_id]
     _namespaces[notebook_id] = {}
     # 캡 초과 시 가장 오래된 namespace 제거 — 해당 노트북의 셀 변수는 잃지만,
@@ -77,6 +121,7 @@ def get_namespace(notebook_id: str) -> dict[str, Any]:
             "kernel namespace LRU evict: notebook=%s (cap=%d)",
             evicted_id, KERNEL_NAMESPACE_MAX,
         )
+    _enforce_rss_cap()
     return _namespaces[notebook_id]
 
 
@@ -153,7 +198,10 @@ def _render_figure_png_base64(fig) -> str | None:
 
     kaleido 가 hang 하는 알려진 케이스(특히 Windows 의 chromium 재사용 실패)에서
     셀 실행 전체가 막히지 않도록 KALEIDO_RENDER_TIMEOUT_SEC 안에 못 끝내면 None 반환.
+    VIBE_ENABLE_KALEIDO=0 이면 즉시 None — chromium spawn 자체를 skip.
     """
+    if not KALEIDO_ENABLED:
+        return None
     try:
         layout = getattr(fig, "layout", None)
         w = getattr(layout, "width", None) if layout is not None else None
