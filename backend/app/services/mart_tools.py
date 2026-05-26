@@ -30,12 +30,28 @@ def _resolve_table(cur, database: str, schema: str, mart_key: str) -> str:
     return mart_key.upper()
 
 
+def _resolve_fqn(database: str, schema: str, mart_key: str) -> tuple[str, str, str]:
+    """히든룰 — mart_key 가 'db.schema.table' 형태면 그대로 분해해서 사용.
+    아니면 기본 (database, schema, mart_key) 적용.
+    반환: (db, schema, table_name) — 모두 그대로 사용 가능한 식별자."""
+    parts = [p.strip() for p in (mart_key or "").split(".") if p.strip()]
+    if len(parts) == 3:
+        db, sch, tbl = parts
+        # 식별자 가드 (인젝션 방지) — 영숫자/언더스코어/달러만 허용
+        import re as _re
+        if all(_re.match(r"^[A-Za-z0-9_$]+$", p) for p in (db, sch, tbl)):
+            return db, sch, tbl
+    return database, schema, mart_key
+
+
 def get_mart_schema(mart_key: str) -> dict:
     """마트의 컬럼 스키마 반환. SHOW COLUMNS + DESCRIBE TABLE(코멘트)로 조회 —
-    information_schema 대비 훨씬 빠름 (메타데이터 캐시)."""
-    conn, database, schema = _ctx()
+    information_schema 대비 훨씬 빠름 (메타데이터 캐시).
+    mart_key 가 'db.schema.table' FQN 이면 그대로 사용 (히든룰 확장 마트)."""
+    conn, default_db, default_schema = _ctx()
     cur = conn.cursor()
-    full = f'{database}.{schema}.{mart_key}'
+    database, schema, table = _resolve_fqn(default_db, default_schema, mart_key)
+    full = f'{database}.{schema}.{table}'
 
     # SHOW COLUMNS: 컬럼명·타입·nullable·comment 를 한 번에
     try:
@@ -68,12 +84,12 @@ def get_mart_schema(mart_key: str) -> dict:
     # 테이블 comment 는 SHOW TABLES 한 번으로 (옵션)
     tbl_comment = ""
     try:
-        cur.execute(f"SHOW TABLES LIKE '{mart_key}' IN SCHEMA {database}.{schema}")
+        cur.execute(f"SHOW TABLES LIKE '{table}' IN SCHEMA {database}.{schema}")
         trow = cur.fetchone()
         if trow:
             # SHOW TABLES 결과에서 comment 는 보통 5~6번 인덱스
             for v in trow:
-                if isinstance(v, str) and v and v.lower() not in (mart_key.lower(), schema.lower(), database.lower()):
+                if isinstance(v, str) and v and v.lower() not in (table.lower(), schema.lower(), database.lower()):
                     if len(v) > 3 and not v.startswith("2"):   # 날짜 값 제외 필터 (대충)
                         tbl_comment = v
                         break
@@ -89,18 +105,19 @@ def get_mart_schema(mart_key: str) -> dict:
 
 
 def preview_mart(mart_key: str, limit: int = 5) -> dict:
-    """상위 N행 샘플 반환 (노트북 셀 생성 없음)."""
+    """상위 N행 샘플 반환 (노트북 셀 생성 없음).
+    mart_key 가 FQN 이면 그대로 사용 (히든룰 확장 마트)."""
     limit = max(1, min(int(limit or 5), 50))
-    conn, database, schema = _ctx()
+    conn, default_db, default_schema = _ctx()
     cur = conn.cursor()
-    table = _resolve_table(cur, database, schema, mart_key)
+    database, schema, table = _resolve_fqn(default_db, default_schema, mart_key)
 
     cur.execute(f'SELECT * FROM {database}.{schema}.{table} LIMIT {limit}')
     cols = [c[0] for c in cur.description]
     rows = [[_serialize(v) for v in row] for row in cur.fetchall()]
 
     return {
-        "mart_key": table.lower(),
+        "mart_key": mart_key.lower(),
         "columns": cols,
         "rows": rows,
         "row_count": len(rows),
@@ -109,10 +126,11 @@ def preview_mart(mart_key: str, limit: int = 5) -> dict:
 
 
 def profile_mart(mart_key: str, sample_size: int = 100000) -> dict:
-    """행수 + 컬럼별 NULL 비율, 카디널리티, 수치형 min/max/avg."""
-    conn, database, schema = _ctx()
+    """행수 + 컬럼별 NULL 비율, 카디널리티, 수치형 min/max/avg.
+    mart_key 가 FQN 이면 그대로 사용 (히든룰 확장 마트)."""
+    conn, default_db, default_schema = _ctx()
     cur = conn.cursor()
-    table = _resolve_table(cur, database, schema, mart_key)
+    database, schema, table = _resolve_fqn(default_db, default_schema, mart_key)
     full = f"{database}.{schema}.{table}"
 
     cur.execute(
@@ -122,7 +140,7 @@ def profile_mart(mart_key: str, sample_size: int = 100000) -> dict:
         WHERE table_schema = %s AND table_name = %s
         ORDER BY ordinal_position
         """,
-        (schema.upper(), table),
+        (schema.upper(), table.upper()),
     )
     col_meta = cur.fetchall()
 
@@ -170,7 +188,7 @@ def profile_mart(mart_key: str, sample_size: int = 100000) -> dict:
         col_profiles.append(entry)
 
     return {
-        "mart_key": table.lower(),
+        "mart_key": mart_key.lower(),
         "row_count": total,
         "sampled": total > sample_size,
         "sample_size": min(total, sample_size),

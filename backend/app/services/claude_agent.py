@@ -106,10 +106,18 @@ def _extract_referenced_tables(sql: str) -> set[str]:
 
 
 def _whitelist_violation(sql: str, selected_marts: list[str]) -> Optional[str]:
-    """SQL이 선택 밖의 테이블을 참조하면 위반 테이블명 반환. 통과하면 None."""
+    """SQL이 선택 밖의 테이블을 참조하면 위반 테이블명 반환. 통과하면 None.
+    선택 마트가 FQN(db.schema.table) 이면 마지막 토큰(bare table) 도 허용."""
     if not selected_marts:
         return None   # 선택 없음 = 체크 생략 (초기 상태)
-    allowed = {m.lower() for m in selected_marts}
+    allowed: set[str] = set()
+    for m in selected_marts:
+        m_low = m.lower()
+        allowed.add(m_low)
+        # FQN 이면 bare table 도 허용 — _extract_referenced_tables 가 마지막 토큰만 반환하므로.
+        bare = m_low.rsplit(".", 1)[-1]
+        if bare and bare != m_low:
+            allowed.add(bare)
     refs = _extract_referenced_tables(sql)
     for r in refs:
         if r not in allowed:
