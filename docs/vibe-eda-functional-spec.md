@@ -196,6 +196,7 @@
 - **결과 카드**: 테이블명 + `DB.SCHEMA · TABLE_TYPE` 부제 + `Plus` 버튼.
   - `+` 클릭 → `GET /marts/columns` 로 컬럼 페치 → `POST /notebooks/{id}/extras` 로 저장 → 마트 풀 카탈로그에 자동 머지 (이번 노트북 한정).
   - 카탈로그에 이미 있는 키는 결과에서 제외 (중복 표시 방지).
+- **FQN 강제 추가**: 검색어가 `db.schema.table` 형태로 인식되면 (식별자 가드 통과) 검색을 우회하고 "이 노트북에 추가" 버튼이 표시됨. `ACCOUNT_USAGE` 지연(최대 3시간) · 권한 부족 · 신규 테이블 미반영 케이스 모두 회피. `GET /marts/columns` 만 호출.
 - **지속성**: `.ipynb` 의 `metadata.vibe.extra_marts[]` 에 저장. 다른 노트북엔 노출되지 않음.
 
 #### [TMH-006-3] 사용할 마트 (우측)

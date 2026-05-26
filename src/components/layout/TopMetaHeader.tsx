@@ -331,6 +331,35 @@ export default function TopMetaHeader() {
     }
   }
 
+  // 검색어가 FQN (db.schema.table) 형태면 검색 우회하고 직접 추가.
+  // ACCOUNT_USAGE 지연(최대 3시간) · 권한 부족 · 신규 테이블 미반영 등을 회피.
+  const fqnParts = (() => {
+    const raw = martSearchQuery.trim()
+    if (!raw) return null
+    const parts = raw.split('.').map((p) => p.trim()).filter(Boolean)
+    if (parts.length !== 3) return null
+    // 식별자 가드 — 영숫자/언더스코어/달러만 허용 (백엔드와 동일).
+    if (!parts.every((p) => /^[A-Za-z0-9_$]+$/.test(p))) return null
+    const [database, schema, table_name] = parts
+    return { database, schema, table_name, fqn: `${database}.${schema}.${table_name}`.toLowerCase() }
+  })()
+
+  async function handleForceAdd() {
+    if (!notebookId || !fqnParts) return
+    setAddingFqn(fqnParts.fqn)
+    setHiddenError(null)
+    try {
+      const res = await getMartColumns(fqnParts.database, fqnParts.schema, fqnParts.table_name)
+      if (!res.ok) throw new Error('컬럼 조회 실패')
+      await addExtraMart(res.mart)
+      setMartSearchQuery('')  // 검색어 비우면 머지된 카탈로그 전체가 보임
+    } catch (e) {
+      setHiddenError(e instanceof Error ? e.message : '추가 실패')
+    } finally {
+      setAddingFqn(null)
+    }
+  }
+
   return (
     <div className="bg-surface border-b border-border-subtle shrink-0">
       {/* Fixed header bar */}
@@ -549,6 +578,27 @@ export default function TopMetaHeader() {
 
                 {unselectedMarts.length === 0 ? (
                   <div className="px-1 py-2">
+                    {fqnParts && (
+                      <div className="mb-2 rounded border border-primary bg-primary-light px-2 py-2">
+                        <div className="text-[10px] font-semibold text-primary-text mb-1 flex items-center gap-1">
+                          <Sparkles size={9} /> FQN 인식 — 검색 없이 강제 추가
+                        </div>
+                        <div className="text-[10px] font-mono text-text-secondary truncate mb-1.5" title={fqnParts.fqn}>
+                          {fqnParts.database}.{fqnParts.schema}.{fqnParts.table_name}
+                        </div>
+                        <button
+                          onClick={handleForceAdd}
+                          disabled={!notebookId || addingFqn === fqnParts.fqn}
+                          className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-[11px] font-semibold bg-primary text-white hover:bg-primary-hover disabled:opacity-60 transition-colors"
+                        >
+                          {addingFqn === fqnParts.fqn ? (
+                            <><Loader2 size={11} className="animate-spin" /> 추가 중…</>
+                          ) : (
+                            <><Plus size={12} /> 이 노트북에 추가</>
+                          )}
+                        </button>
+                      </div>
+                    )}
                     {!martSearchQuery ? (
                       <div className="text-[11px] text-text-disabled text-center py-2">모든 마트를 사용 중이에요</div>
                     ) : hiddenSearching ? (
@@ -599,9 +649,12 @@ export default function TopMetaHeader() {
                       </>
                     ) : hiddenError ? (
                       <div className="text-[10px] text-danger text-center py-2">{hiddenError}</div>
-                    ) : (
+                    ) : fqnParts ? null : (
                       <div className="text-[11px] text-text-disabled text-center py-2">
                         "{martSearchQuery}"에 맞는 마트가 없어요
+                        <div className="mt-1 text-[10px] text-text-disabled">
+                          전체 경로(DB.SCHEMA.TABLE)로 입력하면 검색 없이 추가됩니다
+                        </div>
                       </div>
                     )}
                   </div>
