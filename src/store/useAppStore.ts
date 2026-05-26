@@ -44,6 +44,8 @@ import {
   updateFolder,
   deleteFolder as apiDeleteFolder,
   getMarts,
+  addExtraMart as apiAddExtraMart,
+  removeExtraMart as apiRemoveExtraMart,
   executeCell as apiExecuteCell,
   deleteChatEntry as apiDeleteChatEntry,
   truncateChatHistory as apiTruncateChatHistory,
@@ -391,10 +393,14 @@ interface AppStore {
   selectedMarts: string[]
   martSearchQuery: string
   martInfoExpanded: string | null
+  // 히든룰 — 노트북 단위 영구 저장된 확장 마트. martCatalog 와 머지되어 UI 에 표시됨.
+  extraMarts: MartMeta[]
   addMart: (key: string) => void
   removeMart: (key: string) => void
   setMartSearchQuery: (q: string) => void
   setMartInfoExpanded: (key: string | null) => void
+  addExtraMart: (mart: MartMeta) => Promise<void>
+  removeExtraMart: (key: string) => Promise<void>
 
   // ── Cells ──────────────────────────────────────────────────────────────────
   cells: Cell[]
@@ -655,6 +661,39 @@ export const useAppStore = create<AppStore>((set, get) => ({
   selectedMarts: [],
   martSearchQuery: '',
   martInfoExpanded: null,
+  extraMarts: [],
+
+  addExtraMart: async (mart) => {
+    const { notebookId, extraMarts, martCatalog } = get()
+    if (!notebookId) return
+    const key = mart.key.toLowerCase()
+    const filtered = extraMarts.filter((m) => m.key.toLowerCase() !== key)
+    const nextExtras = [...filtered, mart]
+    // 카탈로그에도 머지 (이미 있으면 덮어쓰기) — 기존 검색/추천 UI 가 자연스레 노출.
+    const catalogFiltered = martCatalog.filter((m) => m.key.toLowerCase() !== key)
+    set({ extraMarts: nextExtras, martCatalog: [...catalogFiltered, mart] })
+    try {
+      await apiAddExtraMart(notebookId, mart)
+    } catch (err) {
+      console.error('addExtraMart API failed:', err)
+    }
+  },
+
+  removeExtraMart: async (key) => {
+    const { notebookId, extraMarts, martCatalog, selectedMarts } = get()
+    if (!notebookId) return
+    const lower = key.toLowerCase()
+    set({
+      extraMarts: extraMarts.filter((m) => m.key.toLowerCase() !== lower),
+      martCatalog: martCatalog.filter((m) => m.key.toLowerCase() !== lower),
+      selectedMarts: selectedMarts.filter((k) => k.toLowerCase() !== lower),
+    })
+    try {
+      await apiRemoveExtraMart(notebookId, key)
+    } catch (err) {
+      console.error('removeExtraMart API failed:', err)
+    }
+  },
 
   addMart: (key) => {
     set((s) =>
@@ -762,6 +801,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         analysisTheme: title,
         analysisDescription: '',
         selectedMarts: [],
+        extraMarts: [],
+        martCatalog: get().martCatalog.filter((m) => !m.extra),
         agentChatHistory: [],
         creating: false,
         metaCollapsed: false,
@@ -812,6 +853,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({
         notebookId: nb.id, cells: [newCell], activeCellId: newCellId,
         analysisTheme: title, analysisDescription: '', selectedMarts: [],
+        extraMarts: [],
+        martCatalog: get().martCatalog.filter((m) => !m.extra),
         agentChatHistory: [], creating: false, metaCollapsed: false,
         histories: [
           { id: nb.id, title, date: '방금 전', folderId: null, isCurrent: true },
@@ -2195,6 +2238,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         analysisTheme: '',
         analysisDescription: '',
         selectedMarts: [],
+        extraMarts: [],
+        martCatalog: get().martCatalog.filter((m) => !m.extra),
       })
     } else {
       set({ histories: remaining, historyMenuOpen: null })
@@ -2490,19 +2535,29 @@ function _applyNotebookDetail(detail: NotebookDetail, _isFirst: boolean) {
     saveCurrentSessionMeta(detail.id, currentMeta)
   }
 
-  useAppStore.setState((s) => ({
-    notebookId: detail.id,
-    cells,
-    activeCellId: cells[0]?.id ?? null,
-    analysisTheme: detail.title,
-    analysisDescription: detail.description,
-    selectedMarts: detail.selected_marts,
-    agentChatHistory,
-    agentSessions,
-    agentSessionTitle: currentMeta?.title ?? null,
-    currentSessionId: currentMeta?.id ?? null,
-    currentSessionCreatedAtMs: currentMeta?.createdAtMs ?? null,
-    collapsedSessionIds: {},
-    histories: s.histories.map((h) => ({ ...h, isCurrent: h.id === detail.id })),
-  }))
+  const extras = detail.extra_marts ?? []
+  useAppStore.setState((s) => {
+    // 노트북 전환 시 이전 노트북의 extras 가 카탈로그에 잔존하지 않도록,
+    // base(=snowflake refresh) 만 남기고 새 노트북의 extras 를 다시 머지.
+    const baseOnly = s.martCatalog.filter((m) => !m.extra)
+    const baseKeys = new Set(extras.map((m) => m.key.toLowerCase()))
+    const baseCatalog = baseOnly.filter((m) => !baseKeys.has(m.key.toLowerCase()))
+    return {
+      notebookId: detail.id,
+      cells,
+      activeCellId: cells[0]?.id ?? null,
+      analysisTheme: detail.title,
+      analysisDescription: detail.description,
+      selectedMarts: detail.selected_marts,
+      extraMarts: extras,
+      martCatalog: [...baseCatalog, ...extras],
+      agentChatHistory,
+      agentSessions,
+      agentSessionTitle: currentMeta?.title ?? null,
+      currentSessionId: currentMeta?.id ?? null,
+      currentSessionCreatedAtMs: currentMeta?.createdAtMs ?? null,
+      collapsedSessionIds: {},
+      histories: s.histories.map((h) => ({ ...h, isCurrent: h.id === detail.id })),
+    }
+  })
 }

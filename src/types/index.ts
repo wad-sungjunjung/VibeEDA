@@ -82,6 +82,21 @@ export interface MartMeta {
   recommendationScore?: number
   aiReason?: string
   updatedAt: string
+  // 히든룰 확장 검색으로 추가된 마트 — DB/스키마 표시 + 노트북 단위 저장 구분용.
+  extra?: boolean
+  database?: string
+  schema?: string
+  table_name?: string
+}
+
+// 히든룰 검색 결과 (컬럼 미페치 상태)
+export interface MartSearchHit {
+  database: string
+  schema: string
+  table_name: string
+  table_type: string
+  comment: string
+  fqn: string
 }
 
 // ─── History & Folders ─────────────────────────────────────────────────────

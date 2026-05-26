@@ -3,8 +3,14 @@ import { ChevronDown, ChevronRight, Pin, FileSearch, FileText, Search, X, Databa
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
 import { scoreMarts, searchMarts } from '@/data/marts'
-import { recommendMarts, enhanceDescription, type MartRecommendation } from '@/lib/api'
-import type { MartMeta } from '@/types'
+import {
+  recommendMarts,
+  enhanceDescription,
+  searchExtraMarts,
+  getMartColumns,
+  type MartRecommendation,
+} from '@/lib/api'
+import type { MartMeta, MartSearchHit } from '@/types'
 import { cn } from '@/lib/utils'
 
 const PREFIX_FILTERS = [
@@ -99,6 +105,8 @@ export default function TopMetaHeader() {
     executeAllCells,
     executingCells,
     cells,
+    notebookId,
+    addExtraMart,
   } = useAppStore(useShallow((s) => ({
     analysisTheme: s.analysisTheme,
     analysisDescription: s.analysisDescription,
@@ -117,6 +125,8 @@ export default function TopMetaHeader() {
     executeAllCells: s.executeAllCells,
     executingCells: s.executingCells,
     cells: s.cells,
+    notebookId: s.notebookId,
+    addExtraMart: s.addExtraMart,
   })))
 
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set(['fact', 'dim']))
@@ -132,6 +142,13 @@ export default function TopMetaHeader() {
   // AI 분석 내용 개선 상태
   const [enhancing, setEnhancing] = useState(false)
   const [enhanceError, setEnhanceError] = useState<string | null>(null)
+
+  // 히든룰 — MART 풀 외 검색 결과
+  const [hiddenHits, setHiddenHits] = useState<MartSearchHit[] | null>(null)
+  const [hiddenSearching, setHiddenSearching] = useState(false)
+  const [hiddenError, setHiddenError] = useState<string | null>(null)
+  const [addingFqn, setAddingFqn] = useState<string | null>(null)
+  const hiddenAbortRef = useRef<AbortController | null>(null)
 
   // 백그라운드 프리패치
   const prefetchedRecs = useRef<MartRecommendation[] | null>(null)
@@ -257,6 +274,62 @@ export default function TopMetaHeader() {
   const unselectedMarts = prefixFiltered
   const totalPages = Math.ceil(unselectedMarts.length / PAGE_SIZE)
   const pagedMarts = unselectedMarts.slice(martPage * PAGE_SIZE, (martPage + 1) * PAGE_SIZE)
+
+  // 히든룰 — 로컬 결과 0개 + 검색어 ≥2자 일 때 자동으로 Snowflake 확장 검색.
+  // martCatalog 의 마트는 이미 prefixFiltered 가 처리하므로, 카탈로그에 없는 테이블만 추려서 노출.
+  const localMatchEmpty = !!martSearchQuery.trim() && unselectedMarts.length === 0 && martSearchQuery.trim().length >= 2
+  useEffect(() => {
+    if (!localMatchEmpty) {
+      setHiddenHits(null)
+      setHiddenError(null)
+      hiddenAbortRef.current?.abort()
+      return
+    }
+    const q = martSearchQuery.trim()
+    const t = setTimeout(async () => {
+      hiddenAbortRef.current?.abort()
+      const ctrl = new AbortController()
+      hiddenAbortRef.current = ctrl
+      setHiddenSearching(true)
+      setHiddenError(null)
+      try {
+        const res = await searchExtraMarts(q, 20)
+        if (ctrl.signal.aborted) return
+        if (!res.ok) {
+          setHiddenHits([])
+          setHiddenError(res.message ?? '검색 실패')
+        } else {
+          // 이미 카탈로그에 있는 키는 제외 — 같은 이름 두번 노출 방지.
+          const knownKeys = new Set(martCatalog.map((m) => m.key.toLowerCase()))
+          setHiddenHits(res.results.filter((h) => !knownKeys.has(h.fqn)))
+        }
+      } catch (e) {
+        if (!ctrl.signal.aborted) {
+          setHiddenError(e instanceof Error ? e.message : String(e))
+          setHiddenHits([])
+        }
+      } finally {
+        if (!ctrl.signal.aborted) setHiddenSearching(false)
+      }
+    }, 350)
+    return () => clearTimeout(t)
+  }, [localMatchEmpty, martSearchQuery, martCatalog])
+
+  async function handleAddHiddenMart(hit: MartSearchHit) {
+    if (!notebookId) return
+    setAddingFqn(hit.fqn)
+    try {
+      const res = await getMartColumns(hit.database, hit.schema, hit.table_name)
+      if (!res.ok) throw new Error('컬럼 조회 실패')
+      await addExtraMart(res.mart)
+      // 추가 직후 검색 결과에서 제거 (시각적 피드백).
+      setHiddenHits((prev) => prev?.filter((h) => h.fqn !== hit.fqn) ?? null)
+    } catch (e) {
+      setHiddenError(e instanceof Error ? e.message : '추가 실패')
+    } finally {
+      setAddingFqn(null)
+    }
+  }
 
   return (
     <div className="bg-surface border-b border-border-subtle shrink-0">
@@ -475,8 +548,62 @@ export default function TopMetaHeader() {
                 )}
 
                 {unselectedMarts.length === 0 ? (
-                  <div className="text-[11px] text-text-disabled text-center py-4 px-2">
-                    {martSearchQuery ? `"${martSearchQuery}"에 맞는 마트가 없어요` : '모든 마트를 사용 중이에요'}
+                  <div className="px-1 py-2">
+                    {!martSearchQuery ? (
+                      <div className="text-[11px] text-text-disabled text-center py-2">모든 마트를 사용 중이에요</div>
+                    ) : hiddenSearching ? (
+                      <div className="flex items-center justify-center gap-1.5 text-[11px] text-text-tertiary py-3">
+                        <Loader2 size={11} className="animate-spin" />
+                        Snowflake 전체에서 검색 중…
+                      </div>
+                    ) : hiddenHits && hiddenHits.length > 0 ? (
+                      <>
+                        <div className="px-1 pb-1 text-[9px] font-semibold uppercase tracking-wide text-primary-text flex items-center gap-1">
+                          <Sparkles size={9} /> 마트 풀 외 검색 결과 ({hiddenHits.length})
+                        </div>
+                        <div className="space-y-1">
+                          {hiddenHits.slice(0, 10).map((hit) => {
+                            const adding = addingFqn === hit.fqn
+                            return (
+                              <div
+                                key={hit.fqn}
+                                className="rounded border border-primary-border bg-primary-pale/30 overflow-hidden"
+                                title={`${hit.database}.${hit.schema}.${hit.table_name}`}
+                              >
+                                <div className="flex items-center gap-1 px-1.5 py-1 min-w-0">
+                                  <Database size={11} className="shrink-0 text-primary" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-[11px] font-mono font-semibold truncate text-text-primary">
+                                      {hit.table_name.toLowerCase()}
+                                    </div>
+                                    <div className="text-[9px] text-text-tertiary truncate font-mono">
+                                      {hit.database}.{hit.schema} · {hit.table_type}
+                                    </div>
+                                  </div>
+                                  <button
+                                    title="이 노트북에 추가"
+                                    disabled={adding || !notebookId}
+                                    onClick={() => handleAddHiddenMart(hit)}
+                                    className="p-0.5 rounded shrink-0 text-primary disabled:opacity-40"
+                                  >
+                                    {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                                  </button>
+                                </div>
+                                {hit.comment && (
+                                  <div className="px-2 pb-1 text-[10px] text-text-tertiary truncate">{hit.comment}</div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </>
+                    ) : hiddenError ? (
+                      <div className="text-[10px] text-danger text-center py-2">{hiddenError}</div>
+                    ) : (
+                      <div className="text-[11px] text-text-disabled text-center py-2">
+                        "{martSearchQuery}"에 맞는 마트가 없어요
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-1">
@@ -509,6 +636,14 @@ export default function TopMetaHeader() {
                               <span className={cn('text-[11px] font-mono font-semibold truncate', isSelected ? 'text-primary' : 'text-text-primary')}>
                                 {mart.key}
                               </span>
+                              {mart.extra && (
+                                <span
+                                  title={mart.database && mart.schema ? `${mart.database}.${mart.schema}` : '확장 검색으로 추가'}
+                                  className="text-[8px] font-semibold px-1 py-0.5 rounded shrink-0 bg-primary-pale text-primary-hover border border-primary-border"
+                                >
+                                  확장
+                                </span>
+                              )}
                               {isSelected && (
                                 <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 bg-primary-light text-primary">
                                   선택됨

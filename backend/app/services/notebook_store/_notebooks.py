@@ -219,12 +219,37 @@ def get_notebook(nb_id: str) -> dict:
         "title": vibe.get("title", nb_id),
         "description": vibe.get("description", ""),
         "selected_marts": vibe.get("selected_marts", []),
+        "extra_marts": vibe.get("extra_marts", []),
         "folder_id": vibe.get("folder_id"),
         "cells": cells,
         "agent_messages": _fmt_agent_messages(vibe),
         "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
         "updated_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
     }
+
+
+def add_extra_mart(nb_id: str, mart: dict) -> dict:
+    """히든룰 — MART 풀 외부에서 발견한 테이블을 노트북 단위로 영구 저장.
+    같은 key 가 이미 있으면 덮어쓴다 (스키마 최신화)."""
+    nb = _read_nb(nb_id)
+    vibe = nb.setdefault("metadata", {}).setdefault("vibe", {})
+    extras = vibe.setdefault("extra_marts", [])
+    key = (mart.get("key") or "").lower()
+    if not key:
+        raise ValueError("mart.key is required")
+    filtered = [m for m in extras if (m.get("key") or "").lower() != key]
+    filtered.append(mart)
+    vibe["extra_marts"] = filtered
+    _write_nb(nb_id, nb)
+    return mart
+
+
+def remove_extra_mart(nb_id: str, key: str) -> None:
+    nb = _read_nb(nb_id)
+    vibe = nb.setdefault("metadata", {}).setdefault("vibe", {})
+    extras = vibe.get("extra_marts", [])
+    vibe["extra_marts"] = [m for m in extras if (m.get("key") or "").lower() != key.lower()]
+    _write_nb(nb_id, nb)
 
 
 def update_notebook_meta(nb_id: str, **kwargs) -> dict:

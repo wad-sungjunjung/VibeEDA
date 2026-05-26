@@ -94,6 +94,14 @@ SSE 스트림 중 에러는 HTTP 200을 유지하고 스트림 내 `{"type":"err
 ### 2.5 `DELETE /notebooks/{notebook_id}`
 노트북 삭제 (`.ipynb` 파일 제거).
 
+### 2.6 `POST /notebooks/{notebook_id}/extras`
+히든룰 — MART 풀 외 영역에서 발견한 마트를 노트북 단위로 영구 저장 (`metadata.vibe.extra_marts`).
+바디는 `/marts/columns` 응답의 `mart` 객체와 동일한 형식 (key/database/schema/columns/...).
+같은 `key` 가 이미 있으면 덮어씀.
+
+### 2.7 `DELETE /notebooks/{notebook_id}/extras/{mart_key}`
+영구 저장된 확장 마트 제거 (`mart_key` 는 FQN, `:path` 라우팅으로 점 포함 가능).
+
 ---
 
 ## 3. 셀 (Cells) — `backend/app/api/cells.py`
@@ -273,7 +281,32 @@ Python 셀이 `plotly.graph_objs.Figure` 를 출력하면 실행 결과에 **저
 ]
 ```
 
-### 7.2 `POST /marts/recommend`
+### 7.2 `GET /marts/search`
+히든룰 — MART 풀 외 영역까지 확장 검색.
+
+**Query**: `q` (≥2자 ≤64자), `limit` (1–50, 기본 20).
+
+`SNOWFLAKE.ACCOUNT_USAGE.TABLES` 에서 `TABLE_NAME ILIKE %q%` 매칭 (DELETED IS NULL, BASE TABLE/VIEW).
+account_usage 권한 실패 시 현재 세션 DB 의 `INFORMATION_SCHEMA.TABLES` 로 폴백.
+
+**Response**
+```json
+{
+  "ok": true,
+  "results": [
+    {"database":"WAD_DW_PROD","schema":"DW","table_name":"FCT_ORDERS","table_type":"BASE TABLE","comment":"주문 사실 테이블","fqn":"wad_dw_prod.dw.fct_orders"}
+  ]
+}
+```
+
+### 7.3 `GET /marts/columns`
+확장 검색 결과 테이블의 컬럼 메타 조회.
+
+**Query**: `database`, `schema`, `table`. 모두 영숫자/언더스코어/달러 외 문자 거부 (인젝션 가드).
+
+**Response**: `{ok, mart}` — `mart` 는 `key`(=`db.schema.table` 소문자), `database`, `schema`, `table_name`, `description`, `columns[]`, `keywords[]`, `extra: true` 를 포함하는 `MartMeta` 호환 객체. `POST /notebooks/{id}/extras` 에 그대로 넣을 수 있음.
+
+### 7.4 `POST /marts/recommend`
 LLM 기반 마트 추천.
 ```json
 {

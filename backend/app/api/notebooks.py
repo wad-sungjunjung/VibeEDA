@@ -1,11 +1,29 @@
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..services import notebook_store
 
 router = APIRouter()
+
+
+class ExtraMartCreate(BaseModel):
+    # /marts/columns 응답의 mart 객체를 그대로 전달.
+    # BaseModel.schema() 와 충돌하므로 schema_name 으로 받고 'schema' alias 매핑.
+    model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
+
+    key: str
+    database: Optional[str] = None
+    schema_name: Optional[str] = Field(default=None, alias="schema")
+    table_name: Optional[str] = None
+    description: str = ""
+    keywords: list[str] = []
+    columns: list[dict[str, Any]] = []
+    rules: list[str] = []
+    recommendationScore: float = 0
+    updatedAt: Optional[str] = None
+    extra: bool = True
 
 
 class NotebookCreate(BaseModel):
@@ -52,3 +70,26 @@ def update_notebook(notebook_id: str, body: NotebookUpdate):
 def delete_notebook(notebook_id: str):
     notebook_store.delete_notebook(notebook_id)
     return {"ok": True}
+
+
+@router.post("/notebooks/{notebook_id}/extras")
+def add_extra_mart(notebook_id: str, body: ExtraMartCreate):
+    """히든룰 — 확장 검색으로 찾은 마트를 노트북에 영구 저장."""
+    try:
+        # alias 'schema' 를 'schema' 키로 저장 (프론트가 그대로 사용)
+        mart_dict = body.model_dump(by_alias=True, exclude_none=True)
+        notebook_store.add_extra_mart(notebook_id, mart_dict)
+        return {"ok": True, "mart": mart_dict}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Notebook not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/notebooks/{notebook_id}/extras/{mart_key:path}")
+def delete_extra_mart(notebook_id: str, mart_key: str):
+    try:
+        notebook_store.remove_extra_mart(notebook_id, mart_key)
+        return {"ok": True}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Notebook not found")

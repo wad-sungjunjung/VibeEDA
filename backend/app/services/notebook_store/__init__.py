@@ -13,6 +13,8 @@ from ._notebooks import (
     update_notebook_meta,
     delete_notebook,
     create_onboarding_notebook,
+    add_extra_mart,
+    remove_extra_mart,
 )
 
 # ── 셀 CRUD ─────────────────────────────────────────────────────────────────

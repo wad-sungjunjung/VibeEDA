@@ -102,7 +102,7 @@ backend/
     ├── database.py        # (미사용) SQLAlchemy 비동기 세션
     ├── models.py          # (미사용) User/Folder/Notebook/Cell DB 모델 정의
     ├── api/
-    │   ├── notebooks.py   # GET/POST/PATCH/DELETE /notebooks[/{id}]
+    │   ├── notebooks.py   # GET/POST/PATCH/DELETE /notebooks[/{id}] + /notebooks/{id}/extras (히든룰 확장 마트 영구 저장)
     │   ├── cells.py       # POST/PATCH/DELETE /notebooks/{id}/cells[/{cid}]
     │   │                  # + chat/{index} DELETE, chat/truncate POST
     │   ├── vibe.py        # POST /vibe (Gemini/Claude 스트리밍), POST /vibe/sheet (Sheet 셀 전용)
@@ -112,7 +112,7 @@ backend/
     │   │                  # (루트 폴더 통합 파일 트리 — ipynb·report·일반 파일·디렉터리)
     │   ├── execute.py     # POST /execute/{cell_id}, DELETE /kernel/{nb_id}
     │   ├── folders.py     # /folders CRUD
-    │   ├── marts.py       # GET /marts
+    │   ├── marts.py       # GET /marts, GET /marts/search (히든룰 — ACCOUNT_USAGE 확장 검색), GET /marts/columns
     │   ├── recommend.py   # POST /marts/recommend (LLM 기반 마트 추천), POST /vibe/enhance-description (AI 편집)
     │   ├── snowflake.py   # POST /snowflake/connect, GET /status, DELETE /connect
     │   ├── report.py      # POST /reports/stream, GET /reports[/{id}[/assets/{f}]], DELETE /reports/{id}
@@ -262,6 +262,9 @@ python -m app.api.mcp_server
       "title": "지역별 매출 분석",
       "description": "...",
       "selected_marts": ["mart_revenue"],
+      "extra_marts": [
+        {"key":"wad_dw_prod.dw.fct_orders","database":"WAD_DW_PROD","schema":"DW","table_name":"FCT_ORDERS","description":"주문 사실 테이블","columns":[…],"extra":true}
+      ],
       "folder_id": null,
       "chat_history": [
         {"cell_id": "...", "messages": [{"role":"user","content":"...","ts":"..."}]}

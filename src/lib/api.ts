@@ -1,4 +1,4 @@
-import type { CellType, MartMeta } from '@/types'
+import type { CellType, MartMeta, MartSearchHit } from '@/types'
 import { useModelStore } from '@/store/modelStore'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4750/v1'
@@ -98,6 +98,7 @@ export interface AgentMessageRow {
 export interface NotebookDetail extends NotebookRow {
   cells: CellRow[]
   agent_messages: AgentMessageRow[]
+  extra_marts?: MartMeta[]
 }
 
 export interface FolderRow {
@@ -316,6 +317,28 @@ export const deleteFolder = (id: string) =>
 // ─── Marts ───────────────────────────────────────────────────────────────────
 
 export const getMarts = () => apiFetch<MartMeta[]>('/marts')
+
+// 히든룰 — MART 풀 외 영역까지 SNOWFLAKE.ACCOUNT_USAGE 로 검색.
+export const searchExtraMarts = (q: string, limit = 20) =>
+  apiFetch<{ ok: boolean; message?: string; results: MartSearchHit[] }>(
+    `/marts/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+  )
+
+export const getMartColumns = (database: string, schema: string, table: string) =>
+  apiFetch<{ ok: boolean; mart: MartMeta }>(
+    `/marts/columns?database=${encodeURIComponent(database)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(table)}`,
+  )
+
+export const addExtraMart = (notebookId: string, mart: MartMeta) =>
+  apiFetch<{ ok: boolean; mart: MartMeta }>(`/notebooks/${notebookId}/extras`, {
+    method: 'POST',
+    body: JSON.stringify(mart),
+  })
+
+export const removeExtraMart = (notebookId: string, martKey: string) =>
+  apiFetch<{ ok: boolean }>(`/notebooks/${notebookId}/extras/${encodeURIComponent(martKey)}`, {
+    method: 'DELETE',
+  })
 
 export interface MartRecommendation {
   key: string
