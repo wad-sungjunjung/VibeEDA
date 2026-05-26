@@ -14,10 +14,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+class AgentConvMessage(BaseModel):
+    role: str  # 'user' | 'assistant'
+    content: str
+
+
+class AgentConvSession(BaseModel):
+    title: Optional[str] = None
+    started_at: Optional[str] = None
+    messages: list[AgentConvMessage] = []
+
+
 class ReportCreateRequest(BaseModel):
     notebook_id: str
     cell_ids: list[str]
     goal: Optional[str] = ""
+    # 사용자가 선택한 에이전트 세션 대화 — 리포트 작성의 보조 맥락으로 사용.
+    # 프론트 localStorage 에 있는 아카이브 세션 + 현재 진행 중 세션을 함께 묶어서 전달.
+    agent_conversation: Optional[list[AgentConvSession]] = None
 
 
 @router.post("/reports/stream")
@@ -31,6 +45,12 @@ async def create_report_stream(
     is_gemini = model.startswith("gemini-")
     api_key = (x_gemini_key or settings.gemini_api_key) if is_gemini else (x_anthropic_key or settings.anthropic_api_key)
 
+    agent_conv = (
+        [s.model_dump() for s in (req.agent_conversation or [])]
+        if req.agent_conversation
+        else None
+    )
+
     async def generate():
         async for event in report_service.run_report_stream(
             api_key=api_key,
@@ -38,6 +58,7 @@ async def create_report_stream(
             notebook_id=req.notebook_id,
             cell_ids=req.cell_ids,
             goal=req.goal or "",
+            agent_conversation=agent_conv,
         ):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 

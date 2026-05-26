@@ -533,7 +533,7 @@ interface AppStore {
   saveCurrentReport: () => Promise<void>
   closeCurrentReport: () => Promise<void>
   setShowReportModal: (v: boolean) => void
-  generateReport: (args: { cellIds: string[]; goal?: string }) => Promise<void>
+  generateReport: (args: { cellIds: string[]; goal?: string; agentSessionIds?: string[] }) => Promise<void>
   cancelReport: () => void
   setShowReport: (v: boolean) => void
   fetchReports: () => Promise<void>
@@ -2279,9 +2279,48 @@ export const useAppStore = create<AppStore>((set, get) => ({
   reportSaving: false,
   setShowReportModal: (v) => set({ showReportModal: v }),
 
-  generateReport: async ({ cellIds, goal }) => {
-    const { notebookId, analysisTheme } = get()
+  generateReport: async ({ cellIds, goal, agentSessionIds }) => {
+    const { notebookId, analysisTheme, agentSessions, agentChatHistory, agentSessionTitle, currentSessionId, currentSessionCreatedAtMs } = get()
     if (!notebookId) return
+
+    // 선택된 에이전트 세션의 user/assistant 메시지만 직렬화 — step/tool 잡음 제거.
+    // 현재 세션(아직 아카이브 전) 은 agentChatHistory + currentSessionId 로 합성.
+    function buildAgentPayload(): import('@/lib/api').AgentConvSessionPayload[] | undefined {
+      const ids = agentSessionIds ?? []
+      if (ids.length === 0) return undefined
+      const out: import('@/lib/api').AgentConvSessionPayload[] = []
+      for (const id of ids) {
+        // 현재 진행 중 세션
+        if (currentSessionId && id === currentSessionId) {
+          const msgs = agentChatHistory
+            .filter((m) => (m.kind ?? 'message') === 'message' && m.content?.trim())
+            .map((m) => ({ role: m.role, content: m.content }))
+          if (msgs.length > 0) {
+            out.push({
+              title: agentSessionTitle ?? '현재 대화',
+              started_at: currentSessionCreatedAtMs ? new Date(currentSessionCreatedAtMs).toISOString() : undefined,
+              messages: msgs,
+            })
+          }
+          continue
+        }
+        // 아카이브 세션
+        const sess = agentSessions.find((s) => s.id === id)
+        if (!sess) continue
+        const msgs = sess.messages
+          .filter((m) => (m.kind ?? 'message') === 'message' && m.content?.trim())
+          .map((m) => ({ role: m.role, content: m.content }))
+        if (msgs.length > 0) {
+          out.push({
+            title: sess.title,
+            started_at: sess.startedAt,
+            messages: msgs,
+          })
+        }
+      }
+      return out.length > 0 ? out : undefined
+    }
+    const agentConvPayload = buildAgentPayload()
     // 이전 진행 중 리포트가 있으면 abort
     if (_reportController) {
       try { _reportController.abort() } catch { /* noop */ }
@@ -2310,7 +2349,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     try {
       const api = await import('@/lib/api')
       await api.streamReport(
-        { notebook_id: notebookId, cell_ids: cellIds, goal: goal || '' },
+        { notebook_id: notebookId, cell_ids: cellIds, goal: goal || '', agent_conversation: agentConvPayload },
         (event) => {
           if (event.type === 'delta') {
             // 토큰별 set 대신 rAF 배치 — 긴 리포트에서 수백 번 리렌더 방지.

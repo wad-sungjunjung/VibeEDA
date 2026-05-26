@@ -1,35 +1,81 @@
-import { useState, useEffect } from 'react'
-import { FileText, X, ChevronDown } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { FileText, X, ChevronDown, MessageSquare } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useModelStore, REPORT_MODELS } from '@/store/modelStore'
 import { cn } from '@/lib/utils'
 
 export default function ReportModal() {
-  const { showReportModal, cells, analysisDescription, setShowReportModal, generateReport } = useAppStore(
+  const {
+    showReportModal, cells, analysisDescription, setShowReportModal, generateReport,
+    agentSessions, agentChatHistory, agentSessionTitle, currentSessionId, currentSessionCreatedAtMs,
+  } = useAppStore(
     useShallow((s) => ({
       showReportModal: s.showReportModal,
       cells: s.cells,
       analysisDescription: s.analysisDescription,
       setShowReportModal: s.setShowReportModal,
       generateReport: s.generateReport,
+      agentSessions: s.agentSessions,
+      agentChatHistory: s.agentChatHistory,
+      agentSessionTitle: s.agentSessionTitle,
+      currentSessionId: s.currentSessionId,
+      currentSessionCreatedAtMs: s.currentSessionCreatedAtMs,
     }))
   )
   const { reportModel, setReportModel } = useModelStore()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [goal, setGoal] = useState('')
+  const [selectedAgentSessionIds, setSelectedAgentSessionIds] = useState<string[]>([])
+
+  // 현재 + 아카이브 세션을 같은 형태로 일원화 — 메시지 수가 0인 세션은 노출 안 함.
+  type SessionRow = { id: string; title: string; startedAt: string; msgCount: number; isCurrent: boolean }
+  const sessionRows: SessionRow[] = useMemo(() => {
+    const rows: SessionRow[] = []
+    const currentMsgCount = agentChatHistory.filter((m) => (m.kind ?? 'message') === 'message' && m.content?.trim()).length
+    if (currentSessionId && currentMsgCount > 0) {
+      rows.push({
+        id: currentSessionId,
+        title: agentSessionTitle || '현재 대화',
+        startedAt: currentSessionCreatedAtMs ? new Date(currentSessionCreatedAtMs).toLocaleString('ko-KR') : '',
+        msgCount: currentMsgCount,
+        isCurrent: true,
+      })
+    }
+    for (const s of agentSessions) {
+      const count = s.messages.filter((m) => (m.kind ?? 'message') === 'message' && m.content?.trim()).length
+      if (count === 0) continue
+      rows.push({
+        id: s.id,
+        title: s.title || '제목 없음',
+        startedAt: s.startedAt ? new Date(s.startedAt).toLocaleString('ko-KR') : '',
+        msgCount: count,
+        isCurrent: false,
+      })
+    }
+    return rows
+  }, [agentSessions, agentChatHistory, agentSessionTitle, currentSessionId, currentSessionCreatedAtMs])
 
   useEffect(() => {
     if (showReportModal) {
       setSelectedIds(cells.filter((c) => c.type === 'markdown' || c.executed).map((c) => c.id))
       setGoal(analysisDescription ?? '')
+      // 기본값: 현재 진행 중 세션만 체크 (아카이브는 사용자가 명시적으로 추가).
+      const current = sessionRows.find((r) => r.isCurrent)
+      setSelectedAgentSessionIds(current ? [current.id] : [])
     }
-  }, [showReportModal, cells, analysisDescription])
+  }, [showReportModal, cells, analysisDescription, sessionRows])
 
   if (!showReportModal) return null
 
   function toggle(id: string) {
     setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }
+
+  function toggleAgentSession(id: string) {
+    setSelectedAgentSessionIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
   }
@@ -152,6 +198,52 @@ export default function ReportModal() {
               </label>
             )
           })}
+
+          {/* 에이전트 대화 세션 — 셀과 함께 리포트 컨텍스트로 사용 */}
+          {sessionRows.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-border-subtle">
+              <div className="flex items-center gap-1.5 mb-2 text-[11px] font-semibold text-text-secondary">
+                <MessageSquare size={11} className="text-primary" />
+                포함할 에이전트 대화
+                <span className="text-text-disabled font-normal">({selectedAgentSessionIds.length}/{sessionRows.length})</span>
+              </div>
+              <div className="space-y-1.5">
+                {sessionRows.map((row) => {
+                  const checked = selectedAgentSessionIds.includes(row.id)
+                  return (
+                    <label
+                      key={row.id}
+                      className={cn(
+                        'flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors',
+                        checked ? 'border-primary-border bg-primary-light' : 'border-border hover:border-border-hover'
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleAgentSession(row.id)}
+                        className="accent-primary"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[12px] text-text-primary truncate">{row.title}</span>
+                          {row.isCurrent && (
+                            <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-primary-pale text-primary-text border border-primary-border shrink-0">
+                              현재
+                            </span>
+                          )}
+                        </div>
+                        {row.startedAt && (
+                          <div className="text-[10px] text-text-tertiary">{row.startedAt}</div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-text-tertiary shrink-0">{row.msgCount}개 메시지</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -164,7 +256,7 @@ export default function ReportModal() {
           </button>
           <button
             disabled={selectedIds.length === 0}
-            onClick={() => generateReport({ cellIds: selectedIds, goal })}
+            onClick={() => generateReport({ cellIds: selectedIds, goal, agentSessionIds: selectedAgentSessionIds })}
             className={cn(
               'px-4 py-2 text-[13px] font-semibold rounded-lg transition-colors',
               selectedIds.length > 0

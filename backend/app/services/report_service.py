@@ -221,6 +221,50 @@ def _extract_depends_on(code: str, other_names: set[str]) -> list[str]:
     return sorted(tokens & other_names)
 
 
+def _format_agent_conversation(sessions: list[dict], max_chars: int = 14000) -> str:
+    """리포트 컨텍스트용 에이전트 대화 transcript.
+    - role 이 'user'/'assistant' 인 메시지만 사용 (tool_use·step 등 잡음 제거).
+    - content 가 비어 있는 메시지는 스킵.
+    - 전체 길이가 max_chars 를 넘으면 뒷부분(최신)을 유지하며 잘라 LLM 컨텍스트 보호.
+    """
+    if not sessions:
+        return ""
+    chunks: list[str] = []
+    for i, sess in enumerate(sessions, 1):
+        msgs = sess.get("messages") or []
+        # 텍스트가 있는 user/assistant 메시지만
+        cleaned = [
+            (m.get("role") or "").strip().lower() + "\t" + (m.get("content") or "").strip()
+            for m in msgs
+            if (m.get("role") in ("user", "assistant")) and (m.get("content") or "").strip()
+        ]
+        if not cleaned:
+            continue
+        header = f"### 세션 {i}"
+        title = (sess.get("title") or "").strip()
+        if title:
+            header += f" — {title}"
+        started = (sess.get("started_at") or "").strip()
+        if started:
+            header += f" ({started})"
+        lines: list[str] = [header]
+        for entry in cleaned:
+            role, _, content = entry.partition("\t")
+            label = "사용자" if role == "user" else "에이전트"
+            # 길이 폭주 방지 — 각 발화는 1200자에서 자른다.
+            if len(content) > 1200:
+                content = content[:1200] + "…(생략)"
+            lines.append(f"- **{label}**: {content}")
+        chunks.append("\n".join(lines))
+    if not chunks:
+        return ""
+    full = "\n\n".join(chunks)
+    if len(full) > max_chars:
+        # 최신 대화가 더 중요 — 뒤에서부터 유지.
+        full = "…(앞부분 생략)\n\n" + full[-max_chars:]
+    return full
+
+
 def build_evidence(
     notebook_id: str,
     cell_ids: list[str],
@@ -464,8 +508,17 @@ def _build_outline_user_prompt(
         f"## 분석 목표\n{goal_line or '(미지정 — 제목/설명으로 추론)'}\n",
         f"## 분석 맥락\n- 제목: {context.get('title','')}\n- 설명: {context.get('description','') or '(없음)'}\n- 사용 마트: {marts}\n",
         chart_block,
-        "## 셀별 증거 요약",
     ]
+    conv = (context.get("agent_conversation") or "").strip()
+    if conv:
+        lines.append(
+            "## 에이전트 분석 대화 (가설·해석 참고용, 수치 출처로 인용 금지)\n"
+            "사용자와 에이전트가 분석을 진행하며 나눈 대화. 가설·맥락·결정 근거를 잡는 데만 사용하고, "
+            "본문 수치는 반드시 **셀 출력**에서 인용한다.\n\n"
+            + conv
+            + "\n"
+        )
+    lines.append("## 셀별 증거 요약")
     for i, e in enumerate(evidence, 1):
         deps = ", ".join(e.get("depends_on") or []) or "-"
         section = [
@@ -532,8 +585,16 @@ def _build_writing_user_prompt(
         "## Outline (이 구조를 엄수)\n```json",
         json.dumps(outline, ensure_ascii=False, indent=2),
         "```",
-        "\n## 셀별 증거",
     ]
+    conv = (context.get("agent_conversation") or "").strip()
+    if conv:
+        lines.append(
+            "\n## 에이전트 분석 대화 (가설·해석 참고용)\n"
+            "본문 **수치는 반드시 셀 출력에서 인용**하라. 대화 내용은 가설 정리·내러티브 흐름·결정 근거 정도로만 사용.\n\n"
+            + conv
+            + "\n"
+        )
+    lines.append("\n## 셀별 증거")
     for i, e in enumerate(evidence, 1):
         section = [
             f"\n### [{i}] 셀 `{e['name']}` ({e['type'].upper()})",
@@ -1024,6 +1085,7 @@ async def run_report_stream(
     notebook_id: str,
     cell_ids: list[str],
     goal: str,
+    agent_conversation: Optional[list[dict]] = None,
 ) -> AsyncGenerator[dict, None]:
     if not api_key:
         yield {"type": "error", "message": "API 키가 설정되지 않았습니다."}
@@ -1035,6 +1097,11 @@ async def run_report_stream(
     except Exception as e:
         yield {"type": "error", "message": f"노트북 로드 실패: {e}"}
         return
+
+    # 사용자가 선택한 에이전트 대화를 컨텍스트에 첨부 (옵션) — 프롬프트가 이 키를 읽음.
+    conv_text = _format_agent_conversation(agent_conversation) if agent_conversation else ""
+    if conv_text:
+        context["agent_conversation"] = conv_text
     if not evidence:
         yield {"type": "error", "message": "선택된 셀에서 유효한 데이터를 찾지 못했습니다."}
         return

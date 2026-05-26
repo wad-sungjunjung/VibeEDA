@@ -370,10 +370,21 @@ LLM 기반 마트 추천.
 {
   "notebook_id": "...",
   "cell_ids": ["cell-a", "cell-b", "cell-c"],
-  "goal": "강남권 매장 쏠림 현상을 경영진에 설명"
+  "goal": "강남권 매장 쏠림 현상을 경영진에 설명",
+  "agent_conversation": [
+    {
+      "title": "자동결제 혜택 전후 결제 비교",
+      "started_at": "2026-05-26T15:17:00",
+      "messages": [
+        {"role": "user", "content": "혜택 매장의 결제율을 비혜택 대비로 보여줘"},
+        {"role": "assistant", "content": "..." }
+      ]
+    }
+  ]
 }
 ```
-`goal` 은 선택 입력. 비우면 `analysisTheme`/`Description` 을 기반으로 추론.
+- `goal` 은 선택 입력. 비우면 `analysisTheme`/`Description` 을 기반으로 추론.
+- `agent_conversation` 도 선택 입력. 사용자가 모달에서 고른 에이전트 세션(현재 진행 + 아카이브) 의 user/assistant 메시지만 직렬화. 프롬프트의 "## 에이전트 분석 대화" 섹션에 주입되어 가설/맥락 참고용으로 사용 (본문 수치 인용 금지 규칙 포함).
 
 **헤더**: `X-Report-Model` 로 모델 선택 (`claude-` → Anthropic, `gemini-` → Google).
 

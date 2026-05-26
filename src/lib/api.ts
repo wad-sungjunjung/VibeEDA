@@ -580,10 +580,18 @@ export type ReportEvent =
     }
   | { type: 'error'; message: string }
 
+export interface AgentConvSessionPayload {
+  title?: string
+  started_at?: string
+  messages: { role: 'user' | 'assistant'; content: string }[]
+}
+
 export interface ReportRequest {
   notebook_id: string
   cell_ids: string[]
   goal?: string
+  // 사용자가 모달에서 선택한 에이전트 세션 대화 (현재 진행 중 + 아카이브)
+  agent_conversation?: AgentConvSessionPayload[]
 }
 
 export async function streamReport(

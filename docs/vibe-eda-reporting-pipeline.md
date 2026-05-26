@@ -96,6 +96,14 @@
 - 이미지는 저해상도 600×400 PNG (`kernel.py::_render_figure_png_base64` 가 셀 실행 시 이미 생성해 `.ipynb` 에 저장해 둠)
 - 메모가 비어 있으면 `(비어있음)` 으로 표시 — 에이전트 가드가 메모를 강제하므로 실제로는 거의 없음
 
+### 2.2.1 에이전트 대화 첨부 (옵션)
+
+리포트 모달에서 사용자가 "포함할 에이전트 대화" 세션을 체크하면 `agent_conversation` 페이로드가 함께 전송된다.
+- 백엔드 `_format_agent_conversation` 이 user/assistant 의 텍스트만 추출 (kind=step·tool 잡음 제거).
+- 발화 1200자 / 전체 14000자 컷오프 (최신 대화 우선 보존).
+- `context["agent_conversation"]` 으로 합쳐서 outline+writing 프롬프트의 "## 에이전트 분석 대화" 섹션에 주입.
+- 시스템 프롬프트가 **수치 인용 금지** 를 명시 — 환각 검증 우회 방지. 본문 수치는 셀 출력에서만 인용.
+
 ### 2.3 수치 집합 수집 (환각 검증용)
 
 `_collect_evidence_numbers(evidence)` 가 반환하는 두 집합:
