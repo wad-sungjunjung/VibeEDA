@@ -371,6 +371,7 @@ LLM 기반 마트 추천.
   "notebook_id": "...",
   "cell_ids": ["cell-a", "cell-b", "cell-c"],
   "goal": "강남권 매장 쏠림 현상을 경영진에 설명",
+  "extra_comment": "TL;DR 은 3줄 이내. 매장 등급별 격차는 강조 X, 시계열 흐름 중심",
   "agent_conversation": [
     {
       "title": "자동결제 혜택 전후 결제 비교",
@@ -384,6 +385,7 @@ LLM 기반 마트 추천.
 }
 ```
 - `goal` 은 선택 입력. 비우면 `analysisTheme`/`Description` 을 기반으로 추론.
+- `extra_comment` 도 선택 입력. 강조 사항·톤·해석 가이드 같은 작성 지침을 자연어로 전달. 프롬프트의 "## 분석가 추가 코멘트" 섹션에 주입. 4000자 컷오프, 수치 출처는 아님.
 - `agent_conversation` 도 선택 입력. 사용자가 모달에서 고른 에이전트 세션(현재 진행 + 아카이브) 의 user/assistant 메시지만 직렬화. 프롬프트의 "## 에이전트 분석 대화" 섹션에 주입되어 가설/맥락 참고용으로 사용 (본문 수치 인용 금지 규칙 포함).
 
 **헤더**: `X-Report-Model` 로 모델 선택 (`claude-` → Anthropic, `gemini-` → Google).

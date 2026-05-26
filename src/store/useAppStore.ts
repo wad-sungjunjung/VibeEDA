@@ -533,7 +533,7 @@ interface AppStore {
   saveCurrentReport: () => Promise<void>
   closeCurrentReport: () => Promise<void>
   setShowReportModal: (v: boolean) => void
-  generateReport: (args: { cellIds: string[]; goal?: string; agentSessionIds?: string[] }) => Promise<void>
+  generateReport: (args: { cellIds: string[]; goal?: string; agentSessionIds?: string[]; extraComment?: string }) => Promise<void>
   cancelReport: () => void
   setShowReport: (v: boolean) => void
   fetchReports: () => Promise<void>
@@ -2279,7 +2279,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   reportSaving: false,
   setShowReportModal: (v) => set({ showReportModal: v }),
 
-  generateReport: async ({ cellIds, goal, agentSessionIds }) => {
+  generateReport: async ({ cellIds, goal, agentSessionIds, extraComment }) => {
     const { notebookId, analysisTheme, agentSessions, agentChatHistory, agentSessionTitle, currentSessionId, currentSessionCreatedAtMs } = get()
     if (!notebookId) return
 
@@ -2349,7 +2349,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     try {
       const api = await import('@/lib/api')
       await api.streamReport(
-        { notebook_id: notebookId, cell_ids: cellIds, goal: goal || '', agent_conversation: agentConvPayload },
+        { notebook_id: notebookId, cell_ids: cellIds, goal: goal || '', agent_conversation: agentConvPayload, extra_comment: extraComment || '' },
         (event) => {
           if (event.type === 'delta') {
             // 토큰별 set 대신 rAF 배치 — 긴 리포트에서 수백 번 리렌더 방지.

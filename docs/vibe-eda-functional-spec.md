@@ -474,6 +474,11 @@
 - `<textarea>`, 2줄, placeholder 예시 포함
 - 비워 두면 백엔드가 노트북 제목/설명에서 추론
 
+#### [MODAL-001-2-1] 추가 코멘트 입력 (선택)
+- `<textarea>` (2줄), placeholder "TL;DR 은 3줄 이내..." 등.
+- 강조 사항·톤·해석 가이드 자유 기술. 4000자 컷오프.
+- 백엔드 프롬프트의 "## 분석가 추가 코멘트" 섹션에 주입 — 작성 방향에 반영하되 수치 출처로는 쓰지 않음.
+
 #### [MODAL-001-3] 모델 드롭다운
 - `REPORT_MODELS` (Claude 4.x / Gemini 2.5·3.x 전체 목록)
 - 선택 값은 `modelStore.reportModel` 에 persist → `X-Report-Model` 헤더로 전송

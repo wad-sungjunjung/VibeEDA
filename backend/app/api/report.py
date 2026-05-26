@@ -32,6 +32,8 @@ class ReportCreateRequest(BaseModel):
     # 사용자가 선택한 에이전트 세션 대화 — 리포트 작성의 보조 맥락으로 사용.
     # 프론트 localStorage 에 있는 아카이브 세션 + 현재 진행 중 세션을 함께 묶어서 전달.
     agent_conversation: Optional[list[AgentConvSession]] = None
+    # 자유 코멘트 — 분석가의 강조점·톤 지침·생략 사항 등을 자연어로 전달.
+    extra_comment: Optional[str] = ""
 
 
 @router.post("/reports/stream")
@@ -59,6 +61,7 @@ async def create_report_stream(
             cell_ids=req.cell_ids,
             goal=req.goal or "",
             agent_conversation=agent_conv,
+            extra_comment=(req.extra_comment or "").strip(),
         ):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 

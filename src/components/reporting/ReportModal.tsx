@@ -26,6 +26,7 @@ export default function ReportModal() {
   const { reportModel, setReportModel } = useModelStore()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [goal, setGoal] = useState('')
+  const [extraComment, setExtraComment] = useState('')
   const [selectedAgentSessionIds, setSelectedAgentSessionIds] = useState<string[]>([])
 
   // 현재 + 아카이브 세션을 같은 형태로 일원화 — 메시지 수가 0인 세션은 노출 안 함.
@@ -60,6 +61,7 @@ export default function ReportModal() {
     if (showReportModal) {
       setSelectedIds(cells.filter((c) => c.type === 'markdown' || c.executed).map((c) => c.id))
       setGoal(analysisDescription ?? '')
+      setExtraComment('')
       // 기본값: 현재 진행 중 세션만 체크 (아카이브는 사용자가 명시적으로 추가).
       const current = sessionRows.find((r) => r.isCurrent)
       setSelectedAgentSessionIds(current ? [current.id] : [])
@@ -121,6 +123,19 @@ export default function ReportModal() {
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
               placeholder="예: 강남권 매장 쏠림 현상을 경영진에게 설명하기 위한 리포트"
+              rows={2}
+              className="w-full text-[12px] px-3 py-2 rounded-md outline-none border border-border-subtle focus:border-primary leading-relaxed resize-y bg-surface text-text-primary placeholder-text-tertiary"
+              style={{ fontFamily: 'inherit' }}
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-text-secondary mb-1">
+              추가 코멘트 <span className="text-text-disabled font-normal">(선택 — 강조 사항·톤·해석 가이드)</span>
+            </label>
+            <textarea
+              value={extraComment}
+              onChange={(e) => setExtraComment(e.target.value)}
+              placeholder="예: TL;DR 은 3줄 이내, 매장 등급별 격차는 강조하지 말고 시계열 흐름에 집중"
               rows={2}
               className="w-full text-[12px] px-3 py-2 rounded-md outline-none border border-border-subtle focus:border-primary leading-relaxed resize-y bg-surface text-text-primary placeholder-text-tertiary"
               style={{ fontFamily: 'inherit' }}
@@ -256,7 +271,7 @@ export default function ReportModal() {
           </button>
           <button
             disabled={selectedIds.length === 0}
-            onClick={() => generateReport({ cellIds: selectedIds, goal, agentSessionIds: selectedAgentSessionIds })}
+            onClick={() => generateReport({ cellIds: selectedIds, goal, agentSessionIds: selectedAgentSessionIds, extraComment })}
             className={cn(
               'px-4 py-2 text-[13px] font-semibold rounded-lg transition-colors',
               selectedIds.length > 0

@@ -592,6 +592,8 @@ export interface ReportRequest {
   goal?: string
   // 사용자가 모달에서 선택한 에이전트 세션 대화 (현재 진행 중 + 아카이브)
   agent_conversation?: AgentConvSessionPayload[]
+  // 분석가 자유 코멘트 — 강조·톤·해석 가이드. 본문 수치 인용 출처는 아님.
+  extra_comment?: string
 }
 
 export async function streamReport(

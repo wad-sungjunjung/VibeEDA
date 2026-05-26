@@ -509,6 +509,15 @@ def _build_outline_user_prompt(
         f"## 분석 맥락\n- 제목: {context.get('title','')}\n- 설명: {context.get('description','') or '(없음)'}\n- 사용 마트: {marts}\n",
         chart_block,
     ]
+    extra = (context.get("extra_comment") or "").strip()
+    if extra:
+        lines.append(
+            "## 분석가 추가 코멘트 (작성 지침)\n"
+            "사용자가 직접 남긴 강조 사항·톤·생략·해석 가이드. **이 지침은 작성 방향에 반영**하라.\n"
+            "수치 출처는 아니므로, 본문 수치는 셀 출력에서 인용.\n\n"
+            + extra
+            + "\n"
+        )
     conv = (context.get("agent_conversation") or "").strip()
     if conv:
         lines.append(
@@ -586,6 +595,15 @@ def _build_writing_user_prompt(
         json.dumps(outline, ensure_ascii=False, indent=2),
         "```",
     ]
+    extra = (context.get("extra_comment") or "").strip()
+    if extra:
+        lines.append(
+            "\n## 분석가 추가 코멘트 (작성 지침)\n"
+            "사용자가 직접 남긴 강조 사항·톤·생략·해석 가이드. 본문에서 이 지침을 반영하되, "
+            "수치는 반드시 셀 출력에서 인용.\n\n"
+            + extra
+            + "\n"
+        )
     conv = (context.get("agent_conversation") or "").strip()
     if conv:
         lines.append(
@@ -1086,6 +1104,7 @@ async def run_report_stream(
     cell_ids: list[str],
     goal: str,
     agent_conversation: Optional[list[dict]] = None,
+    extra_comment: str = "",
 ) -> AsyncGenerator[dict, None]:
     if not api_key:
         yield {"type": "error", "message": "API 키가 설정되지 않았습니다."}
@@ -1102,6 +1121,14 @@ async def run_report_stream(
     conv_text = _format_agent_conversation(agent_conversation) if agent_conversation else ""
     if conv_text:
         context["agent_conversation"] = conv_text
+
+    # 분석가 자유 코멘트 — 강조 사항·톤 지침·해석 가이드 등. 본문 수치 인용 출처는 아님.
+    if (extra_comment or "").strip():
+        # 안전 컷오프 (4000자) — 보통 짧지만 폭주 방지.
+        ec = extra_comment.strip()
+        if len(ec) > 4000:
+            ec = ec[:4000] + "…(생략)"
+        context["extra_comment"] = ec
     if not evidence:
         yield {"type": "error", "message": "선택된 셀에서 유효한 데이터를 찾지 못했습니다."}
         return
