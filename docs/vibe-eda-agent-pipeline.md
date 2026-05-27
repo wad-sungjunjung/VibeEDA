@@ -186,7 +186,7 @@ mcp_client (동적 — 외부 MCP 서버 설정 시) ─────────
   mcp__{server}__{tool}    [예: mcp__datahub__search, mcp__datahub__get_lineage]
 ```
 
-> 위 34개는 정적 도구. 외부 MCP 도구는 `~/vibe-notebooks/.vibe/mcp.json` 설정에 따라
+> 위 34개는 정적 도구. 외부 MCP 도구는 `{NOTEBOOKS_DIR}/.vibe/mcp.json`(홈 폴백) 설정에 따라
 > **런타임에 동적으로 추가**되므로 총 개수는 가변이다.
 
 ---
@@ -196,7 +196,8 @@ mcp_client (동적 — 외부 MCP 서버 설정 시) ─────────
 에이전트는 외부 MCP 서버(예: DataHub)의 도구를 자체 도구처럼 호출할 수 있다.
 (주의: `api/mcp_server.py` 는 반대 방향 — Vibe 가 Claude Code 에 노출되는 MCP **서버**.)
 
-- **설정 소스**: `~/vibe-notebooks/.vibe/mcp.json`. 표준 `mcpServers` 포맷
+- **설정 소스**: `{NOTEBOOKS_DIR}/.vibe/mcp.json` → 없으면 `~/vibe-notebooks/.vibe/mcp.json`
+  폴백 (NOTEBOOKS_DIR 은 GDrive 등으로 옮겨질 수 있어 호출 시점에 해석). 표준 `mcpServers` 포맷
   (`command` / `args` / `env` / `cwd`). `install.sh` 가 생성하는
   `~/.snowflake/cortex/mcp.json` 과 동일 포맷이라 복사해 쓰면 된다.
 - **세션 수명**: 서버마다 전용 백그라운드 asyncio 태스크가 stdio 하위프로세스 +

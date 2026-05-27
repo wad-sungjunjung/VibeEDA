@@ -4,7 +4,9 @@
 - VibeEDA 는 `mcp_server.py` 로 MCP **서버** 도 제공하지만, 이 모듈은 반대로
   에이전트가 외부 MCP 서버(예: `uvx mcp-server-datahub`)의 도구를 **클라이언트** 로
   호출하기 위한 것이다.
-- 설정 소스: `~/vibe-notebooks/.vibe/mcp.json` (표준 mcp.json 포맷 — `mcpServers` 키).
+- 설정 소스: `{NOTEBOOKS_DIR}/.vibe/mcp.json` → 없으면 `~/vibe-notebooks/.vibe/mcp.json`
+  (표준 mcp.json 포맷 — `mcpServers` 키). NOTEBOOKS_DIR 은 사용자가 옮길 수 있어
+  (예: Google Drive) 노트북 디렉터리 기준으로 먼저 찾고, 홈 기본 위치로 폴백한다.
   Cortex 의 `~/.snowflake/cortex/mcp.json` 과 동일 포맷이라 복사해 쓸 수 있다.
 - 각 서버는 stdio 하위프로세스로 1회 띄워 세션을 유지한다. stdio_client / ClientSession
   은 "같은 태스크에서 열고 닫아야" 하므로, 서버마다 전용 백그라운드 태스크를 돌리고
@@ -25,8 +27,33 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# ─── 설정 ──────────────────────────────────────────────────────────────────────
-MCP_CONFIG_PATH = Path.home() / "vibe-notebooks" / ".vibe" / "mcp.json"
+# ─── 설정 경로 ───────────────────────────────────────────────────────────────
+# 우선순위:
+#   1) 실제 노트북 디렉터리의 .vibe/mcp.json (NOTEBOOKS_DIR — 사용자가 GDrive 등으로 옮겼을 수 있음)
+#   2) 홈 기본 경로 ~/vibe-notebooks/.vibe/mcp.json (기본 설치 위치)
+# NOTEBOOKS_DIR 은 런타임에 set_notebooks_dir 로 바뀔 수 있어 호출 시점에 읽는다.
+_HOME_DEFAULT_CONFIG = Path.home() / "vibe-notebooks" / ".vibe" / "mcp.json"
+
+
+def _config_candidates() -> list[Path]:
+    cands: list[Path] = []
+    try:
+        from .notebook_store import _core as _nb_core
+        cands.append(Path(_nb_core.NOTEBOOKS_DIR) / ".vibe" / "mcp.json")
+    except Exception:  # noqa: BLE001
+        pass
+    if _HOME_DEFAULT_CONFIG not in cands:
+        cands.append(_HOME_DEFAULT_CONFIG)
+    return cands
+
+
+def _config_path() -> Optional[Path]:
+    """존재하는 첫 설정 파일 경로 (없으면 None)."""
+    for p in _config_candidates():
+        if p.exists():
+            return p
+    return None
+
 
 TOOL_PREFIX = "mcp"          # 도구 이름 prefix
 TOOL_SEP = "__"              # 구분자 — mcp__{server}__{tool}
@@ -44,14 +71,17 @@ def is_mcp_tool(name: str) -> bool:
 
 def _read_config() -> dict[str, dict]:
     """mcp.json 의 mcpServers 딕셔너리 반환 (없으면 빈 dict)."""
-    if not MCP_CONFIG_PATH.exists():
+    path = _config_path()
+    if path is None:
         return {}
     try:
-        data = json.loads(MCP_CONFIG_PATH.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except Exception as e:  # noqa: BLE001
-        logger.warning("MCP 설정 파싱 실패 (%s): %s", MCP_CONFIG_PATH, e)
+        logger.warning("MCP 설정 파싱 실패 (%s): %s", path, e)
         return {}
     servers = data.get("mcpServers") or {}
+    if servers:
+        logger.info("MCP 설정 로드: %s (서버 %d개)", path, len(servers))
     return servers if isinstance(servers, dict) else {}
 
 

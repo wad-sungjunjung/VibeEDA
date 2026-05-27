@@ -41,13 +41,13 @@ FastAPI 백엔드 (localhost:4750)
 | 런타임 | Python FastAPI (`backend/`) |
 | 저장소 | `.ipynb` 파일 (`~/vibe-notebooks/*.ipynb`) |
 | Vibe Chat | **기본 Gemini** (`gemini-2.5-flash`) 또는 Claude (`claude-haiku-4-5-20251001` / sonnet / opus). 프론트 `X-Vibe-Model` 헤더로 런타임 스위치. SSE streaming. |
-| Agent Mode | **기본 Claude Opus** (`claude-opus-4-7`) 또는 Gemini. 프론트 `X-Agent-Model` 헤더로 스위치. **시니어 분석가 v0.5** — 4-Phase 아키텍처 (복잡도 분류→메서드 라우팅→실행→종합 정리), 3-Tier 예산 (L1/L2/L3, auto-promotion), 7개 메서드 (analyze/explore/predict/causal/ml/ab_test/benchmark) 및 메서드별 도구 (ML·Causal·Predict 각 3개) + 가드. **메서드별 플래닝 스키마** — `create_plan` 이 활성 메서드에 따라 추가 필드 강제 (causal→causal_design, ml→ml_design, predict→forecast_spec, ab_test→ab_design). Tool 총 34개 + (설정 시) 외부 MCP 도구 동적 추가 — `mcp_client.py` 가 `~/vibe-notebooks/.vibe/mcp.json` 의 MCP 서버(DataHub 등) 도구를 `mcp__{server}__{tool}` 로 노출, 시스템 프롬프트에 '메타데이터는 추론 말고 MCP 로 사실 조회' 지침 자동 주입. 노트북별 `learnings.md` 누적. **안정성 가드**: tool loop 절대 50회 캡, LLM API 호출당 5분 타임아웃, 셀 실행 1시간 (SQL/Python 동일). 자세한 내부는 `docs/vibe-eda-agent-pipeline.md` (구조도 포함). |
+| Agent Mode | **기본 Claude Opus** (`claude-opus-4-7`) 또는 Gemini. 프론트 `X-Agent-Model` 헤더로 스위치. **시니어 분석가 v0.5** — 4-Phase 아키텍처 (복잡도 분류→메서드 라우팅→실행→종합 정리), 3-Tier 예산 (L1/L2/L3, auto-promotion), 7개 메서드 (analyze/explore/predict/causal/ml/ab_test/benchmark) 및 메서드별 도구 (ML·Causal·Predict 각 3개) + 가드. **메서드별 플래닝 스키마** — `create_plan` 이 활성 메서드에 따라 추가 필드 강제 (causal→causal_design, ml→ml_design, predict→forecast_spec, ab_test→ab_design). Tool 총 34개 + (설정 시) 외부 MCP 도구 동적 추가 — `mcp_client.py` 가 `{NOTEBOOKS_DIR}/.vibe/mcp.json`(홈 폴백) 의 MCP 서버(DataHub 등) 도구를 `mcp__{server}__{tool}` 로 노출, 시스템 프롬프트에 '메타데이터는 추론 말고 MCP 로 사실 조회' 지침 자동 주입. 노트북별 `learnings.md` 누적. **안정성 가드**: tool loop 절대 50회 캡, LLM API 호출당 5분 타임아웃, 셀 실행 1시간 (SQL/Python 동일). 자세한 내부는 `docs/vibe-eda-agent-pipeline.md` (구조도 포함). |
 | Reporting | **기본 Claude Opus** (`DEFAULT_REPORT_MODEL`). 프론트 `X-Report-Model` 헤더로 스위치. SSE 스트리밍 Markdown 생성 → `reports/*.md` 저장. 차트는 `{id}_images/*.png` 상대 경로로 임베드. 자세한 내부는 `docs/vibe-eda-reporting-pipeline.md`. |
 | Sheet 셀 | UniverJS 기반 스프레드시트 셀. `sheet_snapshot.py`로 workbook JSON 생성·파싱, `sheet_vibe_service.py`로 자연어→JSON 패치 변환. |
 | 커널 | in-process Python exec (노트북별 namespace 유지, **LRU 최대 20개** — `VIBE_KERNEL_NS_MAX` env 로 튜닝, **RSS 임계치 가드** — `VIBE_KERNEL_RSS_MB` 기본 2048MB), Plotly Figure 출력 시 600×400 PNG 자동 렌더 (`kaleido`). **kaleido 옵션화** — `VIBE_ENABLE_KALEIDO=0` 으로 끄면 PNG 렌더 skip (UI 차트는 정상, LLM 만 이미지로 못 봄) |
 | SQL 실행 | Snowflake Python Connector (externalbrowser SSO, 세션 싱글톤) |
 | MCP 서버 | `backend/app/api/mcp_server.py` (Claude Code 연동 — Vibe 가 MCP **서버**) |
-| MCP 클라이언트 | `backend/app/services/mcp_client.py` — 에이전트가 외부 MCP 서버(DataHub 등)를 **클라이언트** 로 호출. `~/vibe-notebooks/.vibe/mcp.json`(표준 `mcpServers` 포맷)에 정의된 stdio 서버를 프로세스당 1회 띄워 세션 유지, 도구를 `mcp__{server}__{tool}` 로 Claude/Gemini 에이전트에 노출. 설정 없음/기동 실패해도 에이전트는 정상 동작(도구만 비활성). DataHub PAT 등은 `install.sh` 가 `~/.snowflake/cortex/mcp.json` 에 넣어주므로 동일 포맷을 복사해 쓸 수 있음. |
+| MCP 클라이언트 | `backend/app/services/mcp_client.py` — 에이전트가 외부 MCP 서버(DataHub 등)를 **클라이언트** 로 호출. `{NOTEBOOKS_DIR}/.vibe/mcp.json`(없으면 `~/vibe-notebooks/.vibe/mcp.json` 폴백, 표준 `mcpServers` 포맷)에 정의된 stdio 서버를 프로세스당 1회 띄워 세션 유지, 도구를 `mcp__{server}__{tool}` 로 Claude/Gemini 에이전트에 노출. 설정 없음/기동 실패해도 에이전트는 정상 동작(도구만 비활성). DataHub PAT 등은 `install.sh` 가 `~/.snowflake/cortex/mcp.json` 에 넣어주므로 동일 포맷을 복사해 쓸 수 있음. |
 | DB (미사용) | `backend/app/models.py`, `database.py` — SQLAlchemy 모델 정의만 존재. 현재 초기화되지 않음 (향후 멀티유저 확장용) |
 
 ### 데이터 저장
@@ -65,7 +65,7 @@ FastAPI 백엔드 (localhost:4750)
 | 카테고리 컬럼 캐시 | `~/vibe-notebooks/.vibe/.categories_cache.json` |
 | 로컬 파일 프로파일 캐시 | `~/vibe-notebooks/.files_profile_cache.json` |
 | 노트북별 누적 학습 (세션 간) | `~/vibe-notebooks/.vibe/learnings/{notebook_id}.md` |
-| 외부 MCP 서버 설정 (에이전트 도구) | `~/vibe-notebooks/.vibe/mcp.json` (표준 `mcpServers` 포맷 — command/args/env, 권한 600 권장) |
+| 외부 MCP 서버 설정 (에이전트 도구) | `{NOTEBOOKS_DIR}/.vibe/mcp.json` → 없으면 `~/vibe-notebooks/.vibe/mcp.json` 폴백 (표준 `mcpServers` 포맷 — command/args/env, 권한 600 권장) |
 
 ## 폴더 구조
 
@@ -141,7 +141,7 @@ backend/
         ├── agent_predict.py       # [메서드별] fit_trend/forecast(신뢰구간 강제)/detect_anomalies
         ├── agent_learnings.py     # 노트북별 .vibe/learnings/{id}.md 누적·로드 (세션 간 학습)
         ├── mcp_client.py          # 외부 MCP 서버(DataHub 등) 클라이언트 — 에이전트가 stdio MCP 도구 호출
-        │                          # `~/vibe-notebooks/.vibe/mcp.json` 읽어 서버별 세션 유지, `mcp__{server}__{tool}` 로 노출
+        │                          # `{NOTEBOOKS_DIR}/.vibe/mcp.json`(홈 폴백) 읽어 서버별 세션 유지, `mcp__{server}__{tool}` 로 노출
         ├── claude_agent.py        # Claude Agent tool loop (NotebookState, agent_skills 통합)
         │                          # _build_cell_dataframes_block: 노트북 SQL 셀 DataFrame 구분 주입
         │                          # cell_dataframe_not_mart 에러 가드: 셀 이름으로 마트 도구 차단
