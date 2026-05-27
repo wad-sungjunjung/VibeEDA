@@ -215,6 +215,8 @@ async def run_agent_stream_gemini(
         while turn_index < MAX_TURNS:
             turn = turn_index  # 호환 — 기존 코드가 turn 변수명을 사용
             retried_for_narration = False
+            empty_turn_retries = 0
+            EMPTY_TURN_MAX = 3
             while True:
                 try:
                     response = await asyncio.wait_for(
@@ -254,6 +256,29 @@ async def run_agent_stream_gemini(
                 ]
                 func_call_parts = [p for p in parts if getattr(p, "function_call", None)]
                 text_total = sum(len(getattr(p, "text", "") or "") for p in text_parts)
+
+                # ─── 빈 턴 / MALFORMED_RESPONSE 가드 ──────────────────────────
+                # Gemini 3.x 는 간헐적으로 파트가 하나도 없는 응답(SDK 가 모르는
+                # finish_reason `MALFORMED_RESPONSE`)을 돌려준다. 이때 그냥 break 하면
+                # 에이전트가 아무 말 없이 멈춘 것처럼 보이므로, 같은 컨텍스트로 재시도한다.
+                if not text_parts and not func_call_parts:
+                    finish = getattr(candidate, "finish_reason", None)
+                    logger.warning(
+                        "Gemini 빈 턴 (finish_reason=%s, turn=%d, retry=%d/%d)",
+                        finish, turn, empty_turn_retries, EMPTY_TURN_MAX,
+                    )
+                    if empty_turn_retries < EMPTY_TURN_MAX:
+                        empty_turn_retries += 1
+                        await asyncio.sleep(0.5 * empty_turn_retries)
+                        continue
+                    yield {
+                        "type": "error",
+                        "message": (
+                            "Gemini 가 빈 응답(MALFORMED_RESPONSE)을 반복 반환해 중단했습니다. "
+                            "잠시 후 다시 시도하거나, 모델을 Gemini 2.5 Pro/Flash 또는 Claude 로 바꿔주세요."
+                        ),
+                    }
+                    return
 
                 # 내레이션 거부: 첫 턴 아니고 tool call 있고 텍스트 부족 → 재요청
                 if (turn > 0 and func_call_parts and text_total < NARRATION_MIN_CHARS
