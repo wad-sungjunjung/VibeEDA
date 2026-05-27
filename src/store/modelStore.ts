@@ -2,8 +2,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export const ALL_MODELS = [
-  // ── Gemini 3 (Preview) ─────────────────────────────────────────
+  // ── Gemini 3.5 / 3.1 (최신) ────────────────────────────────────
+  { value: 'gemini-3.5-flash',         label: 'Gemini 3.5 Flash (최신)',         provider: 'gemini' as const, contextWindow: 1_000_000 },
   { value: 'gemini-3.1-pro-preview',   label: 'Gemini 3.1 Pro (Preview)',        provider: 'gemini' as const, contextWindow: 1_000_000 },
+  { value: 'gemini-3.1-flash-lite',    label: 'Gemini 3.1 Flash Lite (최저비용)', provider: 'gemini' as const, contextWindow: 1_000_000 },
   { value: 'gemini-3-flash-preview',   label: 'Gemini 3 Flash (Preview, 빠름)',  provider: 'gemini' as const, contextWindow: 1_000_000 },
   // ── Gemini 2.5 (Stable) ────────────────────────────────────────
   { value: 'gemini-2.5-pro',           label: 'Gemini 2.5 Pro',                  provider: 'gemini' as const, contextWindow: 2_000_000 },
