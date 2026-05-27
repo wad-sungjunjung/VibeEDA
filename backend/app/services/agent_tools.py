@@ -426,3 +426,11 @@ def gemini_function_declarations(
     """Gemini용 최종 function declaration 리스트."""
     core = [_to_gemini_declaration(t) for t in CORE_TOOLS if t["name"] not in _GEMINI_EXCLUDE]
     return [*core, *skill_tools_gemini, *method_tools_gemini]
+
+
+def to_gemini_declarations(claude_specs: Iterable[dict]) -> list[dict]:
+    """Claude 포맷 tool 스펙 리스트 → Gemini function declaration 리스트.
+
+    런타임에 동적으로 추가되는 도구(예: 외부 MCP 도구)를 Gemini 에 노출할 때 사용.
+    """
+    return [_to_gemini_declaration(t) for t in claude_specs]

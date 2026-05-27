@@ -181,7 +181,42 @@ agent_predict (S6 — 3개, predict 메서드 활성 시) ───────�
   fit_trend    [선형 + STL 분해 + Ljung-Box]
   forecast    [Holt-Winters + 신뢰구간 강제]
   detect_anomalies    [rolling z-score / IQR]
+
+mcp_client (동적 — 외부 MCP 서버 설정 시) ──────────────────────────
+  mcp__{server}__{tool}    [예: mcp__datahub__search, mcp__datahub__get_lineage]
 ```
+
+> 위 34개는 정적 도구. 외부 MCP 도구는 `~/vibe-notebooks/.vibe/mcp.json` 설정에 따라
+> **런타임에 동적으로 추가**되므로 총 개수는 가변이다.
+
+---
+
+## 3-1. 외부 MCP 도구 통합 (`mcp_client.py`)
+
+에이전트는 외부 MCP 서버(예: DataHub)의 도구를 자체 도구처럼 호출할 수 있다.
+(주의: `api/mcp_server.py` 는 반대 방향 — Vibe 가 Claude Code 에 노출되는 MCP **서버**.)
+
+- **설정 소스**: `~/vibe-notebooks/.vibe/mcp.json`. 표준 `mcpServers` 포맷
+  (`command` / `args` / `env` / `cwd`). `install.sh` 가 생성하는
+  `~/.snowflake/cortex/mcp.json` 과 동일 포맷이라 복사해 쓰면 된다.
+- **세션 수명**: 서버마다 전용 백그라운드 asyncio 태스크가 stdio 하위프로세스 +
+  `ClientSession` 을 **프로세스당 1회** 열어 유지한다. stdio/ClientSession 의
+  "같은 태스크에서 열고 닫아야 한다" 제약을 지키기 위해, 도구 호출은
+  `asyncio.Queue` 로 그 태스크에 직렬 전달한다(요청-future 패턴).
+- **도구 이름**: 충돌 방지로 `mcp__{server}__{tool}` prefix. 이름→원본 도구
+  역매핑은 conn 내부에 보관.
+- **에이전트 연결**:
+  - `run_agent_stream` 진입 시 `mcp_client.manager.ensure_started()` 1회 호출.
+  - `active_tools = [*TOOLS, *manager.claude_tool_specs()]` 로 Claude tools 에 병합.
+  - Gemini 는 `agent_tools.to_gemini_declarations()` 로 변환해 Tool 에 합침.
+  - `_execute_tool_impl` 최상단에서 `mcp__*` 도구를 `manager.call_tool()` 로 라우팅.
+  - MCP 도구는 읽기 전용으로 간주 → `PARALLEL_SAFE` 처럼 병렬 호출 허용.
+- **시스템 프롬프트**: MCP 도구가 하나라도 있으면 `manager.prompt_block()` 이
+  도구 목록 + "메타데이터는 추론하지 말고 MCP 로 사실 조회" 지침을 주입한다
+  (`install.sh` 의 `wad-data-exploration-rules` 스킬과 같은 취지).
+- **실패 격리**: 설정 없음 / `mcp` 패키지 없음 / 서버 기동 실패 시 도구가 비어있을
+  뿐이고 에이전트는 정상 동작한다. 도구 호출 실패는 tool_result 의 `error` 로 반환.
+- **타임아웃**: 서버 기동 60s(uvx 콜드스타트 고려), 단일 도구 호출 120s.
 
 ---
 
@@ -340,6 +375,7 @@ class NotebookState:
 5. **`mart_schema_block`** — 선택 마트 컬럼/타입/카테고리 distinct (Snowflake 마트만)
 5a. **`cell_dataframes_block`** — `selected_marts` 중 실행된 SQL 셀과 이름이 겹치는 항목을 "노트북 셀 DataFrame" 섹션으로 주입. `profile_mart` 금지 + `analyze_output` / Python 변수 직접 참조 가이드 포함. 에러 가드: `_execute_tool` 에서 셀 이름으로 `profile_mart/preview_mart/get_mart_schema` 호출 시 `cell_dataframe_not_mart` 에러 반환.
 6. **`local_files_block`** — 루트 폴더의 CSV/Parquet 프로파일
+6a. **`mcp_client.manager.prompt_block()`** — 외부 MCP 도구가 연결돼 있을 때만. 도구 목록 + "메타데이터는 추론 말고 MCP 로 사실 조회" 지침 (§3-1).
 7. **`routing_block`** — 메서드 선택 결과 (또는 미선택 시 select_methods 강제 안내)
 8. **`methods_block`** — 메서드별 fragment (`agent_methods.METHOD_FRAGMENTS`)
 9. **`synthesis_block`** — Phase 3 안내 (L2 간이 / L3 풀 템플릿)

@@ -16,6 +16,7 @@ from . import file_profile_cache
 from . import agent_budget
 from . import agent_classifier
 from . import agent_methods
+from . import mcp_client
 from .code_style import SQL_STYLE_GUIDE, PYTHON_RULES, MARKDOWN_RULES
 
 logger = logging.getLogger(__name__)
@@ -362,6 +363,12 @@ async def _execute_tool_impl(name: str, inp: dict, state: NotebookState) -> tupl
                 "primary 1개 (필수) + secondary 0~2개 + 짧은 rationale 을 함께 제출하세요."
             ),
         }, []
+
+    # ─── 외부 MCP 도구 라우팅 (DataHub 등) ────────────────────────────────
+    # `mcp__{server}__{tool}` 형태의 도구는 mcp_client 매니저로 위임한다.
+    if mcp_client.is_mcp_tool(name):
+        result = await mcp_client.manager.call_tool(name, inp)
+        return result, []
 
     # ─── select_methods 핸들러 (Phase 0) ──────────────────────────────────
     if name == "select_methods":
@@ -1804,7 +1811,7 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - Data Marts (Snowflake): {marts}
 - Snowflake: {sf_status}
 - Tier: **{tier}** (예산 한도 자동 적용 — 답변 분량/깊이를 이 티어에 맞춰 조정하세요)
-{date_block}{mart_schema_block}{_build_cell_dataframes_block(cell_based, state)}{local_files_block}{learnings_block}{routing_block}{methods_block}{synthesis_block}
+{date_block}{mart_schema_block}{_build_cell_dataframes_block(cell_based, state)}{local_files_block}{learnings_block}{mcp_client.manager.prompt_block()}{routing_block}{methods_block}{synthesis_block}
 
 ## Tools
 ### 셀 조작
@@ -2110,7 +2117,15 @@ async def run_agent_stream(
         "methods": list(notebook_state.methods),
     }
 
+    # 외부 MCP 서버(DataHub 등) 연결 — 최초 1회 기동, 실패해도 에이전트는 정상 진행.
+    try:
+        await mcp_client.manager.ensure_started()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("MCP ensure_started 실패 (무시하고 진행): %s", e)
+
     system_prompt = _build_system_prompt(notebook_state)
+    # 정적 도구 + 동적 MCP 도구. system prompt 이후에 만들어 prompt_block 과 일관.
+    active_tools = [*TOOLS, *mcp_client.manager.claude_tool_specs()]
 
     messages: list[dict] = list(conversation_history)
     if images:
@@ -2174,7 +2189,7 @@ async def run_agent_stream(
                 cached_system = [
                     {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
                 ]
-                cached_tools = list(TOOLS)
+                cached_tools = list(active_tools)
                 if cached_tools:
                     last = dict(cached_tools[-1])
                     last["cache_control"] = {"type": "ephemeral"}
@@ -2374,7 +2389,10 @@ async def run_agent_stream(
             notebook_state.current_turn_narration = full_text.strip()
 
             # 모든 호출이 병렬 안전하면 asyncio.gather 로 한꺼번에 실행 — 탐색/프로파일 단계에서 왕복 수 절감.
-            all_parallel_safe = all(tb.name in PARALLEL_SAFE_TOOLS for tb in tool_uses)
+            all_parallel_safe = all(
+                tb.name in PARALLEL_SAFE_TOOLS or mcp_client.is_mcp_tool(tb.name)
+                for tb in tool_uses
+            )
             if all_parallel_safe and len(tool_uses) > 1:
                 for tb in tool_uses:
                     yield {"type": "tool_use", "tool": tb.name, "input": tb.input}

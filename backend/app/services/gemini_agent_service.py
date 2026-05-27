@@ -15,7 +15,7 @@ from .claude_agent import (
     NotebookState,
     PARALLEL_SAFE_TOOLS,
 )
-from . import agent_skills, agent_tools, agent_budget, agent_classifier, agent_methods, agent_synthesis, agent_ml, agent_causal, agent_predict
+from . import agent_skills, agent_tools, agent_budget, agent_classifier, agent_methods, agent_synthesis, agent_ml, agent_causal, agent_predict, mcp_client
 
 
 def _compact_gemini_contents_inplace(contents: list, keep_recent: int = 10) -> int:
@@ -151,7 +151,20 @@ async def run_agent_stream_gemini(
         "methods": list(notebook_state.methods),
     }
 
+    # 외부 MCP 서버(DataHub 등) 연결 — 최초 1회 기동, 실패해도 정상 진행.
+    try:
+        await mcp_client.manager.ensure_started()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("MCP ensure_started 실패 (무시하고 진행): %s", e)
+
     system_prompt = _build_system_prompt(notebook_state)
+
+    # 정적 도구 + 동적 MCP 도구(Gemini 선언으로 변환)를 합쳐 이번 요청의 Tool 구성.
+    _mcp_decls = agent_tools.to_gemini_declarations(mcp_client.manager.claude_tool_specs())
+    gemini_tool = (
+        types.Tool(function_declarations=[*_GEMINI_TOOL.function_declarations, *_mcp_decls])  # type: ignore[arg-type]
+        if _mcp_decls else _GEMINI_TOOL
+    )
 
     contents = _to_gemini_history(conversation_history)
     if images:
@@ -210,7 +223,7 @@ async def run_agent_stream_gemini(
                             contents=contents,
                             config=types.GenerateContentConfig(
                                 system_instruction=system_prompt,
-                                tools=[_GEMINI_TOOL],
+                                tools=[gemini_tool],
                                 temperature=0.2,
                                 max_output_tokens=32000,
                                 thinking_config=types.ThinkingConfig(include_thoughts=False),
@@ -418,7 +431,10 @@ async def run_agent_stream_gemini(
                 if fc.name in agent_skills.ASK_USER_LIKE_TOOLS:
                     ask_user_called = True
 
-            all_parallel_safe = all(n in PARALLEL_SAFE_TOOLS for n, _ in fc_args_list)
+            all_parallel_safe = all(
+                n in PARALLEL_SAFE_TOOLS or mcp_client.is_mcp_tool(n)
+                for n, _ in fc_args_list
+            )
             if all_parallel_safe and len(fc_args_list) > 1:
                 exec_results = await asyncio.gather(
                     *[_execute_tool(n, a, notebook_state) for n, a in fc_args_list],
