@@ -20,21 +20,59 @@ _TYPE_MAP = {
 }
 
 
+# Gemini Schema 가 받지 않는 JSON Schema 메타 키 — 변환 시 제거.
+# (예: 외부 MCP 도구 스키마는 Pydantic 산출물이라 additionalProperties/$defs 등을 포함)
+_DROP_KEYS = {
+    "additionalProperties", "additional_properties",
+    "$schema", "$defs", "$id", "$ref", "title", "examples",
+    "default",  # 일부 Gemini 버전 미지원
+}
+
+
 def _convert_schema(schema: dict) -> dict:
-    """JSON Schema → Gemini parameters 스키마."""
+    """JSON Schema → Gemini parameters 스키마.
+
+    - JSON Schema 타입을 Gemini 대문자 타입으로 변환
+    - Gemini 가 거부하는 메타 키(additionalProperties 등) 제거
+    - `anyOf: [X, {type: null}]` (Pydantic Optional 표현) → X + nullable 로 평탄화
+    """
     if not isinstance(schema, dict):
         return schema
-    out: dict = {}
+
+    # anyOf 처리 — Optional/Union 표현.
+    any_of = schema.get("anyOf") or schema.get("any_of")
+    if isinstance(any_of, list) and any_of:
+        non_null = [v for v in any_of if not (isinstance(v, dict) and v.get("type") == "null")]
+        has_null = len(non_null) != len(any_of)
+        if len(non_null) == 1:
+            merged = _convert_schema(non_null[0])
+            if has_null:
+                merged["nullable"] = True
+            # 형제 키(description 등)를 병합 (anyOf/null/드롭 키 제외)
+            for k, v in schema.items():
+                if k in ("anyOf", "any_of") or k in _DROP_KEYS:
+                    continue
+                merged.setdefault(k, _convert_schema(v) if isinstance(v, dict) else v)
+            return merged
+        out: dict = {"anyOf": [_convert_schema(v) for v in non_null]}
+        if has_null:
+            out["nullable"] = True
+        for k, v in schema.items():
+            if k in ("anyOf", "any_of") or k in _DROP_KEYS:
+                continue
+            out.setdefault(k, _convert_schema(v) if isinstance(v, dict) else v)
+        return out
+
+    out = {}
     for k, v in schema.items():
+        if k in _DROP_KEYS:
+            continue
         if k == "type" and isinstance(v, str):
             out[k] = _TYPE_MAP.get(v.lower(), v.upper())
         elif k == "properties" and isinstance(v, dict):
             out[k] = {pk: _convert_schema(pv) for pk, pv in v.items()}
         elif k == "items" and isinstance(v, dict):
             out[k] = _convert_schema(v)
-        elif k == "default":
-            # Gemini는 `default`를 일부 버전에서 미지원 — 드롭.
-            continue
         else:
             out[k] = v
     return out
