@@ -30,6 +30,7 @@
 │  사용자 요청 → POST /v1/agent/stream  (SSE keepalive 5s)                  │
 │  X-Agent-Model 로 Claude / Gemini 분기, X-*-Key 로 키 주입                 │
 │  images[] 첨부 가능, conversation_history + tier_override 옵션            │
+│  ref_cell_ids[] — "참조 셀" 코드+출력을 프롬프트 상단 블록으로 주입       │
 └─────────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
@@ -340,6 +341,7 @@ class NotebookState:
     analysis_theme: str
     analysis_description: str
     notebook_id: str
+    ref_cell_ids: list[str]                   # 사용자 "참조 셀" — 코드+출력을 프롬프트 상단 주입
 
     # Phase 0 (S2)
     methods: list[str]                        # ['analyze', 'predict', ...]

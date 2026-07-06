@@ -466,6 +466,8 @@ export interface AgentRequest {
   images?: { media_type: string; data: string }[]
   // 사용자가 프론트에서 명시적으로 tier 를 지정했을 때 — 휴리스틱·Haiku 분류기 우회.
   tier_override?: AgentTier | null
+  // 사용자가 "참조 셀" 로 명시적으로 첨부한 셀 id 목록 — 에이전트가 코드+출력을 우선 확인.
+  ref_cell_ids?: string[]
 }
 
 export async function generateAgentSessionTitle(question: string, response?: string): Promise<string> {

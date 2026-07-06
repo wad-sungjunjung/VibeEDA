@@ -223,10 +223,13 @@ Plotly는 `output.data.plotly_json`으로 전달.
   "message": "강남구 세부 분석해줘",
   "conversation_history": [
     {"role":"user","content":"...","ts":"..."}
-  ]
+  ],
+  "ref_cell_ids": ["<cell_id>"]
 }
 ```
 `X-Agent-Model` 헤더로 모델 선택. `gemini-`로 시작하면 Gemini agent loop, 그 외 Claude tool-use loop.
+
+`ref_cell_ids` (선택) — 사용자가 프론트 "참조 셀" 로 명시적으로 첨부한 셀 id 목록. 서버가 저장된 `.ipynb` 에서 해당 셀의 실행 출력을 로드해 시스템 프롬프트 상단 **"📌 참조 셀"** 블록(코드 + 출력 요약)으로 주입하고, `read_cell_output`/`analyze_output` 이 이 셀을 바로 조회할 수 있게 `CellState.output` 을 채운다. 첨부하지 않으면 빈 배열.
 
 **SSE 이벤트** — 상세는 `docs/vibe-eda-agent-spec.md` 와 `docs/vibe-eda-agent-pipeline.md` 참고.
 

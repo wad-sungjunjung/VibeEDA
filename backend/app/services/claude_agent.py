@@ -162,6 +162,8 @@ class NotebookState:
     analysis_theme: str = ""
     analysis_description: str = ""
     notebook_id: str = ""
+    # 사용자가 "참조 셀" 로 명시적으로 첨부한 셀 id 목록 — 에이전트가 코드+출력을 우선 확인.
+    ref_cell_ids: list = field(default_factory=list)
     skill_ctx: dict = field(default_factory=dict)
     # 에이전트가 셀을 만들거나 수정할 때, 해당 셀의 vibe chat history 에 기록할 원 사용자 메시지.
     user_message_latest: str = ""
@@ -1674,6 +1676,40 @@ def _build_cell_dataframes_block(cell_based: list[str], state: NotebookState) ->
     return block
 
 
+def _build_referenced_cells_block(state: NotebookState) -> str:
+    """사용자가 "참조 셀"로 명시적으로 첨부한 셀 — 코드 + 출력 요약을 프롬프트 상단 블록으로 노출.
+
+    사용자가 이 셀들을 콕 집어 첨부했으므로, 에이전트는 다른 탐색보다 **먼저** 이 셀의
+    코드와 값을 근거로 삼아야 한다. 출력은 agent.py 가 .ipynb 에서 로드해 CellState.output 에 주입.
+    """
+    ids = getattr(state, "ref_cell_ids", None) or []
+    if not ids:
+        return ""
+    id_set = set(ids)
+    ref_cells = [c for c in state.cells if c.id in id_set]
+    if not ref_cells:
+        return ""
+    parts = []
+    for cell in ref_cells:
+        code = (cell.code or "").strip()
+        out_summary = _format_output_for_claude(cell.output) if cell.output else (
+            "(실행 출력 없음 — 필요 시 `execute_cell` 로 실행 후 `read_cell_output`/`analyze_output` 확인)"
+        )
+        parts.append(
+            f"### `{cell.name}` (cell_id: `{cell.id}`, type: {cell.type})\n"
+            f"**코드:**\n```\n{code}\n```\n"
+            f"**실행 출력:**\n{out_summary}\n"
+        )
+    return (
+        "\n## 📌 사용자가 명시적으로 첨부한 참조 셀 (최우선 확인)\n"
+        "사용자가 아래 셀을 **직접 참조로 첨부**했습니다. 요청을 해석할 때 이 셀의 코드와 실행 "
+        "출력을 **가장 먼저·가장 중요한 근거**로 삼으세요. 여기 이미 코드와 값이 주어져 있으므로 "
+        "동일 정보를 얻으려고 마트/문서를 새로 탐색하지 말고, 더 깊은 통계가 필요하면 "
+        "`analyze_output(cell_id=...)` 로 이 셀을 직접 분석하세요.\n\n"
+        + "\n".join(parts)
+    )
+
+
 def _build_system_prompt(state: NotebookState) -> str:
     # 실행된 SQL 셀 이름 집합 — selected_marts 중 이 이름과 겹치면 마트가 아닌 셀 DataFrame
     executed_sql_cell_names = {c.name for c in state.cells if c.type == "sql" and c.executed}
@@ -1811,7 +1847,7 @@ You help analysts explore ad platform data by creating, modifying, and executing
 - Data Marts (Snowflake): {marts}
 - Snowflake: {sf_status}
 - Tier: **{tier}** (예산 한도 자동 적용 — 답변 분량/깊이를 이 티어에 맞춰 조정하세요)
-{date_block}{mart_schema_block}{_build_cell_dataframes_block(cell_based, state)}{local_files_block}{learnings_block}{mcp_client.manager.prompt_block()}{routing_block}{methods_block}{synthesis_block}
+{date_block}{_build_referenced_cells_block(state)}{mart_schema_block}{_build_cell_dataframes_block(cell_based, state)}{local_files_block}{learnings_block}{mcp_client.manager.prompt_block()}{routing_block}{methods_block}{synthesis_block}
 
 ## Tools
 ### 셀 조작

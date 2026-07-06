@@ -1651,7 +1651,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const isFirstUserMsg = !get().agentChatHistory.some((m) => m.role === 'user')
     // conversation_history 는 현재 메시지 추가 전 스냅샷이어야 한다.
     // set() 이후 get() 하면 이미 현재 메시지가 포함돼 백엔드에서 중복 append 됨.
-    const { cells, selectedMarts, martCatalog, analysisTheme, analysisDescription, agentChatHistory: prevHistory, notebookId } = get()
+    const { cells, selectedMarts, martCatalog, analysisTheme, analysisDescription, agentChatHistory: prevHistory, notebookId, agentRefCells } = get()
 
     set((s) => ({
       agentChatHistory: [...s.agentChatHistory, userMsg],
@@ -1760,6 +1760,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
             ? pendingImages.map((img) => ({ media_type: img.mediaType, data: img.data }))
             : undefined,
           tier_override: tierOverride,
+          // 참조 셀 — 존재하는 셀 id 만 (삭제된 셀 id 제거)
+          ref_cell_ids: agentRefCells.filter((id) => cells.some((c) => c.id === id)),
         },
         (event) => {
           // helper: 새 텍스트 말풍선 시작 (현재 버블에 내용이 있으면)

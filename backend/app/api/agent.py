@@ -120,6 +120,8 @@ class AgentRequest(BaseModel):
     # 프론트가 명시적으로 tier 를 지정한 경우 — 휴리스틱·Haiku 분류기 우회.
     # 사용자가 "더 깊게" / "간단히" override 버튼을 눌렀을 때 채워진다.
     tier_override: Optional[Literal["L1", "L2", "L3"]] = None
+    # 사용자가 "참조 셀" 로 명시적으로 첨부한 셀 id 목록 — 에이전트가 코드+출력을 우선 확인.
+    ref_cell_ids: list[str] = []
 
 
 @router.post("/agent/stream")
@@ -137,13 +139,34 @@ async def agent_stream_endpoint(
     enriched_marts = category_cache.enrich_mart_metadata(
         [m.model_dump() for m in req.mart_metadata]
     )
+    # 참조 셀(ref_cell_ids)의 실행 출력은 프론트가 보내지 않으므로 저장된 .ipynb 에서 로드해
+    # 해당 CellState.output 에 주입한다 — read_cell_output/analyze_output 및 프롬프트 노출에 필요.
+    ref_cell_ids = req.ref_cell_ids or []
+    ref_outputs: dict[str, dict] = {}
+    if ref_cell_ids and req.notebook_id:
+        try:
+            saved = notebook_store.get_notebook(req.notebook_id)
+            ref_set = set(ref_cell_ids)
+            for sc in saved.get("cells", []):
+                if sc.get("id") in ref_set and sc.get("output"):
+                    ref_outputs[sc["id"]] = sc["output"]
+        except Exception as e:
+            logger.warning("Failed to load referenced cell outputs: %s", e)
+
     notebook_state = NotebookState(
-        cells=[CellState(id=c.id, name=c.name, type=c.type, code=c.code, executed=c.executed) for c in req.cells if c.type != "sheet"],
+        cells=[
+            CellState(
+                id=c.id, name=c.name, type=c.type, code=c.code, executed=c.executed,
+                output=ref_outputs.get(c.id),
+            )
+            for c in req.cells if c.type != "sheet"
+        ],
         selected_marts=req.selected_marts,
         mart_metadata=enriched_marts,
         analysis_theme=req.analysis_theme,
         analysis_description=req.analysis_description,
         notebook_id=req.notebook_id or "",
+        ref_cell_ids=ref_cell_ids,
     )
     history = [{"role": m.role, "content": m.content} for m in req.conversation_history]
 
